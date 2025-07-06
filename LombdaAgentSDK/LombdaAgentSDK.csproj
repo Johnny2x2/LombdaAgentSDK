@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LlmTornado" Version="3.6.2" />
+    <PackageReference Include="OpenAI" Version="2.2.0" />
+    <PackageReference Include="System.Drawing.Common" Version="9.0.6" />
+    <PackageReference Include="System.Memory.Data" Version="9.0.6" />
+  </ItemGroup>
+
+</Project>
