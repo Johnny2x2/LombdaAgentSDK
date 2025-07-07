@@ -38,7 +38,7 @@
         public virtual void ExitState() { }
         public virtual IState CheckConditions()
         {
-            var connection = _Transitions.DefaultIfEmpty(null).First(conn => conn.Evaluate(_Output));
+            var connection = _Transitions.DefaultIfEmpty(null).First(conn => conn?.Evaluate(_Output) ?? false);
 
             return connection != null ? connection.NextProcess : this;
         }

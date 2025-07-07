@@ -29,14 +29,19 @@
 
             while (!ExitTrigger.IsCancellationRequested)
             {
-                await currentState._Invoke();
+                await currentState?._Invoke()!;
 
-                nextState = currentState.CheckConditions();
-
-                await ChangeState(nextState, currentState._Output);
+                if (ExitTrigger.IsCancellationRequested)
+                {
+                    CancellationTriggered?.Invoke();
+                    currentState._ExitState();
+                }
+                else
+                {
+                    nextState = currentState.CheckConditions();
+                    await ChangeState(nextState, currentState._Output);
+                }
             }
-
-            CancellationTriggered?.Invoke();
         }
 
         public async Task ChangeState(IState newState, object? result = null)
