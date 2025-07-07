@@ -4,7 +4,29 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>Lombda Ai Agents</Title>
+    <Description>LombdaAgentSDK is a lightweight C# SDK designed to create and run modular "agents" that can execute tasks, manage state, and communicate with your custom infrastructure. Inspired by modern AI/automation agent patterns, it provides a framework for orchestrating workflows and modular logic with minimal overhead.</Description>
+    <PackageProjectUrl>https://github.com/Johnny2x2/LombdaAgentSDK</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/Johnny2x2/LombdaAgentSDK</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>AI;AGENTS;STATEMACHINE;OPENAI;LANGCHAIN;Anthropic;Google;DeepSeek;Mistra;SDK;</PackageTags>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <PackageId>LombdaAiAgents</PackageId>
+    <Authors>Johnny2x2</Authors>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE.txt">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="LlmTornado" Version="3.7.0" />
