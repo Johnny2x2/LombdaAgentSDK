@@ -6,6 +6,7 @@ using LlmTornado.Code;
 using Newtonsoft.Json;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
+using LlmTornado.Common;
 
 namespace LombdaAgentSDK
 {
@@ -146,27 +147,14 @@ namespace LombdaAgentSDK
             chat =  SetupClient(chat, messages, options);
 
             //Create Open response
-            ChatRichResponse response = await chat.GetResponseRich();
-            RemoveAPIToolCall(chat); //Automatically runs the tool call on their end.. very annoying, so I remove it here.
+            RestDataOrException<ChatRichResponse> response = await chat.GetResponseRichSafe();
 
             //Convert the response back to Model
             //A bit redundant I can cache the current Model items already converted and only process the new ones
-            List<ModelItem> ModelItems = ConvertFromProviderItems(response, chat).ToList();
+            List<ModelItem> ModelItems = ConvertFromProviderItems(response.Data!, chat).ToList();
 
             //Return results.
             return new ModelResponse(options.Model, [ConvertLastFromProviderItems(chat),], outputFormat: options.OutputFormat ?? null, ModelItems);
-        }
-
-        public Conversation RemoveAPIToolCall(Conversation result)
-        {
-            ChatMessage item = result.Messages.Last();
-
-            if (item.Role == ChatMessageRoles.Tool)
-            {
-                result.RemoveMessage(item);
-            }
-
-            return result;
         }
     }
 }
