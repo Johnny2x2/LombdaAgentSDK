@@ -15,7 +15,7 @@
 
 ## 📂 Installation
 
-You can clone the repo directly:
+Install with NuGet
 
 ```bash
 dotnet add package LombdaAiAgents --version 1.0.0
