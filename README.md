@@ -18,7 +18,7 @@
 You can clone the repo directly:
 
 ```bash
-git clone https://github.com/Johnny2x2/LombdaAgentSDK.git
+dotnet add package LombdaAiAgents --version 1.0.0
 ```
 
 Or include the library in your solution by adding the project reference.
