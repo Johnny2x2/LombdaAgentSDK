@@ -55,13 +55,13 @@ namespace LombdaAgentSDK
 
                 currentTurn++;
 
-            } while (await ProcessOutputItems(agent, runResult, verboseCallback));
+            } while (await ProcessOutputItems(agent, runResult, verboseCallback, computerUseCallback));
             //Add output guardrail eventually
             
             return runResult;
         }
 
-        public static async Task<bool> ProcessOutputItems(Agent agent, RunResult runResult, RunnerVerboseCallbacks callback)
+        public static async Task<bool> ProcessOutputItems(Agent agent, RunResult runResult, RunnerVerboseCallbacks callback, ComputerActionCallbacks computerUseCallback)
         {
             bool requiresAction = false;
             List<ModelItem> outputItems = runResult.Response.OutputItems!.ToList();
@@ -104,7 +104,7 @@ namespace LombdaAgentSDK
                 {
                     callback?.Invoke($"[Computer Call invoked]({computerCall.Status}) {computerCall.CallId}");
 
-                    ModelComputerCallOutputItem computerOutputResponse = ProcessComputerCall(computerCall);
+                    ModelComputerCallOutputItem computerOutputResponse = ProcessComputerCall(computerCall, computerUseCallback);
 
                     runResult.Messages.Add(computerOutputResponse);
 
@@ -141,7 +141,7 @@ namespace LombdaAgentSDK
 
         public static ModelComputerCallOutputItem ProcessComputerCall(ModelComputerCallItem computerCall, ComputerActionCallbacks computerCallbacks = null)
         {
-            computerCallbacks.Invoke(computerCall.Action);
+            computerCallbacks?.Invoke(computerCall.Action);
 
             Thread.Sleep(1000);
 

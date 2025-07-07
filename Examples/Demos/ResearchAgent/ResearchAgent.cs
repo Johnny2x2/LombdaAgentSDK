@@ -1,8 +1,5 @@
 ﻿using Examples.Demos.ResearchAgent.DataModels;
 using Examples.Demos.ResearchAgent.States;
-using LombdaAgentSDK;
-using LombdaAgentSDK.Agents;
-using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.StateMachine;
 
 namespace Examples.Demos.ResearchAgent
