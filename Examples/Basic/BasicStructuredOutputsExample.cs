@@ -11,8 +11,6 @@ namespace Examples.Basic
         [Test]
         public async Task RunBasicStructuredOutputExample()
         {
-            OpenAIModelClient client = new OpenAIModelClient("gpt-4o-mini");
-
             Agent agent = new Agent(
                 new OpenAIModelClient("gpt-4o-mini"),
                 "Assistant", 
