@@ -18,11 +18,11 @@ namespace Examples.Demos.ResearchAgent
             plannerState.SetInput("Research for me top 3 best E-bikes under $1500 for mountain trails");
 
             //Setup Transitions between states
-            plannerState.Transitions.Add(new StateTransition<WebSearchPlan>(IfPlanCreated, ResearchState)); //Check if a plan was generated or Rerun
+            plannerState.AddTransition(IfPlanCreated, ResearchState); //Check if a plan was generated or Rerun
 
-            ResearchState.Transitions.Add(new StateTransition<string>(_ => true, reportingState)); //Use Lambda expression For passthrough to reporting state
+            ResearchState.AddTransition(_ => true, reportingState); //Use Lambda expression For passthrough to reporting state
 
-            reportingState.Transitions.Add(new StateTransition<ReportData>(_ => true, new ExitState())); //Use Lambda expression For passthrough to Exit
+            reportingState.AddTransition(_ => true, new ExitState()); //Use Lambda expression For passthrough to Exit
 
             //Create State Machine Runner
             StateMachine stateMachine = new StateMachine();
