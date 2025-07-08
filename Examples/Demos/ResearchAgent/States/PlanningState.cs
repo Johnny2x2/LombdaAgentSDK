@@ -16,9 +16,10 @@ namespace Examples.Demos.ResearchAgent.States
         int attempts = 0;
         int maxAttempts = 5;
 
+        public PlanningState() { }
+
         public PlanningState(string input) => this.Input = input;
-
-
+        
         public override void EnterState(string? input)
         {
             attempts = 0; //Reset attempts if state was exited/ReEntered (StateMachine will just case Invoke if State Doesn't change)

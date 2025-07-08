@@ -10,12 +10,9 @@ namespace Examples.Demos.ResearchAgent
         public async Task Run()
         {
             //Setup states
-            PlanningState plannerState = new PlanningState("Research for me top 3 best E-bikes under $1500 for mountain trails"); //custom init so you can add input here
+            PlanningState plannerState = new PlanningState(); //custom init so you can add input here
             ResearchState ResearchState = new ResearchState();
             ReportingState reportingState = new ReportingState();
-
-            //or Add input to first branch of state machine with Set Input
-            plannerState.SetInput("Research for me top 3 best E-bikes under $1500 for mountain trails");
 
             //Setup Transitions between states
             plannerState.AddTransition(IfPlanCreated, ResearchState); //Check if a plan was generated or Rerun
@@ -24,14 +21,17 @@ namespace Examples.Demos.ResearchAgent
 
             reportingState.AddTransition(_ => true, new ExitState()); //Use Lambda expression For passthrough to Exit
 
-            //Create State Machine Runner
-            StateMachine stateMachine = new StateMachine();
+            //Create State Machine Runner with String as input and ReportData as output
+            ResultingStateMachine<string, ReportData> stateMachine = new();
+
+            stateMachine.SetEntryState(plannerState);
+            stateMachine.SetOutputState(reportingState);
 
             //Run the state machine
-            await stateMachine.Run(plannerState);
+            ReportData report = await stateMachine.Run("What are the top 3 mountain bikes for under $1500?");
 
             //Report on the last state with Results
-            Console.WriteLine(reportingState.Output.FinalReport);
+            Console.WriteLine(report.FinalReport);
         }
 
         //Create validation delegate functions
