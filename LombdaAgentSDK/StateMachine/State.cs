@@ -9,14 +9,19 @@
         public void _EnterState(object input);
         public void _ExitState();
         public StateMachine CurrentStateMachine { get; set; }
+        public List<StateTransition<object>> _Transitions { get; set; }
     }
 
-    public interface IState<TInput, TOutput> : IState
+    public interface IState<TOutput> : IState
     {
         public TOutput Output { get; set; }
-        public TInput Input { get; set; }
         public List<StateTransition<TOutput>> Transitions { get; set; }
         new public Task<TOutput> _Invoke();
+    }
+
+    public interface IState<TInput, TOutput> : IState<TOutput>
+    {
+        public TInput Input { get; set; }
         public void _EnterState(TInput input);
     }
 
@@ -36,6 +41,8 @@
         public virtual void EnterState(object? input) => _Input = input ?? _Input;
         public void _ExitState() => this.ExitState();
         public virtual void ExitState() { }
+        public abstract Type GetInputType();
+        public abstract Type GetOutputType();
         public virtual IState CheckConditions()
         {
             var connection = _Transitions.DefaultIfEmpty(null).First(conn => conn?.Evaluate(_Output) ?? false);
@@ -46,6 +53,9 @@
 
     public abstract class BaseState<TInput, TOutput> : BaseState, IState<TInput, TOutput>
     {
+        public override Type GetInputType() => typeof(TInput);
+        public override Type GetOutputType() => typeof(TOutput);
+
         private List<StateTransition<TOutput>> transitions = new();
 
         public TInput Input { get => (TInput)_Input; set => _Input = value; }
@@ -78,10 +88,18 @@
             return connection != null ? connection.NextProcess : this;
         }
 
+        public void AddTransition(TransitionEvent<TOutput> MethodToInvoke, IState NextProcess)
+        {
+            Transitions.Add(new StateTransition<TOutput>(MethodToInvoke, NextProcess));
+        }
     }
 
-    public class ExitState : BaseState
+    public class ExitState : BaseState<object, object>
     {
-        public override async Task Invoke() => CurrentStateMachine.End();
+        public override async Task<object> Invoke()
+        {
+            CurrentStateMachine.Finish();
+            return Input;
+        }
     }
 }

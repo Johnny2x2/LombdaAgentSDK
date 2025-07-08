@@ -29,7 +29,7 @@ namespace Examples.Demos.ResearchAgent.States
             attempts++;
             if (attempts > maxAttempts)
             {
-                CurrentStateMachine.End(); //Kill the process on max attempts
+                CurrentStateMachine.Stop(); //Kill the process on max attempts
             }
 
             string instructions = """
