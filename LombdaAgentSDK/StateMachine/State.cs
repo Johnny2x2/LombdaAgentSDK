@@ -1,13 +1,15 @@
-﻿namespace LombdaAgentSDK.StateMachine
+﻿using System.Reflection.Metadata.Ecma335;
+
+namespace LombdaAgentSDK.StateMachine
 {
     public interface IState
     {
         public object? _Output { get; set; }
         public object? _Input { get; set; }
         public Task _Invoke();
-        public IState CheckConditions();
-        public void _EnterState(object input);
-        public void _ExitState();
+        public List<IState> CheckConditions();
+        public Task _EnterState(object input);
+        public Task _ExitState();
         public StateMachine CurrentStateMachine { get; set; }
         public List<StateTransition<object>> _Transitions { get; set; }
     }
@@ -37,17 +39,31 @@
         public StateMachine CurrentStateMachine { get; set; }
         public virtual Task _Invoke() => Invoke();
         public abstract Task Invoke();
-        public void _EnterState(object? input) => this.EnterState(input);
+        public async Task _EnterState(object? input) => this.EnterState(input);
         public virtual void EnterState(object? input) => _Input = input ?? _Input;
-        public void _ExitState() => this.ExitState();
-        public virtual void ExitState() { }
+        public async Task _ExitState() => this.ExitState();
+        public virtual async Task ExitState() { }
         public abstract Type GetInputType();
         public abstract Type GetOutputType();
-        public virtual IState CheckConditions()
-        {
-            var connection = _Transitions.DefaultIfEmpty(null).First(conn => conn?.Evaluate(_Output) ?? false);
 
-            return connection != null ? connection.NextProcess : this;
+        public virtual List<IState> CheckConditions()
+        {
+            List<IState> states = new();
+            _Transitions.ForEach(conn =>
+            {
+                if (conn.Evaluate(_Output))
+                {
+                    states.Add(conn.NextProcess);
+                }
+            });
+
+            if (states.Count == 0) 
+            {
+                states.Add(this);
+            }
+
+
+            return states;
         }
     }
 
@@ -67,9 +83,9 @@
 
         public void SetInput(TInput input) => Input = (TInput)input;
 
-        public void _EnterState(TInput? input) => this.EnterState(input);
+        public async Task _EnterState(TInput? input) => this.EnterState(input);
 
-        public virtual void EnterState(TInput? input) => Input = input ?? Input;
+        public virtual async Task EnterState(TInput? input) => Input = input ?? Input;
 
         //This is to enforce Output = Invoke() and it returns the Output
         public override async Task<TOutput> _Invoke()
@@ -81,11 +97,24 @@
         public override abstract Task<TOutput> Invoke();
 
         //Required override to reference the correct type of transitions
-        public override IState CheckConditions()
+        public override List<IState?> CheckConditions()
         {
-            var connection = Transitions?.DefaultIfEmpty(null).First(conn => conn.Evaluate(Output));
+            List<IState> states = new();
+            _Transitions.ForEach(conn =>
+            {
+                if (conn.Evaluate(_Output))
+                {
+                    states.Add(conn.NextProcess);
+                }
+            });
 
-            return connection != null ? connection.NextProcess : this;
+            if (states.Count == 0)
+            {
+                states.Add(this);
+            }
+
+
+            return states;
         }
 
         public void AddTransition(TransitionEvent<TOutput> MethodToInvoke, IState NextProcess)
