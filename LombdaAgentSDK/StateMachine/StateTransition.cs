@@ -4,14 +4,14 @@
 
     public class StateTransition<T>
     {
-        public IState NextProcess { get; set; }
+        public IState NextState { get; set; }
 
         public TransitionEvent<T> InvokeMethod { get; set; }
 
-        public StateTransition(TransitionEvent<T> MethodToInvoke, IState NextProcess)
+        public StateTransition(TransitionEvent<T> methodToInvoke, IState nextState)
         {
-            this.NextProcess = NextProcess;
-            this.InvokeMethod = MethodToInvoke;
+            this.NextState = nextState;
+            this.InvokeMethod = methodToInvoke;
         }
 
         public virtual bool Evaluate(T? result)

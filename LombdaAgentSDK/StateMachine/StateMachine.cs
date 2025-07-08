@@ -1,15 +1,17 @@
-﻿namespace LombdaAgentSDK.StateMachine
+﻿using OpenAI.Responses;
+
+namespace LombdaAgentSDK.StateMachine
 {
     public class ResultingStateMachine<TInput, TOutput> : StateMachine
     {
-        public TOutput? Result { get => (TOutput)ResultState._Output!;}
+        public List<TOutput>? Results { get => ResultState._Output.ConvertAll(item => (TOutput)item)!;}
 
         BaseState StartState { get; set; }
         BaseState ResultState { get; set; }
 
         public ResultingStateMachine() { }
 
-        public async Task<TOutput?> Run(TInput input)
+        public async Task<List<TOutput?>> Run(TInput input)
         {
             if(StartState == null)
             {
@@ -21,11 +23,11 @@
                 throw new InvalidOperationException("Need to Set a Result State for the Resulting StateMachine");
             }
 
-            StartState._Input = input;
+            StartState._Input.Add(input);
 
             await base.Run(StartState);
 
-            return Result;
+            return Results;
         }
 
         public void SetEntryState(BaseState startState)
@@ -102,7 +104,7 @@
 
                 Tasks.Clear();
 
-                //stop the state machine if needed
+                //stop the state machine if needed & exit all states
                 if (IsFinished)
                 {
                     foreach (IState activeState in activeStates)
@@ -129,20 +131,17 @@
                 }
 
                 //Create List of transitions to new states from conditional movement
-                Dictionary<IState, List<IState>> newStateTransitions = new();
+                List<ResultForState> newStateResults = new();
 
                 activeStates.ForEach(state => {
-                    newStateTransitions.Add(state, state.CheckConditions());
+                    newStateResults.AddRange(state.CheckConditions());                    
                     });
 
                 //Check to see if we can exit the active states (Make sure they transition to next phase)
-                foreach (var executedState in newStateTransitions)
-                {
-                    if(executedState.Value.All(selectedTransitionStates => !selectedTransitionStates.Equals(executedState)))
-                    {
-                        Tasks.Add(Task.Run(async () => await executedState.Key._ExitState()));
-                    }
-                }
+                activeStates.ForEach(state => {
+                    if (state.Transitioned) Tasks.Add(Task.Run(async () => await state._ExitState()));
+                });
+
 
                 await Task.WhenAll(Tasks);
                 Tasks.Clear();
@@ -151,17 +150,15 @@
                 activeStates.Clear();
 
                 //Add currentStateMachine to each item and only Enter State if it is new
-                foreach (var executedState in newStateTransitions)
+                //Enter State here is tricky because two states can transition to the same state
+                foreach (ResultForState transitionState in newStateResults)
                 {
-                    foreach (IState transitionState in executedState.Value)
+                    transitionState.State.CurrentStateMachine = this;
+                    if (!transitionState.State.WasInvoked)
                     {
-                        transitionState.CurrentStateMachine = this;
-                        if (!transitionState.Equals(executedState.Key))
-                        {
-                            Tasks.Add(Task.Run(async () => await transitionState._EnterState(executedState.Key._Output!)));
-                        }
+                        Tasks.Add(Task.Run(async () => await transitionState.State._EnterState(transitionState.Result)));
                     }
-                    activeStates.AddRange(executedState.Value); //Add in the new states
+                    activeStates.Add(transitionState.State); //Add in the new states
                 }
 
                 await Task.WhenAll(Tasks);
