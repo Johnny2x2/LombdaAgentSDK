@@ -120,6 +120,7 @@ namespace LombdaAgentSDK
 
         public static async Task<ModelResponse>? _get_new_response(Agent agent, List<ModelItem> messages, bool Streaming = false, StreamingCallbacks streamingCallback = null)
         {
+            return await agent.Client._CreateResponseAsync(messages, agent.Options);
             try
             {
                 if(Streaming)

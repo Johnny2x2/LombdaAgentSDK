@@ -281,7 +281,7 @@ namespace LombdaAgentSDK
             else if (item is ReasoningResponseItem reasoningItem)
             {
                 //They changed the reasoning item to not have an content, so we just return the ID and encrypted content
-                return new ModelReasoningItem(reasoningItem.Id, [reasoningItem.EncryptedContent,]);
+                return new ModelReasoningItem(reasoningItem.Id, [reasoningItem.GetSummaryText(),]);
             }
             else if (item is MessageResponseItem message)
             {
@@ -467,6 +467,11 @@ namespace LombdaAgentSDK
                 }
                 else if (item is ModelFunctionCallOutputItem toolOutput)
                 {
+                    FunctionCallOutputResponseItem functionOutput = ResponseItem.CreateFunctionCallOutputItem(
+                        toolOutput.CallId,
+                        toolOutput.FunctionOutput
+                        );
+
                     responseItems.Add(ResponseItem.CreateFunctionCallOutputItem(
                         toolOutput.CallId,
                         toolOutput.FunctionOutput
