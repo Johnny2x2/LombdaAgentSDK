@@ -126,9 +126,6 @@ PlanningState plannerState = new PlanningState();
 ResearchState ResearchState = new ResearchState();
 ReportingState reportingState = new ReportingState();
 
-//Add input to first branch of state machine with Set Input
-plannerState.SetInput("Research for me top 3 best E-bikes under $1500 for mountain trails");
-
 //Setup Transitions between states
 plannerState.AddTransition(IfPlanCreated, ResearchState); //Check if a plan was generated or Rerun
 
@@ -142,7 +139,7 @@ reportingState.AddTransition(_ => true, new ExitState()); //Use Lambda expressio
 StateMachine stateMachine = new StateMachine();
 
 //Run the state machine
-await stateMachine.Run(plannerState);
+await stateMachine.Run(plannerState, "Research for me top 3 best E-bikes under $1500 for mountain trails");
 
 //Report on the last state with Results
 Console.WriteLine(reportingState.Output.FinalReport);
