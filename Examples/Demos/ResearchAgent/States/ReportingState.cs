@@ -12,7 +12,7 @@ namespace Examples.Demos.ResearchAgent.States
 {
     class ReportingState : BaseState<string, ReportData>
     {
-        public override async Task<ReportData> Invoke()
+        public override async Task<ReportData> Invoke(string input)
         {
             string instructions = """
                     You are a senior researcher tasked with writing a cohesive report for a research query.
@@ -26,7 +26,7 @@ namespace Examples.Demos.ResearchAgent.States
 
             Agent agent = new Agent(new OpenAIModelClient("gpt-4o-mini"), "Reporting agent", instructions, _output_schema: typeof(ReportData));
 
-            return (await Runner.RunAsync(agent, this.Input)).ParseJson<ReportData>(); ;
+            return (await Runner.RunAsync(agent, input)).ParseJson<ReportData>(); ;
         }
     }
 }

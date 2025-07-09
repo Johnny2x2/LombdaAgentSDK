@@ -116,8 +116,6 @@ namespace LombdaAgentSDK.StateMachine
 
     public abstract class BaseState<TInput, TOutput> : BaseState, IState<TInput, TOutput>
     {
-       
-        
         public override Type GetInputType() => typeof(TInput);
         public override Type GetOutputType() => typeof(TOutput);
 
@@ -127,8 +125,6 @@ namespace LombdaAgentSDK.StateMachine
         public List<TOutput> Output { get => _Output.ConvertAll(item => (TOutput)item); set => _Output = value.ConvertAll(item => (object?)item)!; }
 
         public List<StateTransition<TOutput>> Transitions { get => transitions; set => transitions = value; }
-
-        public StateMachine CurrentStateMachine { get; set; }
 
         public void SetInput(TInput input) => Input.Add(input);
 
@@ -155,61 +151,34 @@ namespace LombdaAgentSDK.StateMachine
         //This is to enforce Output = Invoke() and it returns the Output
         public override async Task<List<TOutput>> _Invoke()
         {
-            //try
-            //{
-            //    if (CombineInput)
-            //    {
-            //        if (Input.Count == 0)
-            //            throw new InvalidOperationException($"Input is required on State {this.GetType()}");
-            //        //Invoke Should handle the Input as a whole
-            //        Output.Add(await Invoke(this.Input[0]));
-            //    }
-            //    else
-            //    {
-            //        //Default option to process each input in as its own item
-            //        ConcurrentBag<TOutput> oResults = new ConcurrentBag<TOutput>();
+            if (Input.Count == 0)
+                throw new InvalidOperationException($"Input is required on State {this.GetType()}");
 
-            //        List<Task> Tasks = new List<Task>();
-
-            //        Input.ForEach(input => Tasks.Add(Task.Run(async () => oResults.Add(await Invoke(input)))));
-            //        //Wait for collection
-            //        await Task.WhenAll(Tasks);
-            //        Tasks.Clear();
-            //        Output = oResults.ToList();
-            //    }
-
-            //    WasInvoked = true;
-            //}
-            //catch
-            //{
-            //    throw new InvalidOperationException($"State {this.GetType().Name} failed to invoke. Ensure that the Invoke method is implemented correctly.");
-            //}
+            //Setup Invoke Task
             List<Task> Tasks = new List<Task>();
             ConcurrentBag<TOutput> oResults = new ConcurrentBag<TOutput>();
 
             if (CombineInput)
             {
-                if (Input.Count == 0)
-                    throw new InvalidOperationException($"Input is required on State {this.GetType()}");
                 //Invoke Should handle the Input as a whole
-                Tasks.Add(Task.Run(async () => oResults.Add(await Invoke((TInput)Input[0]))));
+                Tasks.Add(Task.Run(async () => oResults.Add(await Invoke(Input[0]))));
             }
             else
             {
-                //Default option to process each input in as its own item
+                //Default option to process each input in as its own item (This process is resource bound by the single state instance)
                 _Input.ForEach(input => Tasks.Add(Task.Run(async () => oResults.Add(await Invoke((TInput)input)))));
                 //Wait for collection
             }
 
             await Task.WhenAll(Tasks);
             Tasks.Clear();
-            Output = oResults.ToList();
-
             WasInvoked = true;
+
+            Output = oResults.ToList();
             return Output;
         }
 
-        public abstract Task<TOutput> Invoke(TInput? input);
+        public abstract Task<TOutput> Invoke(TInput input);
 
         //Required override to reference the correct type of transitions
         public override List<StateProcess> CheckConditions()
@@ -250,12 +219,10 @@ namespace LombdaAgentSDK.StateMachine
             return newStateProcesses;
         }
 
-
         public void AddTransition(TransitionEvent<TOutput> methodToInvoke, BaseState nextState)
         {
             Transitions.Add(new StateTransition<TOutput>(methodToInvoke, nextState));
         }
-
     }
 
     public class StateProcess
