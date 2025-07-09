@@ -1,15 +1,17 @@
-﻿namespace LombdaAgentSDK.StateMachine
+﻿using OpenAI.Responses;
+
+namespace LombdaAgentSDK.StateMachine
 {
     public class ResultingStateMachine<TInput, TOutput> : StateMachine
     {
-        public TOutput? Result { get => (TOutput)ResultState._Output!;}
+        public List<TOutput>? Results { get => ResultState._Output.ConvertAll(item => (TOutput)item)!;}
 
         BaseState StartState { get; set; }
         BaseState ResultState { get; set; }
 
         public ResultingStateMachine() { }
 
-        public async Task<TOutput?> Run(TInput input)
+        public async Task<List<TOutput?>> Run(TInput input)
         {
             if(StartState == null)
             {
@@ -21,11 +23,13 @@
                 throw new InvalidOperationException("Need to Set a Result State for the Resulting StateMachine");
             }
 
-            StartState._Input = input;
+            StartState.CurrentStateMachine = this;
+            ActiveStates.Add(StartState);
+            await StartState._EnterState(input); //preset input
 
             await base.Run(StartState);
 
-            return Result;
+            return Results;
         }
 
         public void SetEntryState(BaseState startState)
@@ -48,16 +52,12 @@
             ResultState = resultState;
         }
 
-        public bool CanCastToGeneric<T>(object value)
-        {
-            return value is T;
-        }
     }
 
     public class StateMachine
     {
-        private IState currentState;
-        public IState CurrentState => currentState;
+        private List<IState> activeStates = new();
+        public List<IState> ActiveStates => activeStates;
 
         public CancellationTokenSource StopTrigger = new CancellationTokenSource();
         
@@ -81,22 +81,36 @@
 
         public virtual async Task Run(IState state)
         {
-            if (currentState == null)
+            //Add Start State
+            if (ActiveStates.Count == 0)
             {
-                await ChangeState(state, state._Input);
+                state.CurrentStateMachine = this;
+                activeStates.Add(state);
+                await state._EnterState(state._Input); //preset input
             }
-
-            IState nextState;
 
             while (!StopTrigger.IsCancellationRequested || IsFinished)
             {
-                await currentState?._Invoke()!;
+                //States to run
+                List<Task> Tasks = new List<Task>();
 
-                _FinalResult = CurrentState._Output;
+                //Collect each state Result
+                activeStates.ForEach(state => Tasks.Add(Task.Run(async () => await state?._Invoke())));
 
+                //Wait for collection
+                await Task.WhenAll(Tasks);
+
+                Tasks.Clear();
+
+                //stop the state machine if needed & exit all states
                 if (IsFinished)
                 {
-                    currentState._ExitState();
+                    foreach (IState activeState in activeStates)
+                    {
+                        Tasks.Add(Task.Run(async () => await activeState._ExitState()));
+                    }
+                    await Task.WhenAll(Tasks);
+                    Tasks.Clear();
                     FinishedTriggered?.Invoke();
                     break;
                 }
@@ -104,29 +118,53 @@
                 if (StopTrigger.IsCancellationRequested)
                 {
                     CancellationTriggered?.Invoke();
-                    currentState._ExitState();
+
+                    foreach (IState activeState in activeStates)
+                    {
+                        Tasks.Add(Task.Run(async () => await activeState._ExitState()));
+                    }
+                    await Task.WhenAll(Tasks);
+                    Tasks.Clear();
                     break;
                 }
 
-                nextState = currentState.CheckConditions();
-                await ChangeState(nextState, currentState._Output);
+                //Create List of transitions to new states from conditional movement
+                List<StateProcess> newStateResults = new();
+
+                activeStates.ForEach(state => {
+                    newStateResults.AddRange(state.CheckConditions());                    
+                    });
+
+                //Check to see if we can exit the active states (Make sure they transition to next phase)
+                activeStates.ForEach(state => {
+                    if (state.Transitioned) Tasks.Add(Task.Run(async () => await state._ExitState()));
+                });
+
+
+                await Task.WhenAll(Tasks);
+                Tasks.Clear();
+
+                //Clear the active states for new states
+                activeStates.Clear();
+
+                //Add currentStateMachine to each item and only Enter State if it is new
+                //Add The inputs for the next run to each states to process
+                foreach (StateProcess stateProcess in newStateResults)
+                {
+                    stateProcess.State.CurrentStateMachine = this;
+
+                    if (!stateProcess.State.WasInvoked)
+                    {
+                        Tasks.Add(Task.Run(async () => await stateProcess.State._EnterState(stateProcess.Input)));
+                    }
+
+                    activeStates.Add(stateProcess.State); //Add in the new states
+                }
+                activeStates = activeStates.DistinctBy(state => state.GetType()).ToList();
+                await Task.WhenAll(Tasks);
+                Tasks.Clear();
+
             }
-        }
-
-        public async Task ChangeState(IState newState, object? result = null)
-        {
-            if (newState.Equals(currentState)) return;
-
-            newState.CurrentStateMachine = this;
-
-            if (currentState != null)
-            {
-                currentState._ExitState();
-            }
-
-            currentState = newState;
-
-            currentState._EnterState(result);
         }
     }
 

@@ -18,11 +18,11 @@ namespace Examples.Demos.ResearchAgent.States
         bool RunParallel { get; set; } = false;
         public ResearchState(bool runParallel = false) { RunParallel = runParallel; }
 
-        public override async Task<string> Invoke()
+        public override async Task<string> Invoke(WebSearchPlan plan)
         {
             Console.WriteLine("[Starting WebSearch from StateMachine]");
 
-            return RunParallel ? await InvokeParallel() : await InvokeThreaded();
+            return RunParallel ? await InvokeParallel(plan) : await InvokeThreaded(plan);
         }
 
         public async Task<RunResult> RunResearchAgent(WebSearchItem item)
@@ -38,22 +38,22 @@ namespace Examples.Demos.ResearchAgent.States
             return await Runner.RunAsync(agent, item.query);
         }
 
-        public async Task<string> InvokeParallel()
+        public async Task<string> InvokeParallel(WebSearchPlan plan)
         {
             ConcurrentBag<RunResult> researchResults = new ConcurrentBag<RunResult>();
 
             await Parallel.ForEachAsync(
-                Input.items.AsEnumerable(),
+                plan.items.AsEnumerable(),
                 async (item, CancellationToken) => researchResults.Add((await RunResearchAgent(item))));
 
             return string.Join("[RESEARCH RESULT]\n\n\n", researchResults.ToList().Select(result => result.Text));
         }
 
-        public async Task<string> InvokeThreaded()
+        public async Task<string> InvokeThreaded(WebSearchPlan plan)
         {
             List<Task<RunResult>> researchTask = new List<Task<RunResult>>();
-            
-            Input.items.ToList()
+
+            plan.items.ToList()
                 .ForEach(item =>
                     researchTask.Add(Task.Run(async () => await RunResearchAgent(item))));
 

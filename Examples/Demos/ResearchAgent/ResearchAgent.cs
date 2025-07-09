@@ -28,10 +28,10 @@ namespace Examples.Demos.ResearchAgent
             stateMachine.SetOutputState(reportingState);
 
             //Run the state machine
-            ReportData report = await stateMachine.Run("What are the top 3 mountain bikes for under $1500?");
+            List<ReportData> reports = await stateMachine.Run("What are the top 3 mountain bikes for under $1500?");
 
             //Report on the last state with Results
-            Console.WriteLine(report.FinalReport);
+            Console.WriteLine(reports[0].FinalReport);
         }
 
         //Create validation delegate functions
