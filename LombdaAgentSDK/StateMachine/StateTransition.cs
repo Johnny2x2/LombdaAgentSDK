@@ -4,14 +4,21 @@
 
     public class StateTransition<T>
     {
-        public IState NextState { get; set; }
+        public BaseState NextState { get; set; }
 
         public TransitionEvent<T> InvokeMethod { get; set; }
 
-        public StateTransition(TransitionEvent<T> methodToInvoke, IState nextState)
+        public StateTransition(TransitionEvent<T> methodToInvoke, BaseState nextState)
         {
-            this.NextState = nextState;
-            this.InvokeMethod = methodToInvoke;
+            if (nextState.GetInputType().IsAssignableTo(typeof(T)) || typeof(T).IsSubclassOf(nextState.GetInputType()))
+            {
+                this.NextState = nextState;
+                this.InvokeMethod = methodToInvoke;
+            }
+            else
+            {
+                throw new InvalidOperationException($"Next State with input type of {nextState.GetInputType()} requires Input type assignable to type of {typeof(T)}");
+            }
         }
 
         public virtual bool Evaluate(T? result)

@@ -13,7 +13,7 @@ namespace LombdaAgentSDK.StateMachine
         public List<object> _Output { get; set; }
         public List<object> _Input { get; set; }
         public Task _Invoke();
-        public List<ResultForState> CheckConditions();
+        public List<StateProcess> CheckConditions();
         public Task _EnterState(object input);
         public Task _ExitState();
         public StateMachine CurrentStateMachine { get; set; }
@@ -64,9 +64,9 @@ namespace LombdaAgentSDK.StateMachine
 
         public bool WasInvoked { get => wasInvoked; set => wasInvoked = value; }
         public bool CombineInput { get => combineInput; set => combineInput = value; }
-        public virtual List<ResultForState> CheckConditions()
+        public virtual List<StateProcess> CheckConditions()
         {
-            List<ResultForState> states = new();
+            List<StateProcess> states = new();
             
             if (!AllowsParallelTransitions)
             {
@@ -75,7 +75,7 @@ namespace LombdaAgentSDK.StateMachine
                     IState? newState = _Transitions.DefaultIfEmpty(null).FirstOrDefault(transitions => transitions.Evaluate(output))?.NextState ?? null;
                     if (newState != null)
                     {
-                        states.Add(new ResultForState(newState,output));
+                        states.Add(new StateProcess(newState,output));
                     }
                 }
                 
@@ -88,7 +88,7 @@ namespace LombdaAgentSDK.StateMachine
                     {
                         if (transition.Evaluate(_Output))
                         {
-                            states.Add(new ResultForState(transition.NextState, output));
+                            states.Add(new StateProcess(transition.NextState, output));
                         }
                     });
                 });
@@ -96,7 +96,7 @@ namespace LombdaAgentSDK.StateMachine
 
             if (states.Count == 0)
             {
-                _Input.ForEach(inpt => states.Add(new ResultForState(this, inpt)));
+                _Input.ForEach(inpt => states.Add(new StateProcess(this, inpt)));
                 
             }
 
@@ -145,50 +145,76 @@ namespace LombdaAgentSDK.StateMachine
         //This is to enforce Output = Invoke() and it returns the Output
         public override async Task<List<TOutput>> _Invoke()
         {
-            try
+            //try
+            //{
+            //    if (CombineInput)
+            //    {
+            //        if (Input.Count == 0)
+            //            throw new InvalidOperationException($"Input is required on State {this.GetType()}");
+            //        //Invoke Should handle the Input as a whole
+            //        Output.Add(await Invoke(this.Input[0]));
+            //    }
+            //    else
+            //    {
+            //        //Default option to process each input in as its own item
+            //        ConcurrentBag<TOutput> oResults = new ConcurrentBag<TOutput>();
+
+            //        List<Task> Tasks = new List<Task>();
+
+            //        Input.ForEach(input => Tasks.Add(Task.Run(async () => oResults.Add(await Invoke(input)))));
+            //        //Wait for collection
+            //        await Task.WhenAll(Tasks);
+            //        Tasks.Clear();
+            //        Output = oResults.ToList();
+            //    }
+
+            //    WasInvoked = true;
+            //}
+            //catch
+            //{
+            //    throw new InvalidOperationException($"State {this.GetType().Name} failed to invoke. Ensure that the Invoke method is implemented correctly.");
+            //}
+
+            if (CombineInput)
             {
-                if (CombineInput)
-                {
-                    //Invoke Should handle the Input as a whole
-                    Output.Add(await Invoke(default));
-                }
-                else
-                {
-                    //Default option to process each input in as its own item
-                    ConcurrentBag<TOutput> oResults = new ConcurrentBag<TOutput>();
-
-                    await Parallel.ForEachAsync(
-                        Input.AsEnumerable(),
-                        async (item, CancellationToken) => oResults.Add((await Invoke(item))));
-
-                    Output = oResults.ToList();
-                }
-
-                WasInvoked = true;
+                if (Input.Count == 0)
+                    throw new InvalidOperationException($"Input is required on State {this.GetType()}");
+                //Invoke Should handle the Input as a whole
+                Output.Add(await Invoke(this.Input[0]));
             }
-            catch
+            else
             {
-                throw new InvalidOperationException($"State {this.GetType().Name} failed to invoke. Ensure that the Invoke method is implemented correctly.");
+                //Default option to process each input in as its own item
+                ConcurrentBag<TOutput> oResults = new ConcurrentBag<TOutput>();
+
+                List<Task> Tasks = new List<Task>();
+
+                _Input.ForEach(input => Tasks.Add(Task.Run(async () => oResults.Add(await Invoke((TInput)input)))));
+                //Wait for collection
+                await Task.WhenAll(Tasks);
+                Tasks.Clear();
+                Output = oResults.ToList();
             }
-            
+
+            WasInvoked = true;
             return Output;
         }
 
         public abstract Task<TOutput> Invoke(TInput? input);
 
         //Required override to reference the correct type of transitions
-        public override List<ResultForState> CheckConditions()
+        public override List<StateProcess> CheckConditions()
         {
-            List<ResultForState> states = new();
+            List<StateProcess> newStateProcesses = new();
 
             if (!AllowsParallelTransitions)
             {
                 foreach (var output in Output)
                 {
-                    IState? newState = Transitions.DefaultIfEmpty(null).FirstOrDefault(transitions => transitions.Evaluate(output))?.NextState ?? null;
+                    IState? newState = Transitions?.DefaultIfEmpty(null)?.FirstOrDefault(transition => transition?.Evaluate(output) ?? false)?.NextState ?? null;
                     if (newState != null)
                     {
-                        states.Add(new ResultForState(newState, output));
+                        newStateProcesses.Add(new StateProcess(newState, output));
                     }
                 }
             }
@@ -200,37 +226,38 @@ namespace LombdaAgentSDK.StateMachine
                     {
                         if (transition.Evaluate(_Output))
                         {
-                            states.Add(new ResultForState(transition.NextState, output));
+                            newStateProcesses.Add(new StateProcess(transition.NextState, output));
                         }
                     });
                 });
             }
 
-            if (states.Count == 0)
+            if (newStateProcesses.Count == 0)
             {
-                _Input.ForEach(inpt => states.Add(new ResultForState(this, inpt)));
+                _Input.ForEach(inpt => newStateProcesses.Add(new StateProcess(this, inpt)));
 
             }
 
-            return states;
+            return newStateProcesses;
         }
 
 
-        public void AddTransition(TransitionEvent<TOutput> MethodToInvoke, IState NextProcess)
+        public void AddTransition(TransitionEvent<TOutput> methodToInvoke, BaseState nextState)
         {
-            Transitions.Add(new StateTransition<TOutput>(MethodToInvoke, NextProcess));
+            Transitions.Add(new StateTransition<TOutput>(methodToInvoke, nextState));
         }
 
     }
 
-    public class ResultForState
+    public class StateProcess
     {
         public IState State { get; set; }
-        public object Result { get; set; }
-        public ResultForState(IState state, object result)
+        public object Input { get; set; }
+        //public object Result { get; set; }
+        public StateProcess(IState state, object input)
         {
             State = state;
-            Result = result;
+            Input = input;
         }
     }
 

@@ -23,7 +23,9 @@ namespace LombdaAgentSDK.StateMachine
                 throw new InvalidOperationException("Need to Set a Result State for the Resulting StateMachine");
             }
 
-            StartState._Input.Add(input);
+            StartState.CurrentStateMachine = this;
+            ActiveStates.Add(StartState);
+            await StartState._EnterState(input); //preset input
 
             await base.Run(StartState);
 
@@ -84,7 +86,7 @@ namespace LombdaAgentSDK.StateMachine
         public virtual async Task Run(IState state)
         {
             //Add Start State
-            if (ActiveStates.Count <= 0)
+            if (ActiveStates.Count == 0)
             {
                 state.CurrentStateMachine = this;
                 activeStates.Add(state);
@@ -131,7 +133,7 @@ namespace LombdaAgentSDK.StateMachine
                 }
 
                 //Create List of transitions to new states from conditional movement
-                List<ResultForState> newStateResults = new();
+                List<StateProcess> newStateResults = new();
 
                 activeStates.ForEach(state => {
                     newStateResults.AddRange(state.CheckConditions());                    
@@ -150,15 +152,17 @@ namespace LombdaAgentSDK.StateMachine
                 activeStates.Clear();
 
                 //Add currentStateMachine to each item and only Enter State if it is new
-                //Enter State here is tricky because two states can transition to the same state
-                foreach (ResultForState transitionState in newStateResults)
+                //Add The inputs for the next run to each states to process
+                foreach (StateProcess stateProcess in newStateResults)
                 {
-                    transitionState.State.CurrentStateMachine = this;
-                    if (!transitionState.State.WasInvoked)
+                    stateProcess.State.CurrentStateMachine = this;
+
+                    if (!stateProcess.State.WasInvoked)
                     {
-                        Tasks.Add(Task.Run(async () => await transitionState.State._EnterState(transitionState.Result)));
+                        Tasks.Add(Task.Run(async () => await stateProcess.State._EnterState(stateProcess.Input)));
                     }
-                    activeStates.Add(transitionState.State); //Add in the new states
+
+                    activeStates.Add(stateProcess.State); //Add in the new states
                 }
 
                 await Task.WhenAll(Tasks);
