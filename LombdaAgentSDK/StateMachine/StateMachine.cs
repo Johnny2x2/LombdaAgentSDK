@@ -52,10 +52,6 @@ namespace LombdaAgentSDK.StateMachine
             ResultState = resultState;
         }
 
-        public bool CanCastToGeneric<T>(object value)
-        {
-            return value is T;
-        }
     }
 
     public class StateMachine
@@ -164,7 +160,7 @@ namespace LombdaAgentSDK.StateMachine
 
                     activeStates.Add(stateProcess.State); //Add in the new states
                 }
-
+                activeStates = activeStates.DistinctBy(state => state.GetType()).ToList();
                 await Task.WhenAll(Tasks);
                 Tasks.Clear();
 

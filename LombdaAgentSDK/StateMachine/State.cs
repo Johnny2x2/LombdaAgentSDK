@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Reflection.Metadata.Ecma335;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
 namespace LombdaAgentSDK.StateMachine
 {
@@ -38,6 +39,7 @@ namespace LombdaAgentSDK.StateMachine
     //Basically just for the ExitState to not need to return anything
     public abstract class BaseState: IState
     {
+        public bool BeingReran = false;
         private List<StateTransition<object>> transitions = new();
         private List<object> input = new();
         private List<object> output = new();
@@ -55,7 +57,15 @@ namespace LombdaAgentSDK.StateMachine
         //public abstract Task Invoke(object input);
         public async Task _EnterState(object? input) => this.EnterState(input);
         public virtual void EnterState(object? input) => _Input.Add(input);
-        public async Task _ExitState(){ Transitioned = true; this.ExitState(); }
+
+        public async Task _ExitState()
+        {
+            _Input.Clear();
+            BeingReran = false;
+            Transitioned = true; 
+            this.ExitState(); 
+        }
+
         public virtual async Task ExitState() { }
         public abstract Type GetInputType();
         public abstract Type GetOutputType();
@@ -107,7 +117,7 @@ namespace LombdaAgentSDK.StateMachine
     public abstract class BaseState<TInput, TOutput> : BaseState, IState<TInput, TOutput>
     {
        
-        private bool BeingReran = false;
+        
         public override Type GetInputType() => typeof(TInput);
         public override Type GetOutputType() => typeof(TOutput);
 
@@ -174,27 +184,26 @@ namespace LombdaAgentSDK.StateMachine
             //{
             //    throw new InvalidOperationException($"State {this.GetType().Name} failed to invoke. Ensure that the Invoke method is implemented correctly.");
             //}
+            List<Task> Tasks = new List<Task>();
+            ConcurrentBag<TOutput> oResults = new ConcurrentBag<TOutput>();
 
             if (CombineInput)
             {
                 if (Input.Count == 0)
                     throw new InvalidOperationException($"Input is required on State {this.GetType()}");
                 //Invoke Should handle the Input as a whole
-                Output.Add(await Invoke(this.Input[0]));
+                Tasks.Add(Task.Run(async () => oResults.Add(await Invoke((TInput)Input[0]))));
             }
             else
             {
                 //Default option to process each input in as its own item
-                ConcurrentBag<TOutput> oResults = new ConcurrentBag<TOutput>();
-
-                List<Task> Tasks = new List<Task>();
-
                 _Input.ForEach(input => Tasks.Add(Task.Run(async () => oResults.Add(await Invoke((TInput)input)))));
                 //Wait for collection
-                await Task.WhenAll(Tasks);
-                Tasks.Clear();
-                Output = oResults.ToList();
             }
+
+            await Task.WhenAll(Tasks);
+            Tasks.Clear();
+            Output = oResults.ToList();
 
             WasInvoked = true;
             return Output;
@@ -220,11 +229,11 @@ namespace LombdaAgentSDK.StateMachine
             }
             else
             {
-                _Transitions.ForEach(transition =>
+                Transitions.ForEach(transition =>
                 {
-                    _Output.ForEach(output =>
+                    Output.ForEach(output =>
                     {
-                        if (transition.Evaluate(_Output))
+                        if (transition.Evaluate(output))
                         {
                             newStateProcesses.Add(new StateProcess(transition.NextState, output));
                         }

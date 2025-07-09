@@ -40,6 +40,34 @@ namespace Test
             }
         }
 
+        public class IntPlus3State : BaseState<int, int>
+        {
+            public override async Task<int> Invoke(int input)
+            {
+                return input + 3;
+            }
+        }
+
+        public class IntPlus4State : BaseState<int, int>
+        {
+            public override async Task<int> Invoke(int input)
+            {
+                return input + 4;
+            }
+        }
+
+        public class SummingState : BaseState<int, int>
+        {
+            public SummingState()
+            {
+                CombineInput = true;
+            }
+
+            public override async Task<int> Invoke(int input)
+            {
+                return Input.Sum();
+            }
+        }
 
         public class weird { }
         public class ConvertWeirdToIntState : BaseState<weird, weird>
@@ -93,6 +121,41 @@ namespace Test
             Assert.That(result, Is.EqualTo(3));
             Assert.That(stateMachine.Results[0], Is.EqualTo("3"));
             Assert.That(stateResults[0], Is.EqualTo("3"));
+        }
+
+        [Test]
+        public async Task TestStateTransitionWithResultsParallel()
+        {
+            ConvertStringToIntState inputState = new()
+            {
+                AllowsParallelTransitions = true
+            };
+
+            IntPlus3State state3 = new();
+            IntPlus4State state4 = new();
+            SummingState summingState = new();
+            ConvertIntToStringState resultState = new();
+
+            //should happen in parallel and get result
+            inputState.AddTransition(_=> true, state3);
+            inputState.AddTransition(_ => true, state4);
+
+            //summing State should Have 2 Inputs now
+            state3.AddTransition(_ => true, summingState);
+            state4.AddTransition(_ => true, summingState);
+
+            summingState.AddTransition(_ => true, resultState);
+
+            resultState.AddTransition(_ => true, new ExitState());
+
+            ResultingStateMachine<string, string> stateMachine = new();
+
+            stateMachine.SetEntryState(inputState);
+            stateMachine.SetOutputState(resultState);
+
+            List<string?> stateResults = await stateMachine.Run("3");
+
+            Console.WriteLine(stateResults[0]);
         }
     }
 }
