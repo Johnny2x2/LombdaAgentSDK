@@ -79,14 +79,14 @@ namespace LombdaAgentSDK.StateMachine
 
         public void Stop() => StopTrigger.Cancel();
 
-        public virtual async Task Run(IState state)
+        public virtual async Task Run(IState state, object? input = null)
         {
             //Add Start State
             if (ActiveStates.Count == 0)
             {
                 state.CurrentStateMachine = this;
                 activeStates.Add(state);
-                await state._EnterState(state._Input); //preset input
+                await state._EnterState(input); //preset input
             }
 
             while (!StopTrigger.IsCancellationRequested || IsFinished)

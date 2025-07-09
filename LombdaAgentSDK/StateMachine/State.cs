@@ -126,8 +126,6 @@ namespace LombdaAgentSDK.StateMachine
 
         public List<StateTransition<TOutput>> Transitions { get => transitions; set => transitions = value; }
 
-        public void SetInput(TInput input) => Input.Add(input);
-
         public async Task _EnterState(TInput input) 
         {
             WasInvoked = false;

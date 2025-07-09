@@ -83,15 +83,13 @@ namespace Test
         {
             MockState state1 = new MockState();
 
-            state1.Input.Add("test input");
-
             int result = 0;
 
-            state1.Transitions?.Add(new StateTransition<int>((output) => { Console.WriteLine($"Result was {output}"); result = output; return true; }, new MockState()));
-
+            state1.AddTransition((output) => { Console.WriteLine($"Result was {output}"); result = output; return true; }, new ExitState());
+            
             StateMachine stateMachine = new();
 
-            stateMachine.Run(state1);
+            await stateMachine.Run(state1, "test input");
 
             Assert.That(result, Is.EqualTo(3));
         }
