@@ -24,7 +24,7 @@ namespace Examples.Demos
             }
         }
 
-        public static CodeBuildInfo BuildAndRunProject(string pathToSolution, string projectToRun, bool runProject = false)
+        public static CodeBuildInfo BuildAndRunProject(string pathToSolution, string projectToRun, string? framework = "", bool runProject = false)
         {
             CodeBuildInfo codeBuildInfo = new CodeBuildInfo(pathToSolution, projectToRun);
             // Path to the target project's directory
@@ -39,7 +39,7 @@ namespace Examples.Demos
             {
                 Console.WriteLine("Build successful! Now running the built project...");
                 // Find the executable file
-                string executablePath = FindExecutable(projectPath, projectToRun);
+                string executablePath = FindExecutable(projectPath, projectToRun, framework);
 
                 if (!string.IsNullOrEmpty(executablePath))
                 {
@@ -63,11 +63,11 @@ namespace Examples.Demos
         }
 
         // Function to find the executable file after build
-        public static string FindExecutable(string projectPath, string projectName)
+        public static string FindExecutable(string projectPath, string projectName, string framework)
         {
             // Assuming a typical .NET Core/5+ project structure
             // You might need to adjust this based on your project setup
-            string binPath = Path.Combine(projectPath, projectName, "bin", "Debug", "net8.0"); // Adjust framework if needed
+            string binPath = Path.Combine(projectPath, projectName, "bin", "Debug", framework); // Adjust framework if needed
             string executableName = $"{projectName}.exe"; // Replace with your executable name
             string executablePath = Path.Combine(binPath, executableName);
 
@@ -77,7 +77,7 @@ namespace Examples.Demos
             }
 
             // Check the Release folder as well
-            binPath = Path.Combine(projectPath, projectName, "bin", "Release", "net8.0"); // Adjust framework if needed
+            binPath = Path.Combine(projectPath, projectName, "bin", "Release", framework); // Adjust framework if needed
             executablePath = Path.Combine(binPath, executableName);
 
             if (File.Exists(executablePath))

@@ -22,8 +22,6 @@ namespace Examples.Demos
 
                 filePath = filePath.Trim();
 
-                //Path.GetInvalidPathChars().ToList().ForEach(c => filePath = filePath.Replace(c.ToString(), string.Empty));
-
                 Path.GetInvalidFileNameChars().ToList().ForEach(c =>
                 {
                     if (Path.GetFileName(filePath).Contains(c))

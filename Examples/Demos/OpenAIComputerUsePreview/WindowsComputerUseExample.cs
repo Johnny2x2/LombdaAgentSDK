@@ -5,11 +5,11 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Examples.Demos.OpenAIComputerUsePreview
 {
+    [Experimental("computer-use-preview")]
     public class WindowsComputerUseExample
     {
 
         [Test]
-        [Experimental("computer-use-preview")]
         public async Task Run()
         {
             OpenAIModelClient openAIModelClient = new OpenAIModelClient("computer-use-preview", enableComputerCalls: true);
@@ -22,6 +22,7 @@ namespace Examples.Demos.OpenAIComputerUsePreview
 
             RunResult result = await Runner.RunAsync(agent, "Can you find and open blender from my desktop dont ask just do?", computerUseCallback: HandleComputerAction);
         }
+
 
         public static void HandleComputerAction(ComputerToolAction action)
         {

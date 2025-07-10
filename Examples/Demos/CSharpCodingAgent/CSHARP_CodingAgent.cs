@@ -13,7 +13,8 @@ namespace Examples.Demos.CodingAgent
         [Test]
         public async Task Run()
         {
-            FileIOUtility.SafeWorkingDirectory = CSHARP_CodingAgent.ProjectBuildPath;
+            FileIOUtility.SafeWorkingDirectory =  Path.Combine(CSHARP_CodingAgent.ProjectBuildPath, ProjectName);
+
             //Setup states
             CSharpCodingState codeState = new CSharpCodingState();//Program a solution
             CSharpBuildState buildState = new CSharpBuildState(); //Execute a solution 

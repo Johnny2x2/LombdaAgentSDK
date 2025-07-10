@@ -27,7 +27,7 @@ namespace Examples.Demos.CodingAgent.states
 
             //build the project code
             //In theory here i could setup a lot of different code to build
-            CodeBuildInfo codeInfo = CodeUtility.BuildAndRunProject(CSHARP_CodingAgent.ProjectBuildPath, CSHARP_CodingAgent.ProjectName);
+            CodeBuildInfo codeInfo = CodeUtility.BuildAndRunProject(CSHARP_CodingAgent.ProjectBuildPath, CSHARP_CodingAgent.ProjectName, "netcoreapp3.1");
 
             //Report the results of the build
             return new CodeBuildInfoOutput(codeInfo, programResult);
