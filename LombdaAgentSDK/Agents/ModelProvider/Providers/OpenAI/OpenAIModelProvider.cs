@@ -132,7 +132,7 @@ namespace LombdaAgentSDK
             }
 
             responseCreationOptions.TextOptions = responseTextOptions;
-
+            
             return (responseItems, responseCreationOptions);
         }
 
@@ -199,10 +199,10 @@ namespace LombdaAgentSDK
             OpenAIResponse response = await Client.CreateResponseAsync(responseItems, responseCreationOptions);
 
             //Convert the response back to Model
-            List<ModelItem> ModelItems = ConvertFromProviderItems(response.OutputItems.ToList()).ToList();
+            List<ModelItem> ModelItems = ConvertFromProviderItems(response, responseItems).ToList();
 
             //Return results.
-            return new ModelResponse(options.Model, ModelItems, outputFormat: options.OutputFormat ?? null);
+            return new ModelResponse(ModelItems, outputFormat: options.OutputFormat ?? null, messages);
         }
     }
 

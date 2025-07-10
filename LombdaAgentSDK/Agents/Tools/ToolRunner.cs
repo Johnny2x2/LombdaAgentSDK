@@ -23,7 +23,7 @@ namespace LombdaAgentSDK
 
             string? result = (string?)await CallFuncAsync(tool.Function, [.. arguments]);
 
-            return new ModelFunctionCallOutputItem(call.Id, call.CallId, result!, call.Status, call.FunctionName);
+            return new ModelFunctionCallOutputItem(Guid.NewGuid().ToString(), call.CallId, result!, call.Status, call.FunctionName);
         }
 
         //handles extracting the input parameters from the function call and calling the agent tool
@@ -40,11 +40,11 @@ namespace LombdaAgentSDK
                 if (argumentsJson.RootElement.TryGetProperty("input", out JsonElement jValue))
                 {
                     RunResult agentToolResult = await Runner.RunAsync(newAgent, jValue.GetString());
-                    return new ModelFunctionCallOutputItem(call.Id, call.CallId, agentToolResult.Text ?? "Could not get function result", call.Status, call.FunctionName);
+                    return new ModelFunctionCallOutputItem(Guid.NewGuid().ToString(), call.CallId, agentToolResult.Text ?? "Could not get function result", call.Status, call.FunctionName);
                 }
             }
 
-            return new ModelFunctionCallOutputItem(call.Id, call.CallId, string.Empty, call.Status, call.FunctionName);
+            return new ModelFunctionCallOutputItem(Guid.NewGuid().ToString(), call.CallId, string.Empty, call.Status, call.FunctionName);
         }
 
         //Calls the function asynchronously, handling both synchronous and asynchronous methods.
