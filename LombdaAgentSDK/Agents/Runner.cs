@@ -149,7 +149,7 @@ namespace LombdaAgentSDK
 
             GC.Collect();
 
-            return new ModelComputerCallOutputItem(computerCall.Id, computerCall.CallId, ModelStatus.Completed, new ModelMessageImageFileContent(BinaryData.FromBytes(data), "image/png"));
+            return new ModelComputerCallOutputItem(Guid.NewGuid().ToString(), computerCall.CallId, ModelStatus.Completed, new ModelMessageImageFileContent(BinaryData.FromBytes(data), "image/png"));
         }
 
         /// <summary>
