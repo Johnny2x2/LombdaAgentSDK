@@ -245,7 +245,6 @@ namespace LombdaAgentSDK
 
             return responseItems;
         }
-
         public ModelItem ConvertFromProviderItem(ResponseItem item)
         {
             if (item is WebSearchCallResponseItem webSearchCall)
@@ -450,7 +449,6 @@ namespace LombdaAgentSDK
             }
             return messageContent;
         }
-
         public IList<ResponseItem> ConvertToProviderItems(IEnumerable messages)
         {
             List<ResponseItem> responseItems = new List<ResponseItem>();

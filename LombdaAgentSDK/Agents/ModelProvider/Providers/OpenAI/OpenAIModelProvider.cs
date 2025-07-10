@@ -152,11 +152,11 @@ namespace LombdaAgentSDK
                 }
                 if (update is StreamingResponseOutputItemAddedUpdate newItem)
                 {
-                    streamingCallback?.Invoke($"Starting Item of type => ({newItem.Item.GetType()})\n");
+                    //Do nothing
                 }
                 else if (update is StreamingResponseOutputItemDoneUpdate completedItem)
                 {
-                    streamingCallback?.Invoke($"Completed Item of type => ({completedItem.Item.GetType()})\n");
+                    //Do nothing
                 }
                 else if (update is StreamingResponseOutputTextDeltaUpdate deltaUpdate)
                 {
@@ -168,11 +168,11 @@ namespace LombdaAgentSDK
                 }
                 else if (update is StreamingResponseContentPartAddedUpdate newContent)
                 {
-                    streamingCallback?.Invoke($"\nNew Content Started of type => {newContent.Part.Kind}\n");
+                    //Do nothing
                 }
                 else if (update is StreamingResponseContentPartDoneUpdate completedContent)
                 {
-                    streamingCallback?.Invoke($"\nCompleted Content of type => {completedContent.Part.Kind}\n");
+                    //Do nothing
                 }
             }
 
