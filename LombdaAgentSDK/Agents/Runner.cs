@@ -2,6 +2,7 @@
 using System.Text.Json;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents;
+using LlmTornado.Common;
 
 namespace LombdaAgentSDK
 {
@@ -32,7 +33,7 @@ namespace LombdaAgentSDK
             }
 
             //Add the latest message to the stream
-            runResult.Messages.Add(new ModelMessageItem("msg_09238420i0fs0df", "USER", [new ModelMessageRequestTextContent(input),], ModelStatus.Completed));
+            runResult.Messages.Add(new ModelMessageItem(Guid.NewGuid().ToString(), "USER", [new ModelMessageRequestTextContent(input),], ModelStatus.Completed));
 
             //Check if the input triggers a guardrail to stop the agent from continuing
             if (guard_rail != null)
@@ -40,16 +41,17 @@ namespace LombdaAgentSDK
                 var guard_railResult = await (Task<GuardRailFunctionOutput>)guard_rail.DynamicInvoke([input])!;
                 if (guard_railResult != null) {
                     GuardRailFunctionOutput grfOutput = guard_railResult;
-                    if (grfOutput.TripwireTriggered) throw new Exception($"Input Guardrail Stopped the agent from contining because, {grfOutput.OutputInfo}");
+                    if (grfOutput.TripwireTriggered) throw new Exception($"Input Guardrail Stopped the agent from continuing because, {grfOutput.OutputInfo}");
                 }
             }
 
             //Agent loop
             int currentTurn = 0;
             runResult.Response.OutputItems = new List<ModelItem>();
+
             do
             {
-                if (currentTurn >= maxTurns) break;
+                if (currentTurn >= maxTurns) throw new Exception("Max Turns Reached");
 
                 runResult.Response = await _get_new_response(agent, runResult.Messages, streaming, streamingCallback) ?? runResult.Response;
 
@@ -64,37 +66,27 @@ namespace LombdaAgentSDK
         public static async Task<bool> ProcessOutputItems(Agent agent, RunResult runResult, RunnerVerboseCallbacks callback, ComputerActionCallbacks computerUseCallback)
         {
             bool requiresAction = false;
+
             List<ModelItem> outputItems = runResult.Response.OutputItems!.ToList();
+
             foreach (ModelItem item in outputItems)
             {
                 runResult.Messages.Add(item);
-                if (item is ModelWebCallItem webSearchCall)
-                {
-                    callback?.Invoke($"[Web search invoked]({webSearchCall.Status}) {webSearchCall.Id}");   
-                }
-                else if (item is ModelFileSearchCallItem fileSearchCall)
-                {
-                    callback?.Invoke($"[File search invoked]({fileSearchCall.Status}) {fileSearchCall.Id}"); 
-                }
-                else if (item is ModelFunctionCallItem toolCall)
-                {
-                    callback?.Invoke($"""
-                        Calling tool:{toolCall.FunctionName}
-                        using parameters:{JsonDocument.Parse(toolCall.FunctionArguments).RootElement.GetRawText()}
-                        """);
+                HandleVerboseCallback(item, callback);
 
+                //Process Action Call
+                if (item is ModelFunctionCallItem toolCall)
+                {
                     ModelFunctionCallOutputItem functionOutputResponse;
 
                     if (agent.agent_tools.ContainsKey(toolCall.FunctionName))
                     {
                         functionOutputResponse = await ToolRunner.CallAgentToolAsync(agent, toolCall);
-                        callback?.Invoke($"[Agent Tool invoked]({functionOutputResponse.FunctionName}) => {functionOutputResponse.FunctionOutput}");   
                         runResult.Messages.Add(functionOutputResponse);
                     }
                     else
                     {
                         functionOutputResponse = await ToolRunner.CallFuncToolAsync(agent, toolCall);
-                        callback?.Invoke($"[Function Tool invoked]({functionOutputResponse.FunctionName}) => {functionOutputResponse.FunctionOutput}");
                         runResult.Messages.Add(functionOutputResponse);
                     }
 
@@ -102,20 +94,42 @@ namespace LombdaAgentSDK
                 }
                 else if (item is ModelComputerCallItem computerCall)
                 {
-                    callback?.Invoke($"[Computer Call invoked]({computerCall.Status}) {computerCall.CallId}");
-
                     ModelComputerCallOutputItem computerOutputResponse = ProcessComputerCall(computerCall, computerUseCallback);
 
                     runResult.Messages.Add(computerOutputResponse);
 
                     requiresAction = true;
                 }
-                else if (item is ModelMessageItem message)
-                {
-                    callback?.Invoke($"[Message]({message.Role}) {message.Text}");    
-                }
             }
+
             return requiresAction;
+        }
+
+        private static void HandleVerboseCallback(ModelItem item, RunnerVerboseCallbacks callback)
+        {
+            if (item is ModelWebCallItem webSearchCall)
+            {
+                callback?.Invoke($"[Web search invoked]({webSearchCall.Status}) {webSearchCall.Id}");
+            }
+            else if (item is ModelFileSearchCallItem fileSearchCall)
+            {
+                callback?.Invoke($"[File search invoked]({fileSearchCall.Status}) {fileSearchCall.Id}");
+            }
+            else if (item is ModelFunctionCallItem toolCall)
+            {
+                callback?.Invoke($"""
+                        Calling tool:{toolCall.FunctionName}
+                        using parameters:{JsonDocument.Parse(toolCall.FunctionArguments).RootElement.GetRawText()}
+                        """);
+            }
+            else if (item is ModelComputerCallItem computerCall)
+            {
+                callback?.Invoke($"[Computer Call invoked]({computerCall.Status}) {computerCall.Action.TypeText}");
+            }
+            else if (item is ModelMessageItem message)
+            {
+                callback?.Invoke($"[Message]({message.Role}) {message.Text}");
+            }
         }
 
         public static async Task<ModelResponse>? _get_new_response(Agent agent, List<ModelItem> messages, bool Streaming = false, StreamingCallbacks streamingCallback = null)
