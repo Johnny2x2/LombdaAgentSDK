@@ -132,7 +132,7 @@ namespace LombdaAgentSDK
             }
 
             responseCreationOptions.TextOptions = responseTextOptions;
-
+            
             return (responseItems, responseCreationOptions);
         }
 
@@ -202,7 +202,7 @@ namespace LombdaAgentSDK
             List<ModelItem> ModelItems = ConvertFromProviderItems(response, responseItems).ToList();
 
             //Return results.
-            return new ModelResponse(options.Model, ModelItems, outputFormat: options.OutputFormat ?? null);
+            return new ModelResponse(ModelItems, outputFormat: options.OutputFormat ?? null, messages);
         }
     }
 

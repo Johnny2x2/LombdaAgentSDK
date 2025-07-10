@@ -7,8 +7,8 @@ namespace Examples.Demos.CodingAgent
 {
     public class CSHARP_CodingAgent
     {
-        public static string ProjectBuildPath = "C:\\Users\\johnl\\source\\repos\\SimpleTestBuild";
-        public static string ProjectName = "SimpleTestBuild";
+        public static string ProjectBuildPath = "C:\\Users\\jlomba\\source\\repos\\ConsoleTesting";
+        public static string ProjectName = "ConsoleTesting";
 
         [Test]
         public async Task Run()

@@ -12,9 +12,17 @@
 
         public ModelResponse() { }
 
+        [Obsolete]
         public ModelResponse(string model, List<ModelItem> outputItems = null, ModelOutputFormat outputFormat = null, List<ModelItem> messages = null)
         {
             Model = model;
+            OutputItems = outputItems;
+            OutputFormat = outputFormat;
+            Messages = messages ?? new List<ModelItem>();
+        }
+
+        public ModelResponse(List<ModelItem> outputItems = null, ModelOutputFormat outputFormat = null, List<ModelItem> messages = null)
+        {
             OutputItems = outputItems;
             OutputFormat = outputFormat;
             Messages = messages ?? new List<ModelItem>();

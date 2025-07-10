@@ -216,16 +216,30 @@ namespace LombdaAgentSDK
             //add messages to cache
             foreach (ResponseItem item in messages)
             {
-                if (!ResponseCache.ContainsKey(item.Id))
+                if (string.IsNullOrEmpty(item.Id))
                 {
-                    ResponseCache.Add(item.Id, item);
+                    continue;
+                }
+                else
+                {
+                    if(!ResponseCache.ContainsKey(item.Id))
+                    {
+                        ResponseCache.Add(item.Id, item);
+                    }
                 }
             }
 
             //Convert output items
             foreach (ResponseItem item in response.OutputItems)
             {
-                ResponseCache.Add(item.Id, item);
+                if (!string.IsNullOrEmpty(item.Id))
+                {
+                    if (!ResponseCache.ContainsKey(item.Id))
+                    {
+                        ResponseCache.Add(item.Id, item);
+                    }
+                }
+                    
                 responseItems.Add(ConvertFromProviderItem(item));
             }
 
@@ -436,18 +450,23 @@ namespace LombdaAgentSDK
             }
             return messageContent;
         }
+
         public IList<ResponseItem> ConvertToProviderItems(IEnumerable messages)
         {
             List<ResponseItem> responseItems = new List<ResponseItem>();
 
             foreach (ModelItem item in messages)
             {
-                if(ResponseCache.TryGetValue(item.Id, out ResponseItem? cachedItem))
+                if (!string.IsNullOrEmpty(item.Id))
                 {
-                    //If we have a cached item, lets just return that
-                    responseItems.Add(cachedItem);
-                    continue;
+                    if (ResponseCache.TryGetValue(item.Id, out ResponseItem? cachedItem))
+                    {
+                        //If we have a cached item, lets just return that
+                        responseItems.Add(cachedItem);
+                        continue;
+                    }
                 }
+                
                 //If we don't have a cached item, lets convert the model item to a response item
                 if (item is ModelWebCallItem webSearchCall)
                 {
@@ -471,8 +490,8 @@ namespace LombdaAgentSDK
                         fileResult.Score = file.Score;
                         fileSearchCallResults.Add(fileResult);
                     }
-
-                    responseItems.Add(ResponseItem.CreateFileSearchCallItem(fileSearchCall.Queries, fileSearchCallResults));
+                    FileSearchCallResponseItem fileSearchCallResponseItem = ResponseItem.CreateFileSearchCallItem(fileSearchCall.Queries, fileSearchCallResults);
+                    responseItems.Add(fileSearchCallResponseItem);
                 }
                 else if (item is ModelFunctionCallItem toolCall)
                 {
@@ -487,15 +506,12 @@ namespace LombdaAgentSDK
                 }
                 else if (item is ModelFunctionCallOutputItem toolOutput)
                 {
-                    FunctionCallOutputResponseItem functionOutput = ResponseItem.CreateFunctionCallOutputItem(
+                    FunctionCallOutputResponseItem functionResponseOutput = ResponseItem.CreateFunctionCallOutputItem(
                         toolOutput.CallId,
                         toolOutput.FunctionOutput
                         );
 
-                    responseItems.Add(ResponseItem.CreateFunctionCallOutputItem(
-                        toolOutput.CallId,
-                        toolOutput.FunctionOutput
-                        ));
+                    responseItems.Add(functionResponseOutput);
 
                 }
                 else if (item is ModelReasoningItem reasoningItem)
