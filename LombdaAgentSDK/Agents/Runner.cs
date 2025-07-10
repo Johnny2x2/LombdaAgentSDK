@@ -72,7 +72,7 @@ namespace LombdaAgentSDK
             foreach (ModelItem item in outputItems)
             {
                 runResult.Messages.Add(item);
-                HandleVerboseCallback(item, callback);
+                await HandleVerboseCallback(item, callback);
 
                 //Process Action Call
                 if (item is ModelFunctionCallItem toolCall)
@@ -105,7 +105,7 @@ namespace LombdaAgentSDK
             return requiresAction;
         }
 
-        private static void HandleVerboseCallback(ModelItem item, RunnerVerboseCallbacks callback)
+        private static async Task HandleVerboseCallback(ModelItem item, RunnerVerboseCallbacks callback)
         {
             if (item is ModelWebCallItem webSearchCall)
             {

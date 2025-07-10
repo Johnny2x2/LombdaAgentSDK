@@ -18,7 +18,7 @@
 Install with NuGet
 
 ```bash
-dotnet add package LombdaAiAgents --version 1.0.0
+dotnet add package LombdaAiAgents
 ```
 
 Or include the library in your solution by adding the project reference.

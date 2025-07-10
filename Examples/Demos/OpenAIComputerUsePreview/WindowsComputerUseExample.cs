@@ -1,16 +1,43 @@
 ﻿using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
+using NUnit.Framework.Internal.Execution;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading.Tasks;
 
 namespace Examples.Demos.OpenAIComputerUsePreview
 {
-    [Experimental("computer-use-preview")]
+    public class Program
+    {
+        public static void Main()
+        {
+            Task runner = Task.Run(async () => await StartDemo());
+
+            Task.WaitAll(runner);
+        }
+
+        public static async Task StartDemo()
+        {
+#pragma warning disable computerPreview // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+            WindowsComputerUseExample computerUse = new();
+#pragma warning restore computerPreview // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+            RunResult result = new();
+
+            string task = Console.ReadLine();
+
+            while (!task.Equals("EXIT()"))
+            {
+                result = await computerUse.ComputerPreviewRun(task, result);
+                task = Console.ReadLine();
+            }
+        }
+    }
+
+    [Experimental("computerPreview")]
     public class WindowsComputerUseExample
     {
-
         [Test]
-        public async Task Run()
+        public async Task RunTest()
         {
             OpenAIModelClient openAIModelClient = new OpenAIModelClient("computer-use-preview", enableComputerCalls: true);
 
@@ -23,6 +50,18 @@ namespace Examples.Demos.OpenAIComputerUsePreview
             RunResult result = await Runner.RunAsync(agent, "Can you find and open blender from my desktop dont ask just do?", computerUseCallback: HandleComputerAction);
         }
 
+        public async Task<RunResult> ComputerPreviewRun(string task, RunResult? previousResult = null)
+        {
+            OpenAIModelClient openAIModelClient = new OpenAIModelClient("computer-use-preview", enableComputerCalls: true);
+
+            Agent agent = new Agent(
+                openAIModelClient,
+                "Assistant",
+                "You are a useful assistant that controls a windows computer to complete the users task."
+                );
+
+            return await Runner.RunAsync(agent, task, computerUseCallback: HandleComputerAction, messages: previousResult?.Messages);
+        }
 
         public static void HandleComputerAction(ComputerToolAction action)
         {

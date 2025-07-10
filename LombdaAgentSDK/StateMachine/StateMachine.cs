@@ -2,6 +2,7 @@
 
 namespace LombdaAgentSDK.StateMachine
 {
+    [Obsolete]
     public class ResultingStateMachine<TInput, TOutput> : StateMachine
     {
         public List<TOutput>? Results { get => ResultState._Output.ConvertAll(item => (TOutput)item)!;}
@@ -35,6 +36,58 @@ namespace LombdaAgentSDK.StateMachine
         public void SetEntryState(BaseState startState)
         {
             if(!startState.GetInputType().IsAssignableTo(typeof(TInput)))
+            {
+                throw new InvalidCastException($"Entry State {startState.ToString()} with Input type of {startState.GetInputType()} Requires Input Type of {typeof(TInput)}");
+            }
+
+            StartState = startState;
+        }
+
+        public void SetOutputState(BaseState resultState)
+        {
+            if (!resultState.GetOutputType().IsAssignableTo(typeof(TOutput)))
+            {
+                throw new InvalidCastException($"Output State {resultState.ToString()} with Output type of {resultState.GetOutputType()} Requires Cast of Output Type to {typeof(TOutput)}");
+            }
+
+            ResultState = resultState;
+        }
+
+    }
+
+    public class StateMachine<TInput, TOutput> : StateMachine
+    {
+        public List<TOutput>? Results { get => ResultState._Output.ConvertAll(item => (TOutput)item)!; }
+
+        BaseState StartState { get; set; }
+        BaseState ResultState { get; set; }
+
+        public StateMachine() { }
+
+        public async Task<List<TOutput?>> Run(TInput input)
+        {
+            if (StartState == null)
+            {
+                throw new InvalidOperationException("Need to Set a Start State for the Resulting StateMachine");
+            }
+
+            if (ResultState == null)
+            {
+                throw new InvalidOperationException("Need to Set a Result State for the Resulting StateMachine");
+            }
+
+            StartState.CurrentStateMachine = this;
+            ActiveStates.Add(StartState);
+            await StartState._EnterState(input); //preset input
+
+            await base.Run(StartState);
+
+            return Results;
+        }
+
+        public void SetEntryState(BaseState startState)
+        {
+            if (!startState.GetInputType().IsAssignableTo(typeof(TInput)))
             {
                 throw new InvalidCastException($"Entry State {startState.ToString()} with Input type of {startState.GetInputType()} Requires Input Type of {typeof(TInput)}");
             }

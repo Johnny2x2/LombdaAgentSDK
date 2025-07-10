@@ -105,7 +105,7 @@ namespace Test
             state1.AddTransition((output) => { Console.WriteLine($"Result was {output}"); result = output; return true; }, state2);
             state2.AddTransition(_ => true, new ExitState());
 
-            ResultingStateMachine<string, string> stateMachine = new();
+            StateMachine<string, string> stateMachine = new();
 
             Assert.Throws(typeof(InvalidCastException), () => stateMachine.SetEntryState(weirdState));
             Assert.Throws(typeof(InvalidCastException), () => stateMachine.SetOutputState(weirdState));
@@ -146,14 +146,14 @@ namespace Test
 
             resultState.AddTransition(_ => true, new ExitState());
 
-            ResultingStateMachine<string, string> stateMachine = new();
+            StateMachine<string, string> stateMachine = new();
 
             stateMachine.SetEntryState(inputState);
             stateMachine.SetOutputState(resultState);
 
             List<string?> stateResults = await stateMachine.Run("3");
 
-            Console.WriteLine(stateResults[0]);
+            Assert.That(stateResults[0], Is.EqualTo("13"));
         }
     }
 }
