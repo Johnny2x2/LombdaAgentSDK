@@ -1,13 +1,15 @@
-﻿using LombdaAgentSDK.Agents.DataClasses;
-using LombdaAgentSDK.Agents;
-using LombdaAgentSDK.StateMachine;
+﻿using LlmTornado.Chat.Models;
+using LlmTornado.Code;
 using LombdaAgentSDK;
+using LombdaAgentSDK.Agents;
+using LombdaAgentSDK.Agents.DataClasses;
+using LombdaAgentSDK.Agents.Tools;
+using LombdaAgentSDK.StateMachine;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using LombdaAgentSDK.Agents.Tools;
 
 namespace Examples.Demos.CodingAgent
 {
@@ -24,8 +26,11 @@ namespace Examples.Demos.CodingAgent
                     {codeBuildInfo.ProgramResult.ProgramRequest}
                     """;
 
+            LLMTornadoModelProvider client = new(   ChatModel.OpenAi.Gpt41.V41Mini,
+                                                    [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
+
             Agent agent = new Agent(
-                new OpenAIModelClient("gpt-4o-mini"),
+                client,
                 "CodeReviewer",
                 instructions,
                 _tools: [CSHARP_CodingAgent.ReadFileTool, CSHARP_CodingAgent.GetFilesTool],
