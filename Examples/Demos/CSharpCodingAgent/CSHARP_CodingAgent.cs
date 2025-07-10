@@ -7,13 +7,13 @@ namespace Examples.Demos.CodingAgent
 {
     public class CSHARP_CodingAgent
     {
-        public static string ProjectBuildPath = "C:\\Users\\jlomba\\source\\repos\\AgentStateMachine";
-        public static string ProjectName = "AgentStateMachine";
+        public static string ProjectBuildPath = "C:\\Users\\johnl\\source\\repos\\SimpleTestBuild";
+        public static string ProjectName = "SimpleTestBuild";
 
         [Test]
         public async Task Run()
         {
-            FileIOUtility.SafeWorkingDirectory = Path.Combine(CSHARP_CodingAgent.ProjectBuildPath);
+            FileIOUtility.SafeWorkingDirectory = CSHARP_CodingAgent.ProjectBuildPath;
             //Setup states
             CSharpCodingState codeState = new CSharpCodingState();//Program a solution
             CSharpBuildState buildState = new CSharpBuildState(); //Execute a solution 

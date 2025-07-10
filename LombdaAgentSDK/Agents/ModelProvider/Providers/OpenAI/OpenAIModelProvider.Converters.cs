@@ -8,6 +8,7 @@ namespace LombdaAgentSDK
 #pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
     public partial class OpenAIModelClient
     {
+        public Dictionary<string, ResponseItem> ResponseCache { get; set; } = new Dictionary<string, ResponseItem>();
         //Convert OpenAI -> Model
         public List<ModelMessageContent> ConvertProviderContentToModelContent(List<ResponseContentPart> contentParts, MessageResponseItem item = null)
         {
@@ -208,17 +209,29 @@ namespace LombdaAgentSDK
                 computerCallOutput.Status.ToString().TryParseEnum(out ModelStatus status) ? status : ModelStatus.Completed,
                 new ModelMessageImageFileContent(ComputerResults[computerCallOutput.CallId].ImageUrl));
         }
-        public IList<ModelItem> ConvertFromProviderItems(IEnumerable messages)
+        public IList<ModelItem> ConvertFromProviderItems(OpenAIResponse response, List<ResponseItem> messages)
         {
             List<ModelItem> responseItems = new List<ModelItem>();
 
+            //add messages to cache
             foreach (ResponseItem item in messages)
             {
+                if (!ResponseCache.ContainsKey(item.Id))
+                {
+                    ResponseCache.Add(item.Id, item);
+                }
+            }
+
+            //Convert output items
+            foreach (ResponseItem item in response.OutputItems)
+            {
+                ResponseCache.Add(item.Id, item);
                 responseItems.Add(ConvertFromProviderItem(item));
             }
 
             return responseItems;
         }
+
         public ModelItem ConvertFromProviderItem(ResponseItem item)
         {
             if (item is WebSearchCallResponseItem webSearchCall)
@@ -281,7 +294,7 @@ namespace LombdaAgentSDK
             else if (item is ReasoningResponseItem reasoningItem)
             {
                 //They changed the reasoning item to not have an content, so we just return the ID and encrypted content
-                return new ModelReasoningItem(reasoningItem.Id, [reasoningItem.EncryptedContent,]);
+                return new ModelReasoningItem(reasoningItem.Id, [reasoningItem.GetSummaryText(),]);
             }
             else if (item is MessageResponseItem message)
             {
@@ -429,6 +442,13 @@ namespace LombdaAgentSDK
 
             foreach (ModelItem item in messages)
             {
+                if(ResponseCache.TryGetValue(item.Id, out ResponseItem? cachedItem))
+                {
+                    //If we have a cached item, lets just return that
+                    responseItems.Add(cachedItem);
+                    continue;
+                }
+                //If we don't have a cached item, lets convert the model item to a response item
                 if (item is ModelWebCallItem webSearchCall)
                 {
                     WebSearchCallStatus status = ConvertModelWebStatusToProviderWebCallStatus(webSearchCall.Status.ToString());
@@ -436,7 +456,7 @@ namespace LombdaAgentSDK
                     WebSearchCallResponseItem call = ResponseItem.CreateWebSearchCallItem();
                     //call.Status = status; Can not set this yet
                     //Maybe lets not report them in stream until i can get ID returned without modfying the API
-                    //responseItems.Add(ResponseItem.CreateWebSearchCallItem());
+                    responseItems.Add(ResponseItem.CreateWebSearchCallItem());
                 }
                 else if (item is ModelFileSearchCallItem fileSearchCall)
                 {
@@ -467,6 +487,11 @@ namespace LombdaAgentSDK
                 }
                 else if (item is ModelFunctionCallOutputItem toolOutput)
                 {
+                    FunctionCallOutputResponseItem functionOutput = ResponseItem.CreateFunctionCallOutputItem(
+                        toolOutput.CallId,
+                        toolOutput.FunctionOutput
+                        );
+
                     responseItems.Add(ResponseItem.CreateFunctionCallOutputItem(
                         toolOutput.CallId,
                         toolOutput.FunctionOutput

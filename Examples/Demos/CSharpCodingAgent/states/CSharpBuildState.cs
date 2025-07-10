@@ -14,8 +14,6 @@ namespace Examples.Demos.CodingAgent.states
         public override async Task<CodeBuildInfoOutput> Invoke(ProgramResultOutput programResult)
         {
             //Need a file path to a solution you don't care about or has git control
-            
-
             if (!Directory.Exists(FileIOUtility.SafeWorkingDirectory))
             {
                 throw new Exception("Need to set a directory to a c# project");

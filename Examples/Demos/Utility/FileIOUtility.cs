@@ -9,18 +9,50 @@ namespace Examples.Demos
 {
     public class FileIOUtility
     {
-        public static string SafeWorkingDirectory { get; set; } = string.Empty;
+        public static string? SafeWorkingDirectory { get; set; }
 
         public static string ReadFile(string filePath)
-        {
-            if(string.IsNullOrEmpty(SafeWorkingDirectory))
+        {   
+            try
             {
-                throw new InvalidOperationException("SafeWorkingDirectory is not set. Please set SafeWorkingDirectory before reading directories.");
-            }
-            
-            string FixedPath = Path.Combine(SafeWorkingDirectory, filePath);
+                if (string.IsNullOrEmpty(FileIOUtility.SafeWorkingDirectory))
+                {
+                    throw new InvalidOperationException("SafeWorkingDirectory is not set. Please set SafeWorkingDirectory before reading directories.");
+                }
 
-            return File.ReadAllText(FixedPath);
+                filePath = filePath.Trim();
+
+                //Path.GetInvalidPathChars().ToList().ForEach(c => filePath = filePath.Replace(c.ToString(), string.Empty));
+
+                Path.GetInvalidFileNameChars().ToList().ForEach(c =>
+                {
+                    if (Path.GetFileName(filePath).Contains(c))
+                    {
+                        throw new ArgumentException($"File name cannot contain {c}");
+                    }
+                }
+                );
+                // Validate the file path
+                if (string.IsNullOrEmpty(filePath))
+                {
+                    throw new ArgumentException("File path cannot be null or empty.");
+                }
+                if (filePath.StartsWith("..") || filePath.StartsWith("/"))
+                {
+                    throw new ArgumentException("File path cannot contain relative paths like '..', or '/'.");
+                }
+                if(filePath.StartsWith("\\"))
+                {
+                    filePath = filePath.TrimStart('\\');
+                }
+                string fixedPath = Path.Combine(FileIOUtility.SafeWorkingDirectory, filePath.Trim());
+
+                return File.ReadAllText(fixedPath);
+            }
+            catch(Exception ex)
+            {
+                return $"Error reading file -> {ex.Message}"; // Return empty string or handle as needed
+            }
         }
 
         public static void WriteFile(string filePath, string content) {
