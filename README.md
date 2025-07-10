@@ -101,7 +101,7 @@ public string GetCurrentWeather(string location, Unit unit = Unit.celsius)
 ```csharp
 class PlanningState : BaseState<string, WebSearchPlan>
 {
-    public override async Task<WebSearchPlan> Invoke()
+    public override async Task<WebSearchPlan> Invoke(string input)
     {
         string instructions = """
             You are a helpful research assistant. 
@@ -151,14 +151,14 @@ States essentially transforms the Input into the Output
 
 Where `FooState : BaseState<InputType, OutputType>`
 
-Invoke() Must Return the Output Type (Strongly Typed)
+Invoke(InputType input) Must Return the Output Type (Strongly Typed)
 
 You can only Transition to a state where the Output of the current state is the Input to the next state
 
 ```csharp
 class ConvertStringToIntState : BaseState<string, int>
 {
-    public override async Task<int> Invoke()
+    public override async Task<int> Invoke(string input)
     {
         return int.Parse(this.Input)
     }
