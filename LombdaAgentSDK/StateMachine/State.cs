@@ -63,7 +63,7 @@ namespace LombdaAgentSDK.StateMachine
             _Input.Clear();
             BeingReran = false;
             Transitioned = true; 
-            this.ExitState(); 
+            await this.ExitState(); 
         }
 
         public virtual async Task ExitState() { }
@@ -138,7 +138,7 @@ namespace LombdaAgentSDK.StateMachine
                 }
             }
 
-            this.EnterState(input);
+            await this.EnterState(input);
         }
 
         public virtual async Task EnterState(TInput? input)
@@ -178,36 +178,49 @@ namespace LombdaAgentSDK.StateMachine
 
         public abstract Task<TOutput> Invoke(TInput input);
 
+        private IState? GetFirstValidStateTransition(TOutput output)
+        {
+            return Transitions?.DefaultIfEmpty(null)?.FirstOrDefault(transition => transition?.Evaluate(output) ?? false)?.NextState ?? null;
+        }
+
+        private List<StateProcess> GetAllValidStateTransitions()
+        {
+            List<StateProcess> newStateProcesses = new();
+            Transitions.ForEach(transition =>
+            {
+                Output.ForEach(output =>
+                {
+                    if (transition.Evaluate(output))
+                    {
+                        newStateProcesses.Add(new StateProcess(transition.NextState, output));
+                    }
+                });
+            });
+            return newStateProcesses;
+        }
         //Required override to reference the correct type of transitions
         public override List<StateProcess> CheckConditions()
         {
             List<StateProcess> newStateProcesses = new();
 
-            if (!AllowsParallelTransitions)
+            if (AllowsParallelTransitions)
             {
-                foreach (var output in Output)
+                newStateProcesses = GetAllValidStateTransitions();
+            }
+            else
+            {
+                Output.ForEach(output =>
                 {
-                    IState? newState = Transitions?.DefaultIfEmpty(null)?.FirstOrDefault(transition => transition?.Evaluate(output) ?? false)?.NextState ?? null;
+                    IState? newState = GetFirstValidStateTransition(output);
+
                     if (newState != null)
                     {
                         newStateProcesses.Add(new StateProcess(newState, output));
                     }
-                }
-            }
-            else
-            {
-                Transitions.ForEach(transition =>
-                {
-                    Output.ForEach(output =>
-                    {
-                        if (transition.Evaluate(output))
-                        {
-                            newStateProcesses.Add(new StateProcess(transition.NextState, output));
-                        }
-                    });
                 });
             }
 
+            //Rerun on each input (Maybe we can find which ones need rerun instead of rerunning entire step, should that be its own invoke step?)
             if (newStateProcesses.Count == 0)
             {
                 _Input.ForEach(inpt => newStateProcesses.Add(new StateProcess(this, inpt)));
