@@ -65,7 +65,8 @@ namespace Test
 
             public override async Task<int> Invoke(int input)
             {
-                return Input.Sum();
+                List<int> list = InputProcesses.Select(process => process.Input).ToList();
+                return list.Sum();
             }
         }
 

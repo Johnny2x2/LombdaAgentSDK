@@ -1,4 +1,6 @@
-﻿using LombdaAgentSDK.Agents.DataClasses;
+﻿using LlmTornado.Moderation;
+using LombdaAgentSDK.Agents.DataClasses;
+using OpenAI.Realtime;
 using System.Collections.Concurrent;
 using System.Reflection.Metadata.Ecma335;
 using System.Runtime.CompilerServices;
@@ -37,30 +39,34 @@ namespace LombdaAgentSDK.StateMachine
     }
 
     //Basically just for the ExitState to not need to return anything
-    public abstract class BaseState: IState
+    public abstract class BaseState
     {
         public bool BeingReran = false;
         private List<StateTransition<object>> transitions = new();
         private List<object> input = new();
         private List<object> output = new();
+        private List<StateProcess> inputProcesses = new();
+        private List<StateResult> outputResults = new();
         private bool wasInvoked = false;
         private bool combineInput = false;
         private bool transitioned = false;
-
+        
         public List<object> _Output { get => output; set => output = value; }
+
+        public List<StateResult> _OutputResults { get => outputResults; set => outputResults = value; }
         public List<object> _Input { get => input; set => input = value; }
+        public List<StateProcess> _InputProcesses { get => inputProcesses; set => inputProcesses = value; }
         public List<StateTransition<object>> _Transitions { get => transitions; set => transitions = value; }
 
         public bool Transitioned { get => transitioned; set => transitioned = value; }
         public StateMachine CurrentStateMachine { get; set; }
         public abstract Task _Invoke();
         //public abstract Task Invoke(object input);
-        public async Task _EnterState(object? input) => this.EnterState(input);
-        public virtual void EnterState(object? input) => _Input.Add(input);
-
+        public async Task _EnterState(StateProcess? input) => this.EnterState(input);
+        public virtual void EnterState(StateProcess? input) => _InputProcesses.Add(input);
         public async Task _ExitState()
         {
-            _Input.Clear();
+            //_Input.Clear();
             BeingReran = false;
             Transitioned = true; 
             await this.ExitState(); 
@@ -74,59 +80,87 @@ namespace LombdaAgentSDK.StateMachine
 
         public bool WasInvoked { get => wasInvoked; set => wasInvoked = value; }
         public bool CombineInput { get => combineInput; set => combineInput = value; }
-        public virtual List<StateProcess> CheckConditions()
+
+        private BaseState? GetFirstValidStateTransition(object output)
         {
-            List<StateProcess> states = new();
-            
-            if (!AllowsParallelTransitions)
+            return _Transitions?.DefaultIfEmpty(null)?.FirstOrDefault(transition => transition?.Evaluate(output) ?? false)?.NextState ?? null;
+        }
+
+        public virtual List<StateProcess> GetFirstValidStateTransitionForEachResult()
+        {
+            List<StateProcess> newStateProcesses = new();
+
+            _OutputResults.ForEach(result =>
             {
-                foreach(var output in _Output)
+                BaseState? newState = GetFirstValidStateTransition(result.Result);
+
+                if (newState != null)
                 {
-                    IState? newState = _Transitions.DefaultIfEmpty(null).FirstOrDefault(transitions => transitions.Evaluate(output))?.NextState ?? null;
-                    if (newState != null)
+                    newStateProcesses.Add(new StateProcess(newState, result));
+                }
+                else
+                {
+                    //ReRun the process 
+                    StateProcess failedProcess = _InputProcesses.First(process => process.ID == result.ProcessID);
+
+                    if (failedProcess.AddAttempt())
                     {
-                        states.Add(new StateProcess(newState,output));
+                        newStateProcesses.Add(failedProcess);
                     }
                 }
-                
-            }
-            else
+            });
+
+            return newStateProcesses;
+        }
+        public virtual List<StateProcess> GetAllValidStateTransitions()
+        {
+            List<StateProcess> newStateProcesses = new();
+
+            _OutputResults.ForEach((output) =>
             {
+                List<StateProcess> newStateProcessesFromOutput = new();
+
+                //If the transition evaluates to true for the output, add it to the new state processes
                 _Transitions.ForEach(transition =>
                 {
-                    _Output.ForEach(output =>
-                    {
-                        if (transition.Evaluate(_Output))
-                        {
-                            states.Add(new StateProcess(transition.NextState, output));
-                        }
-                    });
+                    if (transition.Evaluate(output.Result)) newStateProcessesFromOutput.Add(new StateProcess(transition.NextState, output.Result));
                 });
-            }
 
-            if (states.Count == 0)
-            {
-                _Input.ForEach(inpt => states.Add(new StateProcess(this, inpt)));
-                
-            }
+                //If process produces no transitions 
+                if (newStateProcessesFromOutput.Count == 0)
+                {
+                    StateProcess failedProcess = _InputProcesses.First(process => process.ID == output.ProcessID);
+                    //rerun the process up to the max attempts
+                    if (failedProcess.AddAttempt()) newStateProcessesFromOutput.Add(failedProcess);
+                }
 
-            return states;
+                newStateProcesses.AddRange(newStateProcessesFromOutput);
+            });
+
+            return newStateProcesses;
+        }
+
+        public List<StateProcess> CheckConditions()
+        {
+            return AllowsParallelTransitions ? GetAllValidStateTransitions() : GetFirstValidStateTransitionForEachResult();
         }
     }
 
-    public abstract class BaseState<TInput, TOutput> : BaseState, IState<TInput, TOutput>
+    public abstract class BaseState<TInput, TOutput> : BaseState
     {
         public override Type GetInputType() => typeof(TInput);
         public override Type GetOutputType() => typeof(TOutput);
 
         private List<StateTransition<TOutput>> transitions = new();
+        public List<TOutput> Output { get => _Output.ConvertAll(item => (TOutput)item); set => _Output = value.ConvertAll(item => (object?) item)!; }
 
-        public List<TInput> Input { get => _Input.ConvertAll(item => (TInput)item); set => _Input = value.ConvertAll(item => (object?)item)!; }
-        public List<TOutput> Output { get => _Output.ConvertAll(item => (TOutput)item); set => _Output = value.ConvertAll(item => (object?)item)!; }
-
+        [Obsolete("Use InputProcesses Instead")]
+        public List<TInput> Input { get => _Input.ConvertAll(item => (TInput)item); set => _Output = value.ConvertAll(item => (object?)item)!; }
+        public List<StateProcess<TInput>> InputProcesses { get => _InputProcesses.ConvertAll(item => (StateProcess<TInput>)item); set => _InputProcesses = value.ConvertAll(item => (StateProcess)item)!; }
+        public List<StateResult<TOutput>> OutputResults { get => _OutputResults.ConvertAll(item => (StateResult<TOutput>)item); set => _OutputResults = value.ConvertAll(item => (StateResult?)item)!; }
         public List<StateTransition<TOutput>> Transitions { get => transitions; set => transitions = value; }
 
-        public async Task _EnterState(TInput input) 
+        public async Task _EnterState(StateProcess<TInput>? input) 
         {
             WasInvoked = false;
 
@@ -134,11 +168,11 @@ namespace LombdaAgentSDK.StateMachine
             {
                 if (input != null)
                 {
-                    Input.Add(input);
+                    InputProcesses.Add(input);
                 }
             }
 
-            await this.EnterState(input);
+            await this.EnterState(input.Input);
         }
 
         public virtual async Task EnterState(TInput? input)
@@ -147,86 +181,107 @@ namespace LombdaAgentSDK.StateMachine
         }
 
         //This is to enforce Output = Invoke() and it returns the Output
-        public override async Task<List<TOutput>> _Invoke()
+        public override async Task<List<StateResult<TOutput>>> _Invoke()
         {
-            if (Input.Count == 0)
-                throw new InvalidOperationException($"Input is required on State {this.GetType()}");
+            if (InputProcesses.Count == 0)
+                throw new InvalidOperationException($"Input Process is required on State {this.GetType()}");
 
             //Setup Invoke Task
             List<Task> Tasks = new List<Task>();
-            ConcurrentBag<TOutput> oResults = new ConcurrentBag<TOutput>();
+            ConcurrentBag<StateResult<TOutput>> oResults = new ConcurrentBag<StateResult<TOutput>>();
 
             if (CombineInput)
             {
                 //Invoke Should handle the Input as a whole
-                Tasks.Add(Task.Run(async () => oResults.Add(await Invoke(Input[0]))));
+                Tasks.Add(Task.Run(async () => oResults.Add(await InternalInvoke(InputProcesses[0]))));
             }
             else
             {
                 //Default option to process each input in as its own item (This process is resource bound by the single state instance)
-                _Input.ForEach(input => Tasks.Add(Task.Run(async () => oResults.Add(await Invoke((TInput)input)))));
+                InputProcesses.ForEach(process => Tasks.Add(Task.Run(async () => oResults.Add(await InternalInvoke(process)))));
                 //Wait for collection
             }
-
+            
             await Task.WhenAll(Tasks);
             Tasks.Clear();
             WasInvoked = true;
 
-            Output = oResults.ToList();
-            return Output;
+            OutputResults = oResults.ToList();
+
+            Output.AddRange(OutputResults.Select(result => result.Result));
+
+            return OutputResults;
+        }
+
+        /// <summary>
+        /// Wrapper for Process and result
+        /// </summary>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        public async Task<StateResult<TOutput>> InternalInvoke(StateProcess<TInput> input)
+        {
+            return new StateResult<TOutput>(input.ID, await Invoke(input.Input));
         }
 
         public abstract Task<TOutput> Invoke(TInput input);
 
-        private IState? GetFirstValidStateTransition(TOutput output)
+        private BaseState? GetFirstValidStateTransition(TOutput output)
         {
             return Transitions?.DefaultIfEmpty(null)?.FirstOrDefault(transition => transition?.Evaluate(output) ?? false)?.NextState ?? null;
         }
 
-        private List<StateProcess> GetAllValidStateTransitions()
+        public override List<StateProcess> GetFirstValidStateTransitionForEachResult()
         {
             List<StateProcess> newStateProcesses = new();
-            Transitions.ForEach(transition =>
+            
+            OutputResults.ForEach(result =>
             {
-                Output.ForEach(output =>
+                BaseState? newState = GetFirstValidStateTransition(result.Result);
+
+                if (newState != null)
                 {
-                    if (transition.Evaluate(output))
+                    newStateProcesses.Add(new StateProcess(newState, result.Result));
+                }
+                else
+                {
+                    //ReRun the process 
+                    StateProcess<TInput> failedProcess = InputProcesses.First(process => process.ID == result.ProcessID);
+
+                    if (failedProcess.AddAttempt())
                     {
-                        newStateProcesses.Add(new StateProcess(transition.NextState, output));
+                        newStateProcesses.Add(failedProcess);
                     }
-                });
+                }
             });
+
             return newStateProcesses;
         }
-        //Required override to reference the correct type of transitions
-        public override List<StateProcess> CheckConditions()
+
+        public override List<StateProcess> GetAllValidStateTransitions()
         {
             List<StateProcess> newStateProcesses = new();
 
-            if (AllowsParallelTransitions)
+            OutputResults.ForEach((output) =>
             {
-                newStateProcesses = GetAllValidStateTransitions();
-            }
-            else
-            {
-                Output.ForEach(output =>
+                List<StateProcess> newStateProcessesFromOutput = new();
+
+                //If the transition evaluates to true for the output, add it to the new state processes
+                Transitions.ForEach(transition =>
                 {
-                    IState? newState = GetFirstValidStateTransition(output);
-
-                    if (newState != null)
-                    {
-                        newStateProcesses.Add(new StateProcess(newState, output));
-                    }
+                    if(transition.Evaluate(output.Result)) newStateProcessesFromOutput.Add(new StateProcess(transition.NextState, output.Result));
                 });
-            }
 
-            //Rerun on each input (Maybe we can find which ones need rerun instead of rerunning entire step, should that be its own invoke step?)
-            if (newStateProcesses.Count == 0)
-            {
-                _Input.ForEach(inpt => newStateProcesses.Add(new StateProcess(this, inpt)));
+                //If process produces no transitions 
+                if (newStateProcessesFromOutput.Count == 0)
+                {
+                    StateProcess failedProcess = InputProcesses.First(process => process.ID == output.ProcessID);
+                    //rerun the process up to the max attempts
+                    if (failedProcess.AddAttempt()) newStateProcessesFromOutput.Add(failedProcess);
+                }
 
-            }
-
+                newStateProcesses.AddRange(newStateProcessesFromOutput);
+            } );
+           
             return newStateProcesses;
         }
 
@@ -236,24 +291,82 @@ namespace LombdaAgentSDK.StateMachine
         }
     }
 
+    //Task for the next state to process
     public class StateProcess
     {
-        public IState State { get; set; }
+        public int MaxReruns { get; set; } = 3;
+        private int rerunAttempts { get; set; } = 0;
+        public string ID { get; } = Guid.NewGuid().ToString();
+        public BaseState State { get; set; }
         public object Input { get; set; }
         //public object Result { get; set; }
-        public StateProcess(IState state, object input)
+        public StateProcess() { }
+
+        public StateProcess(BaseState state, object input, int maxReruns = 3)
         {
             State = state;
             Input = input;
+            MaxReruns = maxReruns;
         }
+
+        public bool AddAttempt()
+        {
+            rerunAttempts++;
+            return rerunAttempts < MaxReruns;
+        }
+
+        public StateResult CreateStateResult(object result)
+        {
+            return new StateResult(ID, result);
+        }
+    }
+
+    public class StateProcess<T> : StateProcess
+    {
+        public new T Input { get; set; }
+        public StateProcess(BaseState state, T input, int maxReruns = 3)
+        {
+            State = state;
+            Input = input!;
+            MaxReruns = maxReruns;
+        }
+
+        public StateResult<T> CreateStateResult(T result)
+        {
+            return new StateResult<T>(ID, result);
+        }
+    }
+
+    public class StateResult
+    {
+        public string ProcessID { get; set; }
+        public object Result { get; set; }
+        //public object Result { get; set; }
+        public StateResult() { }
+
+        public StateResult(string processID, object result)
+        {
+            ProcessID = processID;
+            Result = result;
+        }
+    }
+
+    public class StateResult<T> : StateResult
+    {
+        public new T Result { get; set; }
+        public StateResult(string process, T result)
+        {
+            ProcessID = process;
+            Result = result!;
+        }     
     }
 
     public class ExitState : BaseState<object, object>
     {
-        public override async Task<object> Invoke(object? input)
+        public override async Task<object> Invoke(object input)
         {
             CurrentStateMachine.Finish();
-            return input;
+            return input; //Forced because of the Task not returning in order
         }
     }
 }

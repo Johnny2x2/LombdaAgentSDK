@@ -25,8 +25,9 @@ namespace LombdaAgentSDK.StateMachine
             }
 
             StartState.CurrentStateMachine = this;
-            ActiveStates.Add(StartState);
-            await StartState._EnterState(input); //preset input
+            StateProcess<TInput> process = new StateProcess<TInput>(StartState, input);
+            ActiveProcesses.Add(process);
+            await StartState._EnterState(process); //preset input
 
             await base.Run(StartState);
 
@@ -76,9 +77,12 @@ namespace LombdaAgentSDK.StateMachine
                 throw new InvalidOperationException("Need to Set a Result State for the Resulting StateMachine");
             }
 
+
             StartState.CurrentStateMachine = this;
-            ActiveStates.Add(StartState);
-            await StartState._EnterState(input); //preset input
+            StateProcess<TInput> process = new StateProcess<TInput>(StartState, input);
+            ActiveProcesses.Add(process);
+            await StartState._EnterState(process); //preset input
+
 
             await base.Run(StartState);
 
@@ -109,8 +113,8 @@ namespace LombdaAgentSDK.StateMachine
 
     public class StateMachine
     {
-        private List<IState> activeStates = new();
-        public List<IState> ActiveStates => activeStates;
+        private List<StateProcess> activeProcesses = new();
+        public List<StateProcess> ActiveProcesses => activeProcesses;
 
         public CancellationTokenSource StopTrigger = new CancellationTokenSource();
         
@@ -132,14 +136,15 @@ namespace LombdaAgentSDK.StateMachine
 
         public void Stop() => StopTrigger.Cancel();
 
-        public virtual async Task Run(IState state, object? input = null)
+        public virtual async Task Run(BaseState runStartState, object? input = null)
         {
             //Add Start State
-            if (ActiveStates.Count == 0)
+            if (ActiveProcesses.Count == 0)
             {
-                state.CurrentStateMachine = this;
-                activeStates.Add(state);
-                await state._EnterState(input); //preset input
+                runStartState.CurrentStateMachine = this;
+                StateProcess startProcess = new StateProcess(runStartState, input);
+                activeProcesses.Add(startProcess);
+                await runStartState._EnterState(startProcess); //preset input
             }
 
             while (!StopTrigger.IsCancellationRequested || IsFinished)
@@ -148,7 +153,7 @@ namespace LombdaAgentSDK.StateMachine
                 List<Task> Tasks = new List<Task>();
 
                 //Collect each state Result
-                activeStates.ForEach(state => Tasks.Add(Task.Run(async () => await state?._Invoke())));
+                activeProcesses.ForEach(process => Tasks.Add(Task.Run(async () => await process.State._Invoke())));
 
                 //Wait for collection
                 await Task.WhenAll(Tasks);
@@ -158,9 +163,9 @@ namespace LombdaAgentSDK.StateMachine
                 //stop the state machine if needed & exit all states
                 if (IsFinished)
                 {
-                    foreach (IState activeState in activeStates)
+                    foreach (var process in activeProcesses)
                     {
-                        Tasks.Add(Task.Run(async () => await activeState._ExitState()));
+                        Tasks.Add(Task.Run(async () => await process.State._ExitState()));
                     }
                     await Task.WhenAll(Tasks);
                     Tasks.Clear();
@@ -172,9 +177,9 @@ namespace LombdaAgentSDK.StateMachine
                 {
                     CancellationTriggered?.Invoke();
 
-                    foreach (IState activeState in activeStates)
+                    foreach (var process in activeProcesses)
                     {
-                        Tasks.Add(Task.Run(async () => await activeState._ExitState()));
+                        Tasks.Add(Task.Run(async () => await process.State._ExitState()));
                     }
                     await Task.WhenAll(Tasks);
                     Tasks.Clear();
@@ -182,15 +187,28 @@ namespace LombdaAgentSDK.StateMachine
                 }
 
                 //Create List of transitions to new states from conditional movement
-                List<StateProcess> newStateResults = new();
+                List<StateProcess> newStateProcesses = new();
 
-                activeStates.ForEach(state => {
-                    newStateResults.AddRange(state.CheckConditions());                    
+                activeProcesses.ForEach(process => {
+                    newStateProcesses.AddRange(process.State.CheckConditions());                    
                     });
 
                 //Check to see if we can exit the active states (Make sure they transition to next phase)
-                activeStates.ForEach(state => {
-                    if (state.Transitioned) Tasks.Add(Task.Run(async () => await state._ExitState()));
+                activeProcesses.ForEach(process => {
+                    if (!process.State.CombineInput) 
+                    {
+                        //If normal state where user doesn't have fixed transition
+                        Tasks.Add(Task.Run(async () => await process.State._ExitState())); 
+                    }
+                    else
+                    {
+                        //If state did transition
+                        if (process.State.Transitioned)
+                        {
+                            //Trigger Exit and clear the InputProcesses collected
+                            Tasks.Add(Task.Run(async () => await process.State._ExitState()));
+                        }
+                    }
                 });
 
 
@@ -198,25 +216,28 @@ namespace LombdaAgentSDK.StateMachine
                 Tasks.Clear();
 
                 //Clear the active states for new states
-                activeStates.Clear();
+                activeProcesses.Clear();
 
                 //Add currentStateMachine to each item and only Enter State if it is new
                 //Add The inputs for the next run to each states to process
-                foreach (StateProcess stateProcess in newStateResults)
+                foreach (StateProcess stateProcess in newStateProcesses)
                 {
                     stateProcess.State.CurrentStateMachine = this;
-
+                    //For existing states that have not exited the InputProcess will still exist to run
+                    //Was Invoked but didn't transition
                     if (!stateProcess.State.WasInvoked)
                     {
-                        Tasks.Add(Task.Run(async () => await stateProcess.State._EnterState(stateProcess.Input)));
+                        Tasks.Add(Task.Run(async () => await stateProcess.State._EnterState(stateProcess)));
                     }
 
-                    activeStates.Add(stateProcess.State); //Add in the new states
+                    activeProcesses.Add(stateProcess); //Add in the new states
                 }
-                activeStates = activeStates.DistinctBy(state => state.GetType()).ToList();
+
+                //This is to remove running the state twice with two inputs.. it gets input from _EnterState
+                activeProcesses = activeProcesses.DistinctBy(state => state.GetType()).ToList();
+
                 await Task.WhenAll(Tasks);
                 Tasks.Clear();
-
             }
         }
     }
