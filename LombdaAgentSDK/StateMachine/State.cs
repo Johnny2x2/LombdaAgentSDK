@@ -9,36 +9,6 @@ using System.Threading.Tasks;
 
 namespace LombdaAgentSDK.StateMachine
 {
-    public interface IState
-    {
-        public bool Transitioned { get; set; }
-        public bool CombineInput { get; set; }
-        public bool WasInvoked { get; set; }
-        public List<object> _Output { get; set; }
-        public List<object> _Input { get; set; }
-        public Task _Invoke();
-        public List<StateProcess> CheckConditions();
-        public Task _EnterState(object input);
-        public Task _ExitState();
-        public StateMachine CurrentStateMachine { get; set; }
-        public List<StateTransition<object>> _Transitions { get; set; }
-    }
-
-    public interface IState<TOutput> : IState
-    {
-        public List<TOutput> Output { get; set; }
-        public List<StateTransition<TOutput>> Transitions { get; set; }
-        new public Task<List<TOutput>> _Invoke();
-    }
-
-    public interface IState<TInput, TOutput> : IState<TOutput>
-    {
-        public List<TInput> Input { get; set; }
-        public Task _EnterState(TInput input);
-
-        new public Task<List<TOutput>> _Invoke();
-    }
-
     public abstract class BaseState
     {
         public string ID { get => id; set => id = value; }
@@ -143,6 +113,7 @@ namespace LombdaAgentSDK.StateMachine
         public virtual async Task ExitState() { }
 
         //This is to enforce Output = Invoke() and it returns the Output
+        //Depending on how many Inputs the State got this could Invoke a lot of Threads.. should probably have a limitor here
         public override async Task<List<StateResult<TOutput>>> _Invoke()
         {
             if (InputProcesses.Count == 0)
@@ -161,9 +132,9 @@ namespace LombdaAgentSDK.StateMachine
             {
                 //Default option to process each input in as its own item (This process is resource bound by the single state instance)
                 InputProcesses.ForEach(process => Tasks.Add(Task.Run(async () => oResults.Add(await InternalInvoke(process)))));
-                //Wait for collection
             }
-            
+
+            // Wait for collection
             await Task.WhenAll(Tasks);
             Tasks.Clear();
             WasInvoked = true;
@@ -178,7 +149,7 @@ namespace LombdaAgentSDK.StateMachine
         /// </summary>
         /// <param name="input"></param>
         /// <returns></returns>
-        public async Task<StateResult<TOutput>> InternalInvoke(StateProcess<TInput> input)
+        private async Task<StateResult<TOutput>> InternalInvoke(StateProcess<TInput> input)
         {
             return new StateResult<TOutput>(input.ID, await Invoke(input.Input));
         }
@@ -190,7 +161,7 @@ namespace LombdaAgentSDK.StateMachine
             return Transitions?.DefaultIfEmpty(null)?.FirstOrDefault(transition => transition?.Evaluate(output) ?? false)?.NextState ?? null;
         }
 
-        public List<StateProcess> GetFirstValidStateTransitionForEachResult()
+        private List<StateProcess> GetFirstValidStateTransitionForEachResult()
         {
             List<StateProcess> newStateProcesses = new();
             
@@ -217,7 +188,7 @@ namespace LombdaAgentSDK.StateMachine
             return newStateProcesses;
         }
 
-        public List<StateProcess> GetAllValidStateTransitions()
+        private List<StateProcess> GetAllValidStateTransitions()
         {
             List<StateProcess> newStateProcesses = new();
 
@@ -256,95 +227,9 @@ namespace LombdaAgentSDK.StateMachine
         }
     }
 
-    //Task for the next state to process
-    public class StateProcess
-    {
-        private object input = new();
-
-        public int MaxReruns { get; set; } = 3;
-        private int rerunAttempts { get; set; } = 0;
-        public string ID { get; set; } = Guid.NewGuid().ToString();
-        public BaseState State { get; set; }
-        public object _Input { get => input; set => input = value; }
-        //public object Result { get; set; }
-        public StateProcess() { }
-
-        public StateProcess(BaseState state, object input, int maxReruns = 3)
-        {
-            State = state;
-            _Input = input;
-            MaxReruns = maxReruns;
-        }
-
-        public bool CanReAttempt()
-        {
-            rerunAttempts++;
-            return rerunAttempts < MaxReruns;
-        }
-
-        public StateResult CreateStateResult(object result)
-        {
-            return new StateResult(ID, result);
-        }
-
-        public StateProcess<T> GetProcess<T>()
-        {
-            return new StateProcess<T>(State,(T)input, ID);
-        }
-    }
-
-    public class StateProcess<T> : StateProcess
-    {
-        public T Input { get=> (T)_Input; set=> _Input = (object)value!; }
-
-        public StateProcess(BaseState state, T input, int maxReruns = 3) : base(state, (object?)input!, maxReruns)
-        {
-            Input = input!;
-        }
-
-        public StateProcess(BaseState state, T input, string id, int maxReruns = 3) : base(state, (object?)input!, maxReruns)
-        {
-            Input = input!;
-            ID = id;
-        }
-
-        public StateResult<T> CreateStateResult(T result)
-        {
-            return new StateResult<T>(ID, result);
-        }
-    }
-
-    public class StateResult
-    {
-        private object result = new();
-
-        public string ProcessID { get; set; }
-        public object _Result { get => result; set => result = value; }
-        //public object Result { get; set; }
-        public StateResult() { }
-
-        public StateResult(string processID, object result)
-        {
-            ProcessID = processID;
-            _Result = result;
-        }
-
-        public StateResult<T> GetResult<T>() 
-        { 
-            return new StateResult<T>(ProcessID, (T)_Result);
-        }
-    }
-
-    public class StateResult<T> : StateResult
-    {
-        public T Result { get => (T)_Result; set => _Result = value; }
-        public StateResult(string process, T result)
-        {
-            ProcessID = process;
-            Result = result!;
-        }     
-    }
-
+    /// <summary>
+    /// Helper State
+    /// </summary>
     public class ExitState : BaseState<object, object>
     {
         public override async Task<object> Invoke(object input)
