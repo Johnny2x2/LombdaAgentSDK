@@ -15,8 +15,8 @@
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <PackageId>LombdaAiAgents</PackageId>
     <Authors>Johnny2x2</Authors>
-    <AssemblyVersion>1.2.0</AssemblyVersion>
-    <VersionPrefix>1.2.0</VersionPrefix>
+    <AssemblyVersion>1.3.0</AssemblyVersion>
+    <VersionPrefix>1.3.0</VersionPrefix>
   </PropertyGroup>
 
   <ItemGroup>

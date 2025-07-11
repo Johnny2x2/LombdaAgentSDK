@@ -7,10 +7,10 @@
 ## 🚀 Features
 
 * ✅ Simple `Agent` and `State` abstractions for building agent workflows.
-* ⚙️ Support for state transitions, condition checks, and results.
+* ⚙️ Support for parallel state transitions, condition checks, and results.
 * 🔍 Plug-and-play: easily inject your own function handlers.
 * 📦 .NET Standard compatible – works across .NET Framework and .NET Core.
-
+* ✅ StateMachine Code is completely decoupled from Agent pipelines
 ---
 
 ## 📂 Installation
@@ -166,9 +166,62 @@ class ConvertStringToIntState : BaseState<string, int>
 ```
 You can build pipelines of states and let the agent transition between them based on the results.
 
+### Creating State Machines With Input & Output Types
 
+```csharp
+//Where string is Input and int is Output
+StateMachine<string, int> stateMachine = new();
+
+//Set start state with string Input
+stateMachine.SetEntryState(inputState);
+
+//Set state where output is
+stateMachine.SetOutputState(resultState);
+
+//Return list of Output objects from State 
+//List because machine might generate more than 1 output depending on flow
+List<int> stateResults = await stateMachine.Run("3");
+```
 ---
+### Allow states to transition to other states in a parallel workflow 
 
+```csharp
+//AllowsParallelTransitions = true Allows state Outputs to transition to all states that meet the criteria
+ConvertStringToIntState inputState = new() { AllowsParallelTransitions = true };
+
+IntPlus3State state3 = new();
+IntPlus4State state4 = new();
+
+//CombineInput = true only does 1 execution reguardless of # of Inputs
+//Handle all of the Inputs
+SummingState summingState = new() { CombineInput = true };
+ConvertIntToStringState resultState = new();
+
+//should happen in parallel and get result
+inputState.AddTransition(_=> true, state3);
+inputState.AddTransition(_ => true, state4);
+
+//summing State will get both results next tick
+state3.AddTransition(_ => true, summingState);
+state4.AddTransition(_ => true, summingState);
+
+//Will sum all inputs 
+summingState.AddTransition(_ => true, resultState);
+
+//Convert result and End the State Machine 
+resultState.AddTransition(_ => true, new ExitState());
+
+//Create Input & Output State Machine
+StateMachine<string, string> stateMachine = new();
+
+//Define Entry and Output States
+stateMachine.SetEntryState(inputState);
+stateMachine.SetOutputState(resultState);
+
+//Run the StateMachine
+List<string?> stateResults = await stateMachine.Run("3");
+```
+---
 ## 🚦 Roadmap
 * [ ] Add non async support for agent execution.
 * [ ] Improve logging and diagnostics.
@@ -189,7 +242,7 @@ Pull requests are welcome! For major changes, please open an issue first to disc
 
 ## 🙌 Acknowledgements
 
-LlmTornado
-OpenAI-C#
+[LlmTornado](https://github.com/lofcz/LlmTornado)
+[openai-dotnet](https://github.com/openai/openai-dotnet)
 
 
