@@ -54,7 +54,7 @@ namespace LombdaAgentSDK.StateMachine
         private bool transitioned = false;
         private string id = Guid.NewGuid().ToString();
 
-        public List<object> _Output { get => output; set => output = value; }
+        public List<object> _Output { get => _OutputResults.Select(output => output._Result).ToList(); }
 
         public List<StateResult> _OutputResults { get => outputResults; set => outputResults = value; }
         public List<object> _Input { get => input; set => input = value; }
@@ -89,8 +89,8 @@ namespace LombdaAgentSDK.StateMachine
         public List<TOutput> Output { get => OutputResults.Select(output=> output.Result).ToList();}
 
         public List<TInput> Input { get => InputProcesses.Select(process => process.Input).ToList();}
-        public List<StateProcess<TInput>> InputProcesses { get => _InputProcesses.ConvertAll(item => (StateProcess<TInput>)item); set => _InputProcesses = value.ConvertAll(item => (StateProcess)item)!; }
-        public List<StateResult<TOutput>> OutputResults { get => _OutputResults.ConvertAll(item => (StateResult<TOutput>)item); set => _OutputResults = value.ConvertAll(item => (StateResult?)item)!; }
+        public List<StateProcess<TInput>> InputProcesses { get => _InputProcesses.ConvertAll(item => item.GetProcess<TInput>()); set => _InputProcesses = value.ConvertAll(item => (StateProcess)item)!; }
+        public List<StateResult<TOutput>> OutputResults { get => _OutputResults.ConvertAll(item => item.GetResult<TOutput>()); set => _OutputResults = value.ConvertAll(item => (StateResult?)item)!; }
         public List<StateTransition<TOutput>> Transitions { get => transitions; set => transitions = value; }
 
         public async Task _EnterState(StateProcess<TInput>? input) 
@@ -108,13 +108,34 @@ namespace LombdaAgentSDK.StateMachine
             }
         }
 
-        public async override Task _EnterState(StateProcess? input) => await _EnterState((StateProcess<TInput>)input!);
+        public async override Task _EnterState(StateProcess? input)
+        {
+            await _semaphore.WaitAsync();
+            WasInvoked = false;
+            try
+            {
+                _InputProcesses.Add(input!);
+                await this.EnterState((TInput)input!._Input!);
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
 
 
         public override async Task _ExitState()
         {
-            InputProcesses.Clear();
-            await ExitState();
+            await _semaphore.WaitAsync();
+            try
+            {
+                _InputProcesses.Clear();
+                await ExitState();
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
         }
 
         public virtual async Task EnterState(TInput? input) { }
@@ -238,18 +259,20 @@ namespace LombdaAgentSDK.StateMachine
     //Task for the next state to process
     public class StateProcess
     {
+        private object input = new();
+
         public int MaxReruns { get; set; } = 3;
         private int rerunAttempts { get; set; } = 0;
-        public string ID { get; } = Guid.NewGuid().ToString();
+        public string ID { get; set; } = Guid.NewGuid().ToString();
         public BaseState State { get; set; }
-        public object Input { get; set; }
+        public object _Input { get => input; set => input = value; }
         //public object Result { get; set; }
         public StateProcess() { }
 
         public StateProcess(BaseState state, object input, int maxReruns = 3)
         {
             State = state;
-            Input = input;
+            _Input = input;
             MaxReruns = maxReruns;
         }
 
@@ -263,16 +286,26 @@ namespace LombdaAgentSDK.StateMachine
         {
             return new StateResult(ID, result);
         }
+
+        public StateProcess<T> GetProcess<T>()
+        {
+            return new StateProcess<T>(State,(T)input, ID);
+        }
     }
 
     public class StateProcess<T> : StateProcess
     {
-        public new T Input { get; set; }
-        public StateProcess(BaseState state, T input, int maxReruns = 3)
+        public T Input { get=> (T)_Input; set=> _Input = (object)value!; }
+
+        public StateProcess(BaseState state, T input, int maxReruns = 3) : base(state, (object?)input!, maxReruns)
         {
-            State = state;
             Input = input!;
-            MaxReruns = maxReruns;
+        }
+
+        public StateProcess(BaseState state, T input, string id, int maxReruns = 3) : base(state, (object?)input!, maxReruns)
+        {
+            Input = input!;
+            ID = id;
         }
 
         public StateResult<T> CreateStateResult(T result)
@@ -283,21 +316,28 @@ namespace LombdaAgentSDK.StateMachine
 
     public class StateResult
     {
+        private object result = new();
+
         public string ProcessID { get; set; }
-        public object Result { get; set; }
+        public object _Result { get => result; set => result = value; }
         //public object Result { get; set; }
         public StateResult() { }
 
         public StateResult(string processID, object result)
         {
             ProcessID = processID;
-            Result = result;
+            _Result = result;
+        }
+
+        public StateResult<T> GetResult<T>() 
+        { 
+            return new StateResult<T>(ProcessID, (T)_Result);
         }
     }
 
     public class StateResult<T> : StateResult
     {
-        public new T Result { get; set; }
+        public T Result { get => (T)_Result; set => _Result = value; }
         public StateResult(string process, T result)
         {
             ProcessID = process;

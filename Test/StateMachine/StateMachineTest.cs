@@ -70,6 +70,24 @@ namespace Test
             }
         }
 
+        public class adderState : BaseState<int, int>
+        {
+            public adderState()
+            {
+                CombineInput = true;
+            }
+
+            public override async Task<int> Invoke(int input)
+            {
+                if(InputProcesses.Count >= 2) 
+                { 
+                    return Input[0] + Input[1];
+                }
+
+                return 0;
+            }
+        }
+
         public class weird { }
         public class ConvertWeirdToIntState : BaseState<weird, weird>
         {
@@ -155,6 +173,83 @@ namespace Test
             List<string?> stateResults = await stateMachine.Run("3");
 
             Assert.That(stateResults[0], Is.EqualTo("13"));
+        }
+
+        [Test]
+        public async Task TestStateTransitionWithResultsParallelWaiting()
+        {
+            ConvertStringToIntState inputState = new() { AllowsParallelTransitions = true };
+            IntPlus3State state3 = new();
+            IntPlus4State state4 = new();
+            SummingState summingState = new() { AllowsParallelTransitions = true };
+            adderState addingState = new();
+            ConvertIntToStringState resultState = new();
+
+            //should happen in parallel and get result
+            inputState.AddTransition(_ => true, state3);
+            inputState.AddTransition(_ => true, state4);
+            inputState.AddTransition(_ => true, addingState);
+
+            //summing State should Have 2 Inputs now
+            state3.AddTransition(_ => true, summingState);
+            state4.AddTransition(_ => true, summingState);
+
+            summingState.AddTransition((result) => result < 20, state3);
+            summingState.AddTransition((result) => result < 20, state4);
+            summingState.AddTransition((result) => result >= 20, addingState);
+
+            addingState.AddTransition((result) => result >= 20, resultState);
+
+            resultState.AddTransition(_ => true, new ExitState());
+
+            StateMachine<string, string> stateMachine = new();
+
+            stateMachine.SetEntryState(inputState);
+            stateMachine.SetOutputState(resultState);
+
+            List<string?> stateResults = await stateMachine.Run("3");
+
+            Assert.IsTrue(stateResults.Contains("36"));
+        }
+
+        [Test]
+        public async Task TestStateTransitionWithResultsParallelWaitingArrayed()
+        {
+            ConvertStringToIntState inputState = new() { AllowsParallelTransitions = true };
+            IntPlus3State state3 = new();
+            IntPlus4State state4 = new();
+            SummingState summingState = new() { AllowsParallelTransitions = true };
+            adderState addingState = new();
+            ConvertIntToStringState resultState = new();
+
+            //should happen in parallel and get result
+            inputState.AddTransition(_ => true, state3);
+            inputState.AddTransition(_ => true, state4);
+            inputState.AddTransition(_ => true, addingState);
+
+            //summing State should Have 2 Inputs now
+            state3.AddTransition(_ => true, summingState);
+            state4.AddTransition(_ => true, summingState);
+
+            summingState.AddTransition((result) => result < 20, state3);
+            summingState.AddTransition((result) => result < 20, state4);
+            summingState.AddTransition((result) => result >= 20, addingState);
+
+            addingState.AddTransition((result) => result >= 20, resultState);
+
+            resultState.AddTransition(_ => true, new ExitState());
+
+            StateMachine<string, string> stateMachine = new();
+
+            stateMachine.SetEntryState(inputState);
+            stateMachine.SetOutputState(resultState);
+
+            List<List<string?>> stateResults = await stateMachine.Run(["3","2", "4"]);
+
+            //Order returned is uncertain
+            Assert.IsTrue(stateResults[0].Contains("36"));
+            Assert.IsTrue(stateResults[1].Contains("31"));
+            Assert.IsTrue(stateResults[2].Contains("41"));
         }
     }
 }

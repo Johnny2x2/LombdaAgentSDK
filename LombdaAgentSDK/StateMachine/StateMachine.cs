@@ -1,4 +1,5 @@
 ﻿using OpenAI.Responses;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
@@ -59,8 +60,39 @@ namespace LombdaAgentSDK.StateMachine
 
     }
 
+    
+
+    public class RunOutputCollection<TOutput>
+    {
+        public int Index { get; set; } = 0;
+        public List<TOutput> Results { get; set; }
+
+        public RunOutputCollection() { }
+
+        public RunOutputCollection(int index, List<TOutput> results)
+        {
+            Index = index;
+            Results = results;
+        }
+    }
+
     public class StateMachine<TInput, TOutput> : StateMachine
     {
+        class GFG : IComparer<RunOutputCollection<TOutput?>>
+        {
+            public int Compare(RunOutputCollection<TOutput?> x, RunOutputCollection<TOutput?> y)
+            {
+                if (x.Index == 0 || y.Index == 0)
+                {
+                    return 0;
+                }
+
+                // CompareTo() method
+                return x.Index.CompareTo(y.Index);
+
+            }
+        }
+
         public List<TOutput>? Results { get => ResultState._Output.ConvertAll(item => (TOutput)item)!; }
 
         BaseState StartState { get; set; }
@@ -83,6 +115,34 @@ namespace LombdaAgentSDK.StateMachine
             await base.Run(StartState, input);
 
             return Results;
+        }
+
+        public async Task<List<List<TOutput?>>> Run(TInput[] inputs)
+        {
+            if (StartState == null)
+            {
+                throw new InvalidOperationException("Need to Set a Start State for the Resulting StateMachine");
+            }
+
+            if (ResultState == null)
+            {
+                throw new InvalidOperationException("Need to Set a Result State for the Resulting StateMachine");
+            }
+
+            ConcurrentBag<RunOutputCollection<TOutput?>> oResults = new ConcurrentBag<RunOutputCollection<TOutput?>>();
+
+            for (int i = 0; i < inputs.Length; i++)
+            {
+                var runResult =  await base.Run(StartState, inputs[i], i+1, ResultState);
+                RunOutputCollection<TOutput?> runOutput = new(runResult.Item1, runResult.Item2.ConvertAll(item=> (TOutput)item)!);
+                oResults.Add(runOutput);
+            }
+
+            List<RunOutputCollection<TOutput?>> outResults = oResults!.ToList();
+
+            outResults.Sort(new GFG());
+
+            return outResults.Select(item => item.Results).ToList();
         }
 
         public void SetEntryState(BaseState startState)
@@ -150,7 +210,6 @@ namespace LombdaAgentSDK.StateMachine
             });
 
             await Task.WhenAll(Tasks);
-            activeProcesses.Clear();
             Tasks.Clear();
         }
 
@@ -200,6 +259,7 @@ namespace LombdaAgentSDK.StateMachine
         //Thread Unsafe from InitilizeProcess
         private async Task InitilizeAllNewProcesses(List<StateProcess> newStateProcesses)
         {
+            activeProcesses.Clear();
             List<Task> Tasks = new List<Task>();
             foreach (StateProcess stateProcess in newStateProcesses)
             {
@@ -248,13 +308,24 @@ namespace LombdaAgentSDK.StateMachine
             return false;
         }
 
-        public virtual async Task Run(BaseState runStartState, object? input = null)
+        public void ResetRun()
         {
-            //Add Start State 
-            if (ActiveProcesses.Count == 0)
-            {
-                await InitilizeProcess(new StateProcess(runStartState, input));
-            }
+            IsFinished = false;
+            StopTrigger.TryReset();
+            ActiveProcesses.Clear();
+        }
+
+        public async Task<(int,List<object>)> Run(BaseState runStartState, object input, int index, BaseState ResultingState)
+        {
+            await Run(runStartState, input);
+            return (index, ResultingState._Output);
+        }
+
+        public async Task Run(BaseState runStartState, object? input = null)
+        {
+            ResetRun();
+
+            await InitilizeProcess(new StateProcess(runStartState, input));
 
             while (!StopTrigger.IsCancellationRequested || IsFinished)
             {
@@ -274,6 +345,7 @@ namespace LombdaAgentSDK.StateMachine
 
                 //Add currentStateMachine to each item and only Enter State if it is new
                 //Add The inputs for the next run to each states to process
+                //Reset Active Processes Here
                 await InitilizeAllNewProcesses(newStateProcesses);
             }
         }
