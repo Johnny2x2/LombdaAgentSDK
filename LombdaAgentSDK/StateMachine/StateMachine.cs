@@ -9,7 +9,22 @@ namespace LombdaAgentSDK.StateMachine
     [Obsolete]
     public class ResultingStateMachine<TInput, TOutput> : StateMachine
     {
-        public List<TOutput>? Results { get => ResultState._Output.ConvertAll(item => (TOutput)item)!;}
+        class GFG : IComparer<RunOutputCollection<TOutput?>>
+        {
+            public int Compare(RunOutputCollection<TOutput?> x, RunOutputCollection<TOutput?> y)
+            {
+                if (x.Index == 0 || y.Index == 0)
+                {
+                    return 0;
+                }
+
+                // CompareTo() method
+                return x.Index.CompareTo(y.Index);
+
+            }
+        }
+
+        public List<TOutput>? Results { get => ResultState._Output.ConvertAll(item => (TOutput)item)!; }
 
         BaseState StartState { get; set; }
         BaseState ResultState { get; set; }
@@ -18,7 +33,7 @@ namespace LombdaAgentSDK.StateMachine
 
         public async Task<List<TOutput?>> Run(TInput input)
         {
-            if(StartState == null)
+            if (StartState == null)
             {
                 throw new InvalidOperationException("Need to Set a Start State for the Resulting StateMachine");
             }
@@ -28,19 +43,42 @@ namespace LombdaAgentSDK.StateMachine
                 throw new InvalidOperationException("Need to Set a Result State for the Resulting StateMachine");
             }
 
-            StartState.CurrentStateMachine = this;
-            StateProcess<TInput> process = new StateProcess<TInput>(StartState, input);
-            ActiveProcesses.Add(process);
-            await StartState._EnterState(process); //preset input
-
-            await base.Run(StartState);
+            await base.Run(StartState, input);
 
             return Results;
         }
 
+        public async Task<List<List<TOutput?>>> Run(TInput[] inputs)
+        {
+            if (StartState == null)
+            {
+                throw new InvalidOperationException("Need to Set a Start State for the Resulting StateMachine");
+            }
+
+            if (ResultState == null)
+            {
+                throw new InvalidOperationException("Need to Set a Result State for the Resulting StateMachine");
+            }
+
+            ConcurrentBag<RunOutputCollection<TOutput?>> oResults = new ConcurrentBag<RunOutputCollection<TOutput?>>();
+
+            for (int i = 0; i < inputs.Length; i++)
+            {
+                var runResult = await base.Run(StartState, inputs[i], i + 1, ResultState);
+                RunOutputCollection<TOutput?> runOutput = new(runResult.Item1, runResult.Item2.ConvertAll(item => (TOutput)item)!);
+                oResults.Add(runOutput);
+            }
+
+            List<RunOutputCollection<TOutput?>> outResults = oResults!.ToList();
+
+            outResults.Sort(new GFG());
+
+            return outResults.Select(item => item.Results).ToList();
+        }
+
         public void SetEntryState(BaseState startState)
         {
-            if(!startState.GetInputType().IsAssignableTo(typeof(TInput)))
+            if (!startState.GetInputType().IsAssignableTo(typeof(TInput)))
             {
                 throw new InvalidCastException($"Entry State {startState.ToString()} with Input type of {startState.GetInputType()} Requires Input Type of {typeof(TInput)}");
             }

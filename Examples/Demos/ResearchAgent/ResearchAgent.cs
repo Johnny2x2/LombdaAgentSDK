@@ -22,7 +22,7 @@ namespace Examples.Demos.ResearchAgent
             reportingState.AddTransition(_ => true, new ExitState()); //Use Lambda expression For passthrough to Exit
 
             //Create State Machine Runner with String as input and ReportData as output
-            ResultingStateMachine<string, ReportData> stateMachine = new();
+            StateMachine<string, ReportData> stateMachine = new();
 
             stateMachine.SetEntryState(plannerState);
             stateMachine.SetOutputState(reportingState);
