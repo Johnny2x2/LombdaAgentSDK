@@ -60,8 +60,6 @@ namespace LombdaAgentSDK.StateMachine
 
     }
 
-    
-
     public class RunOutputCollection<TOutput>
     {
         public int Index { get; set; } = 0;
