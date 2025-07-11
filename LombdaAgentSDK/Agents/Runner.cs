@@ -72,37 +72,30 @@ namespace LombdaAgentSDK
             foreach (ModelItem item in outputItems)
             {
                 runResult.Messages.Add(item);
+
                 await HandleVerboseCallback(item, callback);
 
                 //Process Action Call
                 if (item is ModelFunctionCallItem toolCall)
                 {
-                    ModelFunctionCallOutputItem functionOutputResponse;
-
-                    if (agent.agent_tools.ContainsKey(toolCall.FunctionName))
-                    {
-                        functionOutputResponse = await ToolRunner.CallAgentToolAsync(agent, toolCall);
-                        runResult.Messages.Add(functionOutputResponse);
-                    }
-                    else
-                    {
-                        functionOutputResponse = await ToolRunner.CallFuncToolAsync(agent, toolCall);
-                        runResult.Messages.Add(functionOutputResponse);
-                    }
+                    runResult.Messages.Add(await HandleToolCall(agent, toolCall));
 
                     requiresAction = true;
                 }
                 else if (item is ModelComputerCallItem computerCall)
                 {
-                    ModelComputerCallOutputItem computerOutputResponse = ProcessComputerCall(computerCall, computerUseCallback);
-
-                    runResult.Messages.Add(computerOutputResponse);
+                    runResult.Messages.Add(await HandleComputerCall(computerCall, computerUseCallback));
 
                     requiresAction = true;
                 }
             }
 
             return requiresAction;
+        }
+        
+        private static async Task<ModelFunctionCallOutputItem> HandleToolCall(Agent agent, ModelFunctionCallItem toolCall)
+        {
+            return agent.agent_tools.ContainsKey(toolCall.FunctionName) ? await ToolRunner.CallAgentToolAsync(agent, toolCall) : await ToolRunner.CallFuncToolAsync(agent, toolCall);
         }
 
         private static async Task HandleVerboseCallback(ModelItem item, RunnerVerboseCallbacks callback)
@@ -153,7 +146,7 @@ namespace LombdaAgentSDK
             return null;
         }
 
-        public static ModelComputerCallOutputItem ProcessComputerCall(ModelComputerCallItem computerCall, ComputerActionCallbacks computerCallbacks = null)
+        public static async Task<ModelComputerCallOutputItem> HandleComputerCall(ModelComputerCallItem computerCall, ComputerActionCallbacks computerCallbacks = null)
         {
             computerCallbacks?.Invoke(computerCall.Action);
 
