@@ -6,115 +6,9 @@ using System.Threading.Tasks;
 
 namespace LombdaAgentSDK.StateMachine
 {
-    [Obsolete]
-    public class ResultingStateMachine<TInput, TOutput> : StateMachine
-    {
-        class GFG : IComparer<RunOutputCollection<TOutput?>>
-        {
-            public int Compare(RunOutputCollection<TOutput?> x, RunOutputCollection<TOutput?> y)
-            {
-                if (x.Index == 0 || y.Index == 0)
-                {
-                    return 0;
-                }
-
-                // CompareTo() method
-                return x.Index.CompareTo(y.Index);
-
-            }
-        }
-
-        public List<TOutput>? Results { get => ResultState._Output.ConvertAll(item => (TOutput)item)!; }
-
-        BaseState StartState { get; set; }
-        BaseState ResultState { get; set; }
-
-        public ResultingStateMachine() { }
-
-        public async Task<List<TOutput?>> Run(TInput input)
-        {
-            if (StartState == null)
-            {
-                throw new InvalidOperationException("Need to Set a Start State for the Resulting StateMachine");
-            }
-
-            if (ResultState == null)
-            {
-                throw new InvalidOperationException("Need to Set a Result State for the Resulting StateMachine");
-            }
-
-            await base.Run(StartState, input);
-
-            return Results;
-        }
-
-        public async Task<List<List<TOutput?>>> Run(TInput[] inputs)
-        {
-            if (StartState == null)
-            {
-                throw new InvalidOperationException("Need to Set a Start State for the Resulting StateMachine");
-            }
-
-            if (ResultState == null)
-            {
-                throw new InvalidOperationException("Need to Set a Result State for the Resulting StateMachine");
-            }
-
-            ConcurrentBag<RunOutputCollection<TOutput?>> oResults = new ConcurrentBag<RunOutputCollection<TOutput?>>();
-
-            for (int i = 0; i < inputs.Length; i++)
-            {
-                var runResult = await base.Run(StartState, inputs[i], i + 1, ResultState);
-                RunOutputCollection<TOutput?> runOutput = new(runResult.Item1, runResult.Item2.ConvertAll(item => (TOutput)item)!);
-                oResults.Add(runOutput);
-            }
-
-            List<RunOutputCollection<TOutput?>> outResults = oResults!.ToList();
-
-            outResults.Sort(new GFG());
-
-            return outResults.Select(item => item.Results).ToList();
-        }
-
-        public void SetEntryState(BaseState startState)
-        {
-            if (!startState.GetInputType().IsAssignableTo(typeof(TInput)))
-            {
-                throw new InvalidCastException($"Entry State {startState.ToString()} with Input type of {startState.GetInputType()} Requires Input Type of {typeof(TInput)}");
-            }
-
-            StartState = startState;
-        }
-
-        public void SetOutputState(BaseState resultState)
-        {
-            if (!resultState.GetOutputType().IsAssignableTo(typeof(TOutput)))
-            {
-                throw new InvalidCastException($"Output State {resultState.ToString()} with Output type of {resultState.GetOutputType()} Requires Cast of Output Type to {typeof(TOutput)}");
-            }
-
-            ResultState = resultState;
-        }
-
-    }
-
-    public class RunOutputCollection<TOutput>
-    {
-        public int Index { get; set; } = 0;
-        public List<TOutput> Results { get; set; }
-
-        public RunOutputCollection() { }
-
-        public RunOutputCollection(int index, List<TOutput> results)
-        {
-            Index = index;
-            Results = results;
-        }
-    }
-
     public class StateMachine<TInput, TOutput> : StateMachine
     {
-        class GFG : IComparer<RunOutputCollection<TOutput?>>
+        class IndexSorter : IComparer<RunOutputCollection<TOutput?>>
         {
             public int Compare(RunOutputCollection<TOutput?> x, RunOutputCollection<TOutput?> y)
             {
@@ -176,7 +70,7 @@ namespace LombdaAgentSDK.StateMachine
 
             List<RunOutputCollection<TOutput?>> outResults = oResults!.ToList();
 
-            outResults.Sort(new GFG());
+            outResults.Sort(new IndexSorter());
 
             return outResults.Select(item => item.Results).ToList();
         }
@@ -387,5 +281,18 @@ namespace LombdaAgentSDK.StateMachine
         }
     }
 
-    
+    public class RunOutputCollection<TOutput>
+    {
+        public int Index { get; set; } = 0;
+        public List<TOutput> Results { get; set; }
+
+        public RunOutputCollection() { }
+
+        public RunOutputCollection(int index, List<TOutput> results)
+        {
+            Index = index;
+            Results = results;
+        }
+    }
+
 }
