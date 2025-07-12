@@ -1,4 +1,4 @@
-﻿using Examples.Demos.FunctionGenerator;
+﻿using BabyAGI.Utility;
 using LombdaAgentSDK.StateMachine;
 using System;
 using System.Collections.Generic;
@@ -27,7 +27,7 @@ namespace Examples.Demos.CodingAgent.states
 
             //build the project code
             //In theory here i could setup a lot of different code to build
-            CodeBuildInfo codeInfo = FunctionGeneratorUtility.BuildAndRunProject(StateAgent.FunctionsPath, StateAgent.ProjectName, "net8.0");
+            CodeBuildInfo codeInfo = FunctionGeneratorUtility.BuildAndRunProject(StateAgent.FunctionsPath, StateAgent.ProjectName, "net8.0", programResult.Result.Sample_EXE_Args, true);
 
             //Report the results of the build
             return new CodeBuildInfoOutput(codeInfo, programResult);

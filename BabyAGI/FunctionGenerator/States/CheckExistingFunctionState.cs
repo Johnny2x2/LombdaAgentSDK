@@ -45,35 +45,6 @@ namespace Examples.Demos.FunctionGenerator.States
 
             {1}
 
-            Determine if any of the existing functions perfectly fulfill the user's request. If so, return the name of the function.
-
-            Provide your answer in the following JSON format:
-            {{
-                "FunctionFound": true or false,
-                "FunctionName": "<name of the function if found, else null>"
-            }}
-
-            Examples:
-
-            Example 1:
-            User input: "Calculate the sum of two numbers"
-            Functions: [{{"name": "add_numbers", "description": "Adds two numbers"}}]
-            Response:
-            {{
-                "FunctionFound": true,
-                "FunctionName": "add_numbers"
-            }}
-
-            Example 2:
-            User input: "Translate text to French"
-            Functions: [{{"name": "add_numbers", "description": "Adds two numbers"}}]
-            Response:
-            {{
-                "FunctionFound": false,
-                "FunctionName": null
-            }}
-
-            Now, analyze the user's request and provide the JSON response.
             """, args, string.Empty);
 
             LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Mini, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
@@ -81,16 +52,15 @@ namespace Examples.Demos.FunctionGenerator.States
             Agent agent = new Agent(client,
                 "Code Assistant",
                 "You are an expert software assistant.",
-                _tools: [CSHARP_CodingAgent.ReadFileTool, CSHARP_CodingAgent.GetFilesTool],
                 _output_schema: typeof(FunctionFoundResult));
 
             RunResult result = await Runner.RunAsync(agent, instructions);
 
             return new FunctionFoundResultOutput(args, result.ParseJson<FunctionFoundResult>());
         }
-        
+        public async Task QueryFunctionDB()
+        {
+
+        }
     }
-
-
-
 }

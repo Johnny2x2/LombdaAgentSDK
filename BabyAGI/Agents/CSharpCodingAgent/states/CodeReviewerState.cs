@@ -42,6 +42,17 @@ namespace Examples.Demos.CodingAgent
                 _tools: [StateAgent.ReadFileTool, StateAgent.GetFilesTool],
                 _output_schema: typeof(CodeReview));
 
+            string Prompt = $"""
+                    Build Errors: {codeBuildInfo.BuildInfo.BuildResult.Error}
+
+                    Application Results: 
+                    Input Args: {codeBuildInfo.ProgramResult.Result.Sample_EXE_Args}
+
+                    Returned Result: {codeBuildInfo.BuildInfo.ExecutableResult.Output}
+
+                    Error messages: {codeBuildInfo.BuildInfo.ExecutableResult.Error}
+                    """;
+
             RunResult result = await Runner.RunAsync(agent, $"Errors Generated {codeBuildInfo.BuildInfo.BuildResult.Error}");
 
             CodeReview review = result.ParseJson<CodeReview>();

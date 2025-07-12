@@ -9,7 +9,7 @@ using System.Reflection.Metadata;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Examples.Demos.FunctionGenerator
+namespace BabyAGI.Utility
 {
     public class BuildOutputResult
     {
@@ -69,7 +69,7 @@ namespace Examples.Demos.FunctionGenerator
         [Test]
         public static void TestCreateProject()
         {
-            CreateNewProject(functionsDirectory, "Test");
+            CreateNewProject(functionsDirectory, "Test", "Test Project");
         }
 
         [Test]
@@ -127,7 +127,7 @@ namespace Examples.Demos.FunctionGenerator
         {
             if (string.IsNullOrEmpty(FunctionsDirectory))
             {
-                throw new InvalidOperationException("FunctionsDirectoryis not set. Please set FunctionsDirectory before reading directories.");
+                throw new InvalidOperationException("FunctionsDirectory is not set. Please set FunctionsDirectory before reading directories.");
             }
 
             string zipPath = Path.Combine(FunctionsDirectory, "FunctionApplicationTemplate.zip");
@@ -142,6 +142,8 @@ namespace Examples.Demos.FunctionGenerator
             ZipFile.ExtractToDirectory(zipPath, extractPath);
             Directory.Move(Path.Combine(extractPath,"FunctionApplication"), finalPath);
             Directory.Delete(extractPath, true);
+
+            WriteProjectDescription(FunctionsDirectory, projectName, projectDescription);
 
             return true;
         }
@@ -241,6 +243,18 @@ namespace Examples.Demos.FunctionGenerator
             File.WriteAllText(descriptionPath, content);
         }
 
+        public static void WriteProjectArgs(string FunctionsDirectory, string projectName, string content)
+        {
+            if (string.IsNullOrEmpty(FunctionsDirectory))
+            {
+                throw new InvalidOperationException("FunctionsDirectory is not set. Please set FunctionsDirectory before reading directories.");
+            }
+
+            string descriptionPath = Path.Combine(FunctionsDirectory, projectName, "ExampleArgs.txt");
+
+            File.WriteAllText(descriptionPath, content);
+        }
+
         public static string GetProjectFiles(string FunctionsDirectory, string projectName)
         {
             if (string.IsNullOrEmpty(FunctionsDirectory))
@@ -294,21 +308,21 @@ namespace Examples.Demos.FunctionGenerator
             }
         }
 
-        public static CodeBuildInfo BuildAndRunProject(string pathToSolution, string projectToRun, string framework = "", string args = "", bool runProject = false)
+        public static CodeBuildInfo BuildAndRunProject(string pathToFunctions, string projectToRun, string framework = "", string args = "", bool runProject = false)
         {
-            CodeBuildInfo codeBuildInfo = new CodeBuildInfo(pathToSolution, projectToRun);
+            CodeBuildInfo codeBuildInfo = new CodeBuildInfo(pathToFunctions, projectToRun);
             // Path to the target project's directory
 
             // ... (Code for programmatically building the project as shown in the previous example) ...
 
             // After the build is successful:
-            codeBuildInfo.BuildResult = BuildProject(pathToSolution);
+            codeBuildInfo.BuildResult = BuildProject(Path.Combine(pathToFunctions, projectToRun));
 
             if (codeBuildInfo.BuildResult.BuildCompleted)
             {
                 Console.WriteLine("Build successful! Now running the built project...");
                 // Find the executable file
-                string executablePath = FindExecutable(pathToSolution, projectToRun, framework);
+                string executablePath = FindExecutable(pathToFunctions, projectToRun, framework);
 
                 if (!string.IsNullOrEmpty(executablePath))
                 {
@@ -331,14 +345,26 @@ namespace Examples.Demos.FunctionGenerator
             return codeBuildInfo;
         }
 
+        public static async Task<ExecutableOutputResult> FindAndRunExecutableAndCaptureOutput(string pathToFunctions, string projectToRun, string framework = "", string args = "")
+        {
+            string executablePath = FindExecutable(pathToFunctions, projectToRun, framework);
+
+            if (!string.IsNullOrEmpty(executablePath))
+            {
+                return await RunExecutableAndCaptureOutputAsync(executablePath, args);
+            }
+
+            return new ExecutableOutputResult();
+        }
+
 
         // Function to find the executable file after build
-        public static string FindExecutable(string projectPath, string projectName, string framework)
+        public static string FindExecutable(string pathToFunctions, string projectName, string framework)
         {
             // Assuming a typical .NET Core/5+ project structure
             // You might need to adjust this based on your project setup
-            string binPath = Path.Combine(projectPath, projectName, "bin", "Debug", framework); // Adjust framework if needed
-            string executableName = $"{projectName}.exe"; // Replace with your executable name
+            string binPath = Path.Combine(pathToFunctions, projectName, "FunctionApplication", "bin", "Debug", framework); // Adjust framework if needed
+            string executableName = $"FunctionApplication.exe"; // Replace with your executable name
             string executablePath = Path.Combine(binPath, executableName);
 
             if (File.Exists(executablePath))
@@ -347,7 +373,7 @@ namespace Examples.Demos.FunctionGenerator
             }
 
             // Check the Release folder as well
-            binPath = Path.Combine(projectPath, projectName, "bin", "Release", framework); // Adjust framework if needed
+            binPath = Path.Combine(pathToFunctions, projectName, "FunctionApplication", "bin", "Release", framework); // Adjust framework if needed
             executablePath = Path.Combine(binPath, executableName);
 
             if (File.Exists(executablePath))
@@ -401,7 +427,48 @@ namespace Examples.Demos.FunctionGenerator
                 return result;
             }
         }
+        public static async Task<ExecutableOutputResult> RunExecutableAndCaptureOutputAsync(string executablePath, string? arguments = "")
+        {
+            Process process = new Process();
+            process.StartInfo.FileName = executablePath;
+            process.StartInfo.Arguments = arguments; // Pass any arguments to the executable here
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.RedirectStandardOutput = true;
+            process.StartInfo.RedirectStandardError = true;
+            process.StartInfo.CreateNoWindow = true;
 
+            ExecutableOutputResult result = new ExecutableOutputResult();
+
+            try
+            {
+                process.Start();
+
+                // Read the output and error streams
+                result.Output = process.StandardOutput.ReadToEnd();
+                result.Error = process.StandardError.ReadToEnd();
+
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode == 0)
+                {
+                    Console.WriteLine("Executable Output:");
+                    Console.WriteLine(result.Output);
+                }
+                else
+                {
+                    Console.WriteLine("Executable Error:");
+                    Console.WriteLine(result.Error);
+                }
+                result.ExecutionCompleted = true;
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error running executable: {ex.Message}");
+                result.ExecutionCompleted = false;
+                return result;
+            }
+        }
         // Function to build the project using dotnet CLI
         public static BuildOutputResult BuildProject(string path)
         {

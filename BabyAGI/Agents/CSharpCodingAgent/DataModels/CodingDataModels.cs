@@ -1,10 +1,11 @@
 ﻿
-using Examples.Demos.FunctionGenerator;
+using BabyAGI.Utility;
 
 namespace Examples.Demos.CodingAgent
 {
     public struct ProgramResult
     {
+        public string Sample_EXE_Args {  get; set; }
         public CodeItem[] items { get; set; }
         public ProgramResult(CodeItem[] items)
         {
