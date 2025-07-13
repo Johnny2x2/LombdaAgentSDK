@@ -107,7 +107,7 @@ namespace LombdaAgentSDK
 
             ResponseRequest request = new ResponseRequest
             {
-                Model = ChatModel.OpenAi.Gpt41.V41,
+                Model = CurrentModel,
                 InputItems = InputItems,
                 Instructions = options.Instructions
             };
@@ -154,16 +154,33 @@ namespace LombdaAgentSDK
                 {
                     Summary = ResponseReasoningSummaries.Concise
                 };
+                request.Background = false;
             }
 
             //Convert Text Format Here
             if (options.OutputFormat != null)
             {
                 dynamic? responseFormat = JsonConvert.DeserializeObject<dynamic>(options.OutputFormat.JsonSchema.ToString());
-                request.Text= TextConfiguration.CreateJsonSchema(
+
+
+                dynamic? result = options.OutputFormat.JsonSchema.ToObjectFromJson<dynamic>();
+                var jobj = JObject.FromObject(result);
+
+                var config1 = TextConfiguration.CreateJsonSchema(
                     responseFormat,
                     options.OutputFormat.JsonSchemaFormatName,
-                    strict:true);
+                    strict: true);
+                var config2 = TextConfiguration.CreateJsonSchema(
+                     result,
+                    options.OutputFormat.JsonSchemaFormatName,
+                    strict: true);
+                var config3 = TextConfiguration.CreateJsonSchema(
+                    jobj,
+                    options.OutputFormat.JsonSchemaFormatName,
+                    strict: true);
+
+
+                request.Text = config2;
             }
 
             if (options.ReasoningOptions != null)
@@ -238,11 +255,7 @@ namespace LombdaAgentSDK
 
         public override async Task<ModelResponse> CreateStreamingResponseAsync(List<ModelItem> messages, ModelResponseOptions options, Runner.StreamingCallbacks streamingCallback = null)
         {
-            Conversation chat = Client.Chat.CreateConversation(CurrentModel);
-
-            chat = SetupClient(chat, messages, options);
-
-            return await HandleStreaming(chat, messages, options, streamingCallback);
+            return UseResponseAPI ? await StreamingResponseAPIAsync(messages, options, streamingCallback) : await StreamingChatAPIAsync(messages, options, streamingCallback);
         }
 
         public async Task<ModelResponse> StreamingChatAPIAsync(List<ModelItem> messages, ModelResponseOptions options, Runner.StreamingCallbacks streamingCallback = null)
@@ -275,17 +288,11 @@ namespace LombdaAgentSDK
 
                     if (data is ResponseEventOutputItemDone itemDone)
                     {
+                        ResponseOutput.OutputItems.Add(ConvertFromProviderOutputItem(itemDone.Item));
+
                         if (itemDone.Item is ResponseFunctionToolCallItem call)
                         {
                             streamingCallback?.Invoke($"INVOKING -> [{call.Name}]");
-                            //Add the tool call to the response output
-                            ResponseOutput.OutputItems.Add(new ModelFunctionCallItem(
-                                call.Id,
-                                 call.CallId,
-                                call.Name,
-                                ModelStatus.InProgress,
-                                BinaryData.FromString(call.Arguments)
-                                ));
                         }
                     }
 

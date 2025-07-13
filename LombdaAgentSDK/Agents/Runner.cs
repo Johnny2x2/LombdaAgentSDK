@@ -14,14 +14,15 @@ namespace LombdaAgentSDK
         public static async Task<RunResult> RunAsync(
             Agent agent,
             string input = "",
-            GuardRailFunction? guard_rail = null, 
-            bool single_turn = false, 
+            GuardRailFunction? guard_rail = null,
+            bool single_turn = false,
             int maxTurns = 10,
             List<ModelItem>? messages = null,
             ComputerActionCallbacks computerUseCallback = null,
             RunnerVerboseCallbacks verboseCallback = null,
             bool streaming = false,
-            StreamingCallbacks streamingCallback = null
+            StreamingCallbacks streamingCallback = null,
+            string responseID = ""
             )
         {
             RunResult runResult = new RunResult();
@@ -30,6 +31,11 @@ namespace LombdaAgentSDK
             if (messages != null) 
             {
                 runResult.Messages.AddRange(messages);
+            }
+
+            if (!string.IsNullOrEmpty(responseID))
+            {
+                agent.Options.PreviousResponseId = responseID;
             }
 
             //Add the latest message to the stream
@@ -41,7 +47,11 @@ namespace LombdaAgentSDK
                 var guard_railResult = await (Task<GuardRailFunctionOutput>)guard_rail.DynamicInvoke([input])!;
                 if (guard_railResult != null) {
                     GuardRailFunctionOutput grfOutput = guard_railResult;
-                    if (grfOutput.TripwireTriggered) throw new Exception($"Input Guardrail Stopped the agent from continuing because, {grfOutput.OutputInfo}");
+                    if (grfOutput.TripwireTriggered) throw new GuardRailTriggerException($"Input Guardrail Stopped the agent from continuing because, {grfOutput.OutputInfo}");
+                }
+                else
+                {
+                    throw new Exception($"GuardRail Failed To Run");
                 }
             }
 
@@ -156,7 +166,7 @@ namespace LombdaAgentSDK
 
             GC.Collect();
 
-            return new ModelComputerCallOutputItem(Guid.NewGuid().ToString(), computerCall.CallId, ModelStatus.Completed, new ModelMessageImageFileContent(BinaryData.FromBytes(data), "image/png"));
+            return new ModelComputerCallOutputItem("cuo_"+Guid.NewGuid().ToString().Replace("-","_"), computerCall.CallId, ModelStatus.Completed, new ModelMessageImageFileContent(BinaryData.FromBytes(data), "image/png"));
         }
 
         /// <summary>

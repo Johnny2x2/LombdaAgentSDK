@@ -13,8 +13,19 @@
 
         public bool GuardrailTriggered { get => guardrailTriggered; set => guardrailTriggered = value; }
 
-        public string? Text => ((ModelMessageItem?)Response.OutputItems?.LastOrDefault())?.Text ?? string.Empty;
+        public string? Text => TryGetText();
 
+        public string? TryGetText()
+        {
+            try
+            {
+                return ((ModelMessageItem?)Response.OutputItems?.LastOrDefault())?.Text ?? string.Empty;
+            }
+            catch
+            {
+                return null;
+            }
+        }
         public RunResult() { }
     }
 

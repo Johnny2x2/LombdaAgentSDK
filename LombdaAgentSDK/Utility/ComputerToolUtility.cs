@@ -146,6 +146,15 @@ namespace LombdaAgentSDK
             keybd_event(keyCode, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
         }
 
+        public static void PressKeyDown(string keyCode)
+        {
+            short vkCode = VkKeyScan(keyCode[0]); // Get virtual key code for the character
+            byte keyCod = (byte)(vkCode & 0xFF); // Extract the virtual key code (low-order byte)
+            keybd_event(keyCod, 0, KEYEVENTF_KEYDOWN, UIntPtr.Zero);
+            Thread.Sleep(50);
+            keybd_event(keyCod, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        }
+
         public static void Type(List<string> texts)
         {
             foreach (string text in texts)

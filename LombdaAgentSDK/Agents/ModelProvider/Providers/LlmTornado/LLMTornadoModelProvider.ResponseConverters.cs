@@ -236,7 +236,7 @@ namespace LombdaAgentSDK
                         new ComputerToolActionClick(
                             clickAction.X,
                             clickAction.Y,
-                            clickAction.Button.ToString().ToUpper().TryParseEnum(out MouseButtons button) ? button : MouseButtons.LEFT)),
+                            clickAction.Button.ToString().TryParseEnum(out MouseButtons button) ? button : MouseButtons.Left)),
 
                 DoubleClickAction clickAction =>
                     Wrap(
@@ -311,7 +311,7 @@ namespace LombdaAgentSDK
                         new ComputerToolActionClick(
                             clickAction.X,
                             clickAction.Y,
-                            clickAction.Button.ToString().ToUpper().TryParseEnum(out MouseButtons button) ? button : MouseButtons.LEFT)),
+                            clickAction.Button.ToString().TryParseEnum(out MouseButtons button) ? button : MouseButtons.Left)),
 
                 DoubleClickAction clickAction =>
                     Wrap(
@@ -471,9 +471,9 @@ namespace LombdaAgentSDK
                 throw new ArgumentNullException(nameof(computerCall));
 
             // Local helper so we don’t repeat the constructor footprint eight times.
-            ComputerToolCallInput Wrap(string id, string callId, IComputerAction action)
+            ComputerToolCallInput Wrap(string id, string callId, IComputerAction action, ResponseMessageStatuses status)
                 => new(id, callId, action, ResponseMessageStatuses.Completed);
-
+            
             // Pattern‑matching switch keeps the code compact and type‑safe.
             return computerCall.Action switch
             {
@@ -491,8 +491,10 @@ namespace LombdaAgentSDK
                                 ? btn : ResponseMouseButton.Left,
                             X = clickSrc.MoveCoordinates.X,
                             Y = clickSrc.MoveCoordinates.Y
-                        }),
-
+                        }, 
+                        ResponseMessageStatuses.Completed),
+                        
+                
                 // -------------------------------------------------------------------------
                 // DOUBLE‑CLICK (no button property in new model – assumes primary button)
                 // -------------------------------------------------------------------------
@@ -504,7 +506,8 @@ namespace LombdaAgentSDK
                         {
                             X = dblSrc.MoveCoordinates.X,
                             Y = dblSrc.MoveCoordinates.Y
-                        }),
+                        },
+                        ResponseMessageStatuses.Completed),
 
                 // -------------------------------------------------------------------------
                 // DRAG
@@ -520,7 +523,8 @@ namespace LombdaAgentSDK
                                 new() { X = dragSrc.StartDragLocation.X, Y = dragSrc.StartDragLocation.Y },
                                 new() { X = dragSrc.MoveCoordinates.X,   Y = dragSrc.MoveCoordinates.Y   }
                             }
-                        }),
+                        },
+                        ResponseMessageStatuses.Completed),
 
                 // -------------------------------------------------------------------------
                 // KEYPRESS
@@ -529,7 +533,8 @@ namespace LombdaAgentSDK
                     Wrap(
                         computerCall.Id,
                         computerCall.CallId,
-                        new KeyPressAction { Keys = new List<string>(keySrc.KeysToPress) }),
+                        new KeyPressAction { Keys = new List<string>(keySrc.KeysToPress) },
+                        ResponseMessageStatuses.Completed),
 
                 // -------------------------------------------------------------------------
                 // MOVE
@@ -538,7 +543,8 @@ namespace LombdaAgentSDK
                     Wrap(
                         computerCall.Id,
                         computerCall.CallId,
-                        new MoveAction { X = moveSrc.MoveCoordinates.X, Y = moveSrc.MoveCoordinates.Y }),
+                        new MoveAction { X = moveSrc.MoveCoordinates.X, Y = moveSrc.MoveCoordinates.Y },
+                        ResponseMessageStatuses.Completed),
 
                 // -------------------------------------------------------------------------
                 // SCREENSHOT
@@ -547,7 +553,8 @@ namespace LombdaAgentSDK
                     Wrap(
                         computerCall.Id,
                         computerCall.CallId,
-                        new ScreenshotAction()),
+                        new ScreenshotAction(),
+                        ResponseMessageStatuses.Completed),
 
                 // -------------------------------------------------------------------------
                 // SCROLL
@@ -562,7 +569,8 @@ namespace LombdaAgentSDK
                             Y       = scrollSrc.MoveCoordinates.Y,
                             ScrollX = scrollSrc.ScrollHorOffset,
                             ScrollY = scrollSrc.ScrollVertOffset
-                        }),
+                        },
+                        ResponseMessageStatuses.Completed),
 
                 // -------------------------------------------------------------------------
                 // TYPE
@@ -571,7 +579,8 @@ namespace LombdaAgentSDK
                     Wrap(
                         computerCall.Id,
                         computerCall.CallId,
-                        new TypeAction { Text = typeSrc.TypeText }),
+                        new TypeAction { Text = typeSrc.TypeText },
+                        ResponseMessageStatuses.Completed),
 
                 // -------------------------------------------------------------------------
                 // WAIT
@@ -580,7 +589,8 @@ namespace LombdaAgentSDK
                     Wrap(
                         computerCall.Id,
                         computerCall.CallId,
-                        new WaitAction()),
+                        new WaitAction(),
+                        ResponseMessageStatuses.Completed),
 
                 // -------------------------------------------------------------------------
                 // FALL‑THROUGH: unrecognised action
@@ -591,11 +601,14 @@ namespace LombdaAgentSDK
 
         public ComputerToolCallOutput ConvertComputerOutputToProviderItem(ModelComputerCallOutputItem computerCallOutput)
         {
-            ComputerScreenshot ss = new ComputerScreenshot();
-            ss.ImageUrl = computerCallOutput.ScreenShot.ImageURL;
-            ss.FileId = computerCallOutput.ScreenShot.FileId;
+            ComputerScreenshot ss = new();
+            ResponseInputContentImage ssContent = ResponseInputContentImage.CreateImageUrl(computerCallOutput.ScreenShot.ImageURL);
+            ss.ImageUrl = ssContent.ImageUrl;
+            //ss.FileId = ssContent.FileId;
+          
             ComputerToolCallOutput computerToolCallOutput = new ComputerToolCallOutput(computerCallOutput.CallId, ss);
-            computerToolCallOutput.Id = computerCallOutput.Id;
+            //computerToolCallOutput.Id = computerCallOutput.Id;
+
             return computerToolCallOutput;
         }
     }
