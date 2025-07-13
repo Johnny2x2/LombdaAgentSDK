@@ -12,6 +12,10 @@ namespace Examples.Demos.CodingAgent
     {
         public string FunctionsPath = "C:\\Users\\johnl\\source\\repos\\FunctionApplications";
         public string ProjectName = "";
+        public CSHARP_CodingAgent(string functionsPath) 
+        { 
+            FunctionsPath = functionsPath;
+        }
         public FunctionBreakDownInput Context {  get; set; }
         public async Task<CodeBuildInfoOutput> RunCodingAgent(FunctionBreakDownInput context)
         {

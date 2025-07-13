@@ -1,4 +1,5 @@
 ﻿using Examples.Demos.CodingAgent;
+using Examples.Demos.FunctionGenerator;
 using Examples.Demos.FunctionGenerator.States;
 using LombdaAgentSDK.StateMachine;
 using System;
@@ -11,7 +12,9 @@ namespace BabyAGI.FunctionGenerator.States
 {
     public class GenerateFunctionState : BaseState<FunctionBreakDownResults, FunctionBreakDownResults>
     {
-        public override Task<FunctionBreakDownResults> Invoke(FunctionBreakDownResults breakDownResults)
+        public FunctionGeneratorAgent StateController { get; set; }
+        public GenerateFunctionState(FunctionGeneratorAgent stateController) { StateController = stateController; }
+        public override async Task<FunctionBreakDownResults> Invoke(FunctionBreakDownResults breakDownResults)
         {
             List<Task> tasks = new();
 
@@ -22,11 +25,12 @@ namespace BabyAGI.FunctionGenerator.States
 
             await Task.WhenAll(tasks);
 
-            async Task RunAgent(FunctionBreakDown function)
-            {
-                CSHARP_CodingAgent codeAgent = new CSHARP_CodingAgent();
-                await codeAgent.RunCodingAgent(new FunctionBreakDownInput(, function));
-            }
+            return breakDownResults;
+        }
+        async Task RunAgent(FunctionBreakDown function)
+        {
+            CSHARP_CodingAgent codeAgent = new CSHARP_CodingAgent(StateController.FunctionsPath);
+            await codeAgent.RunCodingAgent(new FunctionBreakDownInput("", function));
         }
     }
 }

@@ -10,6 +10,7 @@ using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.StateMachine;
+using NUnit.Framework;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -61,7 +62,7 @@ namespace BabyAGI.Agents.CSharpCodingAgent.states
             Agent agent = new Agent(client,
                 "Enricher Assistant",
                 "You are an expert C# programmer. Your task is to enrich the generated function information to allow another AI to be able to Understand what it does, and how to use it.\n"+
-                "Generate a description of the function so an agent can decide from a list of functions when to use it.\n"+
+                "Generate a short description of the function so an agent can decide from a list of functions when to use it.\n"+
                 "To help the agent figure out how to use the function with EXE Args Generate 5-10 working Example input args " +
                 "to use for the function when running EXE process process.StartInfo.Arguments = arguments; ",
                 _output_schema: typeof(FunctionEnrichment));
@@ -99,11 +100,14 @@ namespace BabyAGI.Agents.CSharpCodingAgent.states
 
         public async Task AddFunctionDescriptionIntoDB(FunctionEnrichment enrichment)
         {
-            var configOptions = new ChromaConfigurationOptions(uri: "http://localhost:8000/api/v1/");
-            using var httpClient = new HttpClient();
-            var chromaClient = new ChromaClient(configOptions, httpClient);
+            var handler = new ApiV1ToV2DelegatingHandler
+            {
+                InnerHandler = new HttpClientHandler()
+            };
 
-            Console.WriteLine(await chromaClient.GetVersion());
+            var configOptions = new ChromaConfigurationOptions(uri: "http://localhost:8001/api/v2/");
+            using var httpClient = new HttpClient(handler);
+            var chromaClient = new ChromaClient(configOptions, httpClient);
 
             var functionCollection = await chromaClient.GetOrCreateCollection("functionCollection");
             var functionClient = new ChromaCollectionClient(functionCollection, configOptions, httpClient);
@@ -112,14 +116,10 @@ namespace BabyAGI.Agents.CSharpCodingAgent.states
 
             functionMetaData.Add("FunctionName", StateAgent.ProjectName);
 
-            TornadoApi tornadoApi = new TornadoApi();
-            EmbeddingResult? embresult = await tornadoApi.Embeddings.CreateEmbedding(EmbeddingModel.OpenAi.Gen2.Ada, "lorem ipsum");
+            TornadoApi tornadoApi = new TornadoApi([new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
+            EmbeddingResult? embresult = await tornadoApi.Embeddings.CreateEmbedding(EmbeddingModel.OpenAi.Gen2.Ada, enrichment.description);
 
             float[]? data = embresult?.Data.FirstOrDefault()?.Embedding;
-
-            LLMTornadoModelProvider embeddingClient = new(
-                ChatModel.OpenAi.Gpt41.V41Mini,
-                [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
 
             await functionClient.Add([Guid.NewGuid().ToString()], embeddings: [new(data)], metadatas: [functionMetaData], documents: [enrichment.description]);
         }

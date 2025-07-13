@@ -53,7 +53,7 @@ namespace Examples.Demos.CodingAgent
                     Error messages: {codeBuildInfo.BuildInfo.ExecutableResult.Error}
                     """;
 
-            RunResult result = await Runner.RunAsync(agent, $"Errors Generated {codeBuildInfo.BuildInfo.BuildResult.Error}");
+            RunResult result = await Runner.RunAsync(agent, Prompt);
 
             CodeReview review = result.ParseJson<CodeReview>();
 

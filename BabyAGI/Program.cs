@@ -1,21 +1,46 @@
-﻿using Examples.Demos.CodingAgent;
-using Examples.Demos.FunctionGenerator.States;
+﻿using BabyAGI.Utility;
+using Examples.Demos.CodingAgent;
+using Examples.Demos.FunctionGenerator;
+using LlmTornado.Chat.Models;
+using LlmTornado.Code;
+using LombdaAgentSDK;
+using LombdaAgentSDK.Agents;
+using LombdaAgentSDK.Agents.DataClasses;
+using LombdaAgentSDK.Agents.Tools;
 
-string userInput = "Can you divide 2 numbers for me?";
+string instructions = $"""
+                    You are a person assistant AGI with the ability to generate tools to answer any user question if you cannot do it directly task your tool to create it.
+                    """;
+ToolClass tools = new();
+LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Mini, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
+Agent agent = new Agent(client, "BabyAGI", instructions, _tools: [tools.GenerateResponse]);
 
-FunctionBreakDownResults breakDownResults = await new BreakDownTaskState().Invoke(userInput);
+//Agent agent = new Agent(new OpenAIModelClient("gpt-4.1-2025-04-14"),"BabyAGI", instructions, _tools: [tools.GenerateResponse]);
 
-List<Task> tasks = new();
-
-foreach (var function in breakDownResults.FunctionsToGenerate)
+Console.WriteLine("Enter a Message");
+Console.Write("[User]: ");
+string userInput = Console.ReadLine() ?? "";
+RunResult result = await Runner.RunAsync(agent, userInput, streaming: true, streamingCallback: Console.Write);
+Console.WriteLine("");
+Console.Write("[User]: ");
+userInput = Console.ReadLine() ?? "";
+while (!userInput.Equals("EXIT()"))
 {
-    tasks.Add(Task.Run(async () => await RunAgent(function)));
+    result = await Runner.RunAsync(agent, userInput, messages:result.Messages, streaming:true, streamingCallback:Console.Write);
+    Console.WriteLine("");
+    Console.Write("[User]: ");
+    userInput = Console.ReadLine() ?? "";
 }
 
-await Task.WhenAll(tasks);
-
-async Task RunAgent(FunctionBreakDown function)
+public class ToolClass
 {
-    CSHARP_CodingAgent codeAgent = new CSHARP_CodingAgent();
-    await codeAgent.RunCodingAgent(new FunctionBreakDownInput(userInput, function));
+    [Tool(Description = "Tru this tool to complete any task you don't normally have the ability to do.", In_parameters_description = ["The task you wish to accomplish."])]
+    public async Task<string> GenerateResponse(string task)
+    {
+        FunctionGeneratorAgent generatorSystem = new("C:\\Users\\johnl\\source\\repos\\FunctionApplications");
+        return await generatorSystem.RunAgent(task);
+    }
 }
+
+
+

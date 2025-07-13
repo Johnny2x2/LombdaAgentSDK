@@ -62,7 +62,7 @@ namespace Examples.Demos.FunctionGenerator.States
         }
     }
 
-    public class BreakDownTaskState:BaseState<string, FunctionBreakDownResults>
+    public class BreakDownTaskState:BaseState<FunctionFoundResultOutput, FunctionBreakDownResults>
     {
         private const string Format = @"
             You are an expert software assistant helping to break down a user's request into smaller functions for a microservice-inspired architecture. 
@@ -110,9 +110,9 @@ namespace Examples.Demos.FunctionGenerator.States
 
             Now, provide the breakdown for the user's request.";
 
-        public async override Task<FunctionBreakDownResults> Invoke(string input)
+        public async override Task<FunctionBreakDownResults> Invoke(FunctionFoundResultOutput input)
         {
-            string instructions = string.Format(Format, input);
+            string instructions = string.Format(Format, input.UserInput);
 
             LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Mini, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
 

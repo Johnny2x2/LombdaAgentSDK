@@ -94,7 +94,7 @@ namespace BabyAGI.Utility
         [Test]
         public static void TestGetDescription()
         {
-            Console.WriteLine(GetProjectDescription(functionsDirectory, "Test"));
+            Console.WriteLine(ReadProjectDescription(functionsDirectory, "Test"));
         }
 
         [Test]
@@ -147,25 +147,7 @@ namespace BabyAGI.Utility
 
             return true;
         }
-        public static string GetProjectDescription(string FunctionsDirectory,  string projectName)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(FunctionsDirectory))
-                {
-                    throw new InvalidOperationException("FunctionsDirectory is not set. Please set FunctionsDirectory before reading directories.");
-                }
 
-                string fixedPath = Path.Combine(FunctionsDirectory, projectName, "Description.txt");
-
-                return File.ReadAllText(fixedPath);
-            }
-
-            catch (Exception ex)
-            {
-                return $"Error reading file -> {ex.Message}"; // Return empty string or handle as needed
-            }
-        }
         public static string ReadProjectFile(string FunctionsDirectory, string projectName, string filePath)
         {
             try
@@ -214,7 +196,7 @@ namespace BabyAGI.Utility
         {
             if (string.IsNullOrEmpty(FunctionsDirectory))
             {
-                throw new InvalidOperationException("FunctionsDirectory is not set. Please set FunctionsDirectory before reading directories.");
+                throw new InvalidOperationException("FunctionsDirectory is not set. Please set FunctionsDirectory before writing directories.");
             }
 
             string projectPath = Path.Combine(FunctionsDirectory, projectName,"FunctionApplication");
@@ -235,24 +217,61 @@ namespace BabyAGI.Utility
         {
             if (string.IsNullOrEmpty(FunctionsDirectory))
             {
-                throw new InvalidOperationException("FunctionsDirectory is not set. Please set FunctionsDirectory before reading directories.");
+                throw new InvalidOperationException("FunctionsDirectory is not set. Please set FunctionsDirectory before writing directories.");
             }
 
             string descriptionPath = Path.Combine(FunctionsDirectory, projectName,"Description.txt");
 
             File.WriteAllText(descriptionPath, content);
         }
-
-        public static void WriteProjectArgs(string FunctionsDirectory, string projectName, string content)
+        public static string ReadProjectDescription(string FunctionsDirectory, string projectName)
         {
             if (string.IsNullOrEmpty(FunctionsDirectory))
             {
                 throw new InvalidOperationException("FunctionsDirectory is not set. Please set FunctionsDirectory before reading directories.");
             }
 
+            try
+            {
+                string descriptionPath = Path.Combine(FunctionsDirectory, projectName, "Description.txt");
+
+                return File.ReadAllText(descriptionPath);
+            }
+            catch (Exception ex) 
+            {
+                return ex.Message;
+            }
+
+        }
+
+        public static void WriteProjectArgs(string FunctionsDirectory, string projectName, string content)
+        {
+            if (string.IsNullOrEmpty(FunctionsDirectory))
+            {
+                throw new InvalidOperationException("FunctionsDirectory is not set. Please set FunctionsDirectory before writing directories.");
+            }
+
             string descriptionPath = Path.Combine(FunctionsDirectory, projectName, "ExampleArgs.txt");
 
             File.WriteAllText(descriptionPath, content);
+        }
+
+        public static string ReadProjectArgs(string FunctionsDirectory, string projectName)
+        {
+            if (string.IsNullOrEmpty(FunctionsDirectory))
+            {
+                throw new InvalidOperationException("FunctionsDirectory is not set. Please set FunctionsDirectory before reading directories.");
+            }
+            try
+            {
+                string descriptionPath = Path.Combine(FunctionsDirectory, projectName, "ExampleArgs.txt");
+
+                return File.ReadAllText(descriptionPath);
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
         }
 
         public static string GetProjectFiles(string FunctionsDirectory, string projectName)
