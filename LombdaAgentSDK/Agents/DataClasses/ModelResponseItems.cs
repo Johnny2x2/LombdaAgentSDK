@@ -35,7 +35,10 @@
 
     public class ModelWebCallItem : ModelItem
     {
+        private string query = "";
         public ModelWebSearchingStatus Status { get; set; }
+        public string Query { get => query; set => query = value; }
+
         public ModelWebCallItem(string id, ModelWebSearchingStatus status) : base(id)
         {
             Id = id;
@@ -45,6 +48,7 @@
 
     public class ModelReasoningItem : ModelItem
     {
+        public string? EncryptedContent { get; set; } = "";
         public List<string> Summary { get; set; } = new List<string>();
         public ModelReasoningItem(string id, string[]? summary = null) : base(id)
         {

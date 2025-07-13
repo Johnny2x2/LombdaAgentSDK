@@ -2,6 +2,8 @@
 {
     public class RunResult
     {
+        
+
         private List<ModelItem> messages = new List<ModelItem>();
 
         private bool guardrailTriggered = false;

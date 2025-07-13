@@ -3,10 +3,14 @@ using LlmTornado.Chat;
 using LlmTornado.Chat.Models;
 using LlmTornado.ChatFunctions;
 using LlmTornado.Code;
-using Newtonsoft.Json;
+using LlmTornado.Common;
+using LlmTornado.Responses;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
-using LlmTornado.Common;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
 
 namespace LombdaAgentSDK
 {
@@ -15,28 +19,33 @@ namespace LombdaAgentSDK
         public TornadoApi Client { get; set; }
         public ChatModel CurrentModel { get; set; }
 
+        public bool UseResponseAPI { get; set; }
+
         public LLMTornadoModelProvider(
-            ChatModel model, List<ProviderAuthentication> provider)
+            ChatModel model, List<ProviderAuthentication> provider, bool useResponseAPI = false)
         {
             Model = model.Name;
             CurrentModel = model;
             Client = new TornadoApi(provider);
+            UseResponseAPI = useResponseAPI;
         }
 
         public LLMTornadoModelProvider(
-            ChatModel model, Uri provider)
+            ChatModel model, Uri provider, bool useResponseAPI = false)
         {
             Model = model.Name;
             CurrentModel = model;
             Client = new TornadoApi(provider);
+            UseResponseAPI = useResponseAPI;
         }
 
         public LLMTornadoModelProvider(
-            ChatModel model, TornadoApi client )
+            ChatModel model, TornadoApi client, bool useResponseAPI = false)
         {
             Model = model;
             CurrentModel = model;
             Client = client;
+            UseResponseAPI = useResponseAPI;
         }
 
         public Conversation SetupClient(Conversation chat, List<ModelItem> messages, ModelResponseOptions options)
@@ -76,6 +85,80 @@ namespace LombdaAgentSDK
             chat = ConvertToProviderItems(messages, chat);
 
             return chat;
+        }
+
+        public ResponseRequest SetupResponseClient(List<ModelItem> messages, ModelResponseOptions options)
+        {
+            List<ResponseInputItem> InputItems = new();
+
+            InputItems.AddRange(ConvertToProviderResponseItems(new List<ModelItem>([messages.Last()])));
+
+            ResponseRequest request = new ResponseRequest
+            {
+                Model = ChatModel.OpenAi.Gpt41.V41,
+                InputItems = InputItems,
+                Instructions = options.Instructions
+            };
+            
+            if (request.Tools == null) request.Tools = new List<ResponseTool>();
+
+            request.PreviousResponseId = options.PreviousResponseId ?? null;
+            //Convert Tools here
+            foreach (BaseTool tool in options.Tools)
+            {
+                dynamic? responseFormat = JsonConvert.DeserializeObject<dynamic>(tool.ToolParameters.ToString());
+
+                var obj = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        location = new
+                        {
+                            type = "string",
+                            description = "name of the location"
+                        }
+                    },
+                    required = new List<string> { "location" },
+                    additionalProperties = false
+                };
+
+                ResponseFunctionTool rftool = new()
+                {
+                    Name = tool.ToolName,
+                    Description = tool.ToolDescription,
+                    Parameters = JObject.FromObject(obj),
+                    Strict = true
+                };
+
+                request.Tools.Add(rftool);
+            }
+
+            //Convert Text Format Here
+            if (options.OutputFormat != null)
+            {
+                dynamic? responseFormat = JsonConvert.DeserializeObject<dynamic>(options.OutputFormat.JsonSchema.ToString());
+                request.Text= TextConfiguration.CreateJsonSchema(
+                    responseFormat,
+                    options.OutputFormat.JsonSchemaFormatName,
+                    strict:true);
+            }
+
+            if (options.ReasoningOptions != null)
+            {
+                request.Reasoning = new ReasoningConfiguration()
+                {
+                    Effort = options.ReasoningOptions.EffortLevel switch
+                    {
+                        ModelReasoningEffortLevel.Low => ResponseReasoningEfforts.Low,
+                        ModelReasoningEffortLevel.Medium => ResponseReasoningEfforts.Medium,
+                        ModelReasoningEffortLevel.High => ResponseReasoningEfforts.High,
+                        _ => ResponseReasoningEfforts.Low
+                    }
+                };
+            }
+
+            return request;
         }
 
         public async Task<ModelResponse> HandleStreaming(Conversation chat, List<ModelItem> messages, ModelResponseOptions options, Runner.StreamingCallbacks streamingCallback = null)
@@ -142,9 +225,14 @@ namespace LombdaAgentSDK
 
         public override async Task<ModelResponse> CreateResponseAsync(List<ModelItem> messages, ModelResponseOptions options)
         {
+            return UseResponseAPI ? await CreateFromResponseAPIAsync(messages, options) : await CreateFromChatAPIAsync(messages, options);
+        }
+
+        public async Task<ModelResponse> CreateFromChatAPIAsync(List<ModelItem> messages, ModelResponseOptions options)
+        {
             Conversation chat = Client.Chat.CreateConversation(CurrentModel);
 
-            chat =  SetupClient(chat, messages, options);
+            chat = SetupClient(chat, messages, options);
 
             //Create Open response
             RestDataOrException<ChatRichResponse> response = await chat.GetResponseRichSafe();
@@ -155,6 +243,19 @@ namespace LombdaAgentSDK
 
             //Return results.
             return new ModelResponse(options.Model, [ConvertLastFromProviderItems(chat),], outputFormat: options.OutputFormat ?? null, ModelItems);
+        }
+
+        public async Task<ModelResponse> CreateFromResponseAPIAsync(List<ModelItem> messages, ModelResponseOptions options)
+        {
+            ResponseRequest request = SetupResponseClient(messages, options);
+
+            ResponseResult response = await Client.Responses.CreateResponse(request);
+
+            List<ModelItem> ModelItems = ConvertOutputItems(response.Output);
+
+            options.PreviousResponseId = response.Id;
+
+            return new ModelResponse(ModelItems, outputFormat: options.OutputFormat ?? null, messages, id: response.Id);
         }
     }
 }

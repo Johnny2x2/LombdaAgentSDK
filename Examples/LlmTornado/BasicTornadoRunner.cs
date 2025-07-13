@@ -13,7 +13,7 @@ namespace Examples.LlmTornado
         {
             LLMTornadoModelProvider client = new(
             ChatModel.OpenAi.Gpt41.V41Mini,
-            [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
+            [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),], true);
 
             Agent agent = new Agent(client, "Assistant", "You are a useful assistant.");
 

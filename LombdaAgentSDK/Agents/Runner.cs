@@ -33,7 +33,7 @@ namespace LombdaAgentSDK
             }
 
             //Add the latest message to the stream
-            runResult.Messages.Add(new ModelMessageItem(Guid.NewGuid().ToString(), "USER", [new ModelMessageRequestTextContent(input),], ModelStatus.Completed));
+            runResult.Messages.Add(new ModelMessageItem("msg_"+Guid.NewGuid().ToString().Replace("-","_"), "USER", [new ModelMessageRequestTextContent(input),], ModelStatus.Completed));
 
             //Check if the input triggers a guardrail to stop the agent from continuing
             if (guard_rail != null)

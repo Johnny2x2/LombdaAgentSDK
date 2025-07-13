@@ -15,6 +15,7 @@
 * 🔍 Plug-and-play: easily inject your own function handlers.
 * 📦 .NET Standard compatible – works across .NET Framework and .NET Core.
 * ✅ StateMachine Code is completely decoupled from Agent pipelines
+* 📦 BabyAGI
 ---
 
 ## 📂 Installation
