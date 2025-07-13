@@ -3,7 +3,11 @@
 ⚡ **LombdaAgentSDK** is a lightweight C# SDK designed to create and run modular "agents" that can execute tasks, manage state, and communicate with your custom infrastructure. Inspired by modern AI/automation agent patterns, it provides a framework for orchestrating workflows and modular logic with minimal overhead.
 
 ---
+> [!CAUTION]
+> This is a framework built by Johnny2x2 who has never held a job as a developer. 
+> The purpose of this repo is to share ideas and spark discussion and for experienced devs to play with. Not meant for production use. Use with caution.
 
+---
 ## 🚀 Features
 
 * ✅ Simple `Agent` and `State` abstractions for building agent workflows.

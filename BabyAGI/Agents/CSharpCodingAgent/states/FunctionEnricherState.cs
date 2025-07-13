@@ -105,7 +105,7 @@ namespace BabyAGI.Agents.CSharpCodingAgent.states
                 InnerHandler = new HttpClientHandler()
             };
 
-            var configOptions = new ChromaConfigurationOptions(uri: "http://localhost:8001/api/v2/");
+            var configOptions = new ChromaConfigurationOptions(uri: BabyAGIConfig.ChromaDbURI);
             using var httpClient = new HttpClient(handler);
             var chromaClient = new ChromaClient(configOptions, httpClient);
 
