@@ -80,7 +80,7 @@ namespace LombdaAgentSDK
                                 new ComputerToolActionClick(
                                     computerCall.Action.ClickCoordinates.Value.X,
                                     computerCall.Action.ClickCoordinates.Value.Y,
-                                    MouseButtons.LEFT)
+                                    MouseButtons.Left)
                                 );
                         case ComputerCallActionMouseButton.Right:
                             return new ModelComputerCallItem(
@@ -90,7 +90,7 @@ namespace LombdaAgentSDK
                                 new ComputerToolActionClick(
                                     computerCall.Action.ClickCoordinates.Value.X,
                                     computerCall.Action.ClickCoordinates.Value.Y,
-                                    MouseButtons.RIGHT)
+                                    MouseButtons.Right)
                                 );
                         case ComputerCallActionMouseButton.Wheel:
                             return new ModelComputerCallItem(
@@ -100,7 +100,7 @@ namespace LombdaAgentSDK
                                 new ComputerToolActionClick(
                                     computerCall.Action.ClickCoordinates.Value.X,
                                     computerCall.Action.ClickCoordinates.Value.Y,
-                                    MouseButtons.MIDDLE)
+                                    MouseButtons.Middle)
                                 );
                         case ComputerCallActionMouseButton.Back:
                             return new ModelComputerCallItem(
@@ -110,7 +110,7 @@ namespace LombdaAgentSDK
                                 new ComputerToolActionClick(
                                     computerCall.Action.ClickCoordinates.Value.X,
                                     computerCall.Action.ClickCoordinates.Value.Y,
-                                    MouseButtons.BACK)
+                                    MouseButtons.Back)
                                 );
                         case ComputerCallActionMouseButton.Forward:
                             return new ModelComputerCallItem(
@@ -120,7 +120,7 @@ namespace LombdaAgentSDK
                                 new ComputerToolActionClick(
                                     computerCall.Action.ClickCoordinates.Value.X,
                                     computerCall.Action.ClickCoordinates.Value.Y,
-                                    MouseButtons.FORWARD)
+                                    MouseButtons.Forward)
                                 );
                         default:
                             return new ModelComputerCallItem(

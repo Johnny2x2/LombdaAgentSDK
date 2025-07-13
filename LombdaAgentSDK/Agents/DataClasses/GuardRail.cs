@@ -15,4 +15,9 @@
             TripwireTriggered = tripwireTriggered;
         }
     }
+
+    public class GuardRailTriggerException : Exception
+    {
+        public GuardRailTriggerException(string message): base(message) { }
+    }
 }
