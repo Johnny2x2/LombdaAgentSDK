@@ -36,7 +36,7 @@ public class BabyAGIConfig
 
     public BabyAGIConfig()
     {
-        if (Directory.Exists(FunctionsPath))
+        if (!Directory.Exists(FunctionsPath))
         {
             throw new Exception("Functions directory is not setup");
         }
