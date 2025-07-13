@@ -1,29 +1,30 @@
-﻿using System;
+﻿using Microsoft.CodeAnalysis;
+using System;
 using System.Diagnostics;
-using Microsoft.CodeAnalysis;
+using static Examples.Demos.CodeUtility;
 namespace Examples.Demos
 {
-   
+    public class CodeBuildInfo
+    {
+
+        public string BuildPath { get; set; }
+
+        public string ProjectName { get; set; }
+        public ExecutableOutputResult? ExecutableResult { get; set; }
+
+        public BuildOutputResult? BuildResult { get; set; }
+
+        public CodeBuildInfo() { }
+
+        public CodeBuildInfo(string buildPath, string projectName)
+        {
+            BuildPath = buildPath;
+            ProjectName = projectName;
+        }
+    }
+
     public class CodeUtility
     {
-        public class CodeBuildInfo
-        {
-           
-            public string BuildPath { get; set; }
-            
-            public string ProjectName { get; set; }
-            public ExecutableOutputResult? ExecutableResult { get; set; }
-
-            public BuildOutputResult? BuildResult { get; set; }
-
-            public CodeBuildInfo() { }
-
-            public CodeBuildInfo(string buildPath, string projectName) { 
-                BuildPath = buildPath; 
-                ProjectName = projectName; 
-            }
-        }
-
         public static CodeBuildInfo BuildAndRunProject(string pathToSolution, string projectToRun, string? framework = "", bool runProject = false)
         {
             CodeBuildInfo codeBuildInfo = new CodeBuildInfo(pathToSolution, projectToRun);
@@ -106,12 +107,20 @@ namespace Examples.Demos
             }
         }
 
+        [Test]
+        public static void TestEXEwithArgs()
+        {
+            ExecutableOutputResult result = RunExecutableAndCaptureOutput("C:\\Users\\johnl\\source\\repos\\SimpleTestBuild\\SimpleTestBuild\\bin\\Debug\\net8.0\\SimpleTestBuild.exe", "hi by");
+            Assert.IsNotNull(result);
+            Console.WriteLine(result.Output);
+        }
+
         // Function to run the executable and capture its output
-        public static ExecutableOutputResult RunExecutableAndCaptureOutput(string executablePath)
+        public static ExecutableOutputResult RunExecutableAndCaptureOutput(string executablePath, string? arguments = "")
         {
             Process process = new Process();
             process.StartInfo.FileName = executablePath;
-            process.StartInfo.Arguments = ""; // Pass any arguments to the executable here
+            process.StartInfo.Arguments = arguments; // Pass any arguments to the executable here
             process.StartInfo.UseShellExecute = false;
             process.StartInfo.RedirectStandardOutput = true;
             process.StartInfo.RedirectStandardError = true;
