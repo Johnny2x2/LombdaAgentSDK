@@ -1,4 +1,6 @@
-﻿using Examples.Demos.FunctionGenerator;
+﻿using BabyAGI.Agents;
+using BabyAGI.Agents.ResearchAgent;
+using Examples.Demos.FunctionGenerator;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
 using LombdaAgentSDK;
@@ -8,11 +10,14 @@ using LombdaAgentSDK.Agents.Tools;
 
 //Seems to require a little persuasion to get to use tool instead of openAI being like nah I can't do that.
 //Stop the process with EXIT()
-string instructions = $"""You are a person assistant AGI with the ability to generate tools to answer any user question if you cannot do it directly task your tool to create it.""";
-
+ComputerControllerAgent computerTool = new ComputerControllerAgent();
+ResearchAgent researchTool = new ResearchAgent();
+SimpleWebSearchAgent websearchTool = new SimpleWebSearchAgent();
 BabyAGIConfig config = new();
-LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Mini, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
-Agent agent = new Agent(client, "BabyAGI", instructions, _tools: [config.AttemptToCompleteTask]);
+
+LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
+string instructions = $"""You are a person assistant AGI with the ability to generate tools to answer any user question if you cannot do it directly task your tool to create it.""";
+Agent agent = new Agent(client, "BabyAGI", instructions, _tools: [config.AttemptToCompleteTask, computerTool.ControlComputer, researchTool.DoResearch, websearchTool.BasicWebSearch]);
 
 Console.WriteLine("Enter a Message");
 Console.Write("[User]: ");
@@ -42,7 +47,7 @@ public class BabyAGIConfig
         }
     }
 
-    [Tool(Description = "Try this tool to complete any task you don't normally have the ability to do.", In_parameters_description = ["The task you wish to accomplish."])]
+    [Tool(Description = "Use this before telling a user you are unable to do something", In_parameters_description = ["The task you wish to accomplish."])]
     public async Task<string> AttemptToCompleteTask(string task)
     {
         FunctionGeneratorAgent generatorSystem = new(FunctionsPath);
