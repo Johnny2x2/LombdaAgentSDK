@@ -17,7 +17,7 @@ namespace LombdaAgentSDK.Agents.Tools
                                 "properties": { "input" : {"type" : "string"}},
                                 "required": [ "input" ]
                             }
-                            """u8.ToArray()))
+                            """u8.ToArray()), true)
                 );
         }
 
@@ -66,7 +66,8 @@ namespace LombdaAgentSDK.Agents.Tools
                         toolName: method.Name,
                         toolDescription: toolAttr.Description,
                         toolParameters: BinaryData.FromBytes(Encoding.UTF8.GetBytes(funcParamResult)),
-                        function: function
+                        function: function,
+                        strictSchema: required_inputs.Count == toolAttr.In_parameters_description.Length
                     );
 
             return newTool;

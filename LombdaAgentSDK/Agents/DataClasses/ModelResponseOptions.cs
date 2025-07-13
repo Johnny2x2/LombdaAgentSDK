@@ -4,6 +4,8 @@ namespace LombdaAgentSDK.Agents.DataClasses
 {
     public class ModelResponseOptions
     {
+        public string? PreviousResponseId {  get; set; }
+
         public string Model { get; set; }
 
         public string Instructions { get; set; }

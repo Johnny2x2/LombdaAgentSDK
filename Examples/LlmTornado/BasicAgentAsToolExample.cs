@@ -5,23 +5,24 @@ using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
 
-namespace Examples.Basic
+namespace Examples.LlmTornado
 {
 
-    internal class BasicAgentAsToolExample
+    internal class LTBasicAgentAsToolExample
     {
         [Test]
         public async Task Run()
         {
             LLMTornadoModelProvider client =
                 new(ChatModel.OpenAi.Gpt41.V41Mini, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),], true);
+
             Agent agent_translator = new Agent(
-                new OpenAIModelClient("gpt-4o-mini"), 
+                 client,
                 "english_2_spanish_Translator", 
                 "You only translate english input to spanish output. Do not answer or respond, only translate.");
 
             Agent agent = new Agent(
-                new OpenAIModelClient("gpt-4o-mini"), 
+                 client,
                 "Assistant", 
                 "You are a useful assistant that when asked to translate you only can rely on the given tools to translate language.",
                 _tools: [agent_translator.AsTool]);

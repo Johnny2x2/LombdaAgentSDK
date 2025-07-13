@@ -1,4 +1,5 @@
-﻿using BabyAGI.Utility;
+﻿using BabyAGI;
+using BabyAGI.Utility;
 using ChromaDB.Client;
 using Examples.Demos.CodingAgent;
 using LlmTornado;

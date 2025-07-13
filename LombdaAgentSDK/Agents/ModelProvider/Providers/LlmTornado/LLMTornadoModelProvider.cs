@@ -3,10 +3,19 @@ using LlmTornado.Chat;
 using LlmTornado.Chat.Models;
 using LlmTornado.ChatFunctions;
 using LlmTornado.Code;
-using Newtonsoft.Json;
+using LlmTornado.Common;
+using LlmTornado.Responses;
+using LlmTornado.Responses.Events;
+using LlmTornado.Threads;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
-using LlmTornado.Common;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using FunctionCall = LlmTornado.ChatFunctions.FunctionCall;
 
 namespace LombdaAgentSDK
 {
@@ -15,28 +24,40 @@ namespace LombdaAgentSDK
         public TornadoApi Client { get; set; }
         public ChatModel CurrentModel { get; set; }
 
+        public bool UseResponseAPI { get; set; }
+
+        public bool AllowComputerUse { get; set; }
+        public VectorSearchOptions? VectorSearchOptions { get; set; }
         public LLMTornadoModelProvider(
-            ChatModel model, List<ProviderAuthentication> provider)
+            ChatModel model, List<ProviderAuthentication> provider, bool useResponseAPI = false, 
+            bool allowComputerUse = false, VectorSearchOptions? searchOptions = null)
         {
             Model = model.Name;
             CurrentModel = model;
             Client = new TornadoApi(provider);
+            UseResponseAPI = useResponseAPI;
+            AllowComputerUse = allowComputerUse;
+            VectorSearchOptions = searchOptions;
         }
 
         public LLMTornadoModelProvider(
-            ChatModel model, Uri provider)
+            ChatModel model, Uri provider, bool useResponseAPI = false, bool allowComputerUse = false)
         {
             Model = model.Name;
             CurrentModel = model;
             Client = new TornadoApi(provider);
+            UseResponseAPI = useResponseAPI;
+            AllowComputerUse = allowComputerUse;
         }
 
         public LLMTornadoModelProvider(
-            ChatModel model, TornadoApi client )
+            ChatModel model, TornadoApi client, bool useResponseAPI = false, bool allowComputerUse = false)
         {
             Model = model;
             CurrentModel = model;
             Client = client;
+            UseResponseAPI = useResponseAPI;
+            AllowComputerUse = allowComputerUse;
         }
 
         public Conversation SetupClient(Conversation chat, List<ModelItem> messages, ModelResponseOptions options)
@@ -76,6 +97,107 @@ namespace LombdaAgentSDK
             chat = ConvertToProviderItems(messages, chat);
 
             return chat;
+        }
+
+        public ResponseRequest SetupResponseClient(List<ModelItem> messages, ModelResponseOptions options)
+        {
+            List<ResponseInputItem> InputItems = new();
+
+            InputItems.AddRange(ConvertToProviderResponseItems(new List<ModelItem>([messages.Last()])));
+
+            ResponseRequest request = new ResponseRequest
+            {
+                Model = CurrentModel,
+                InputItems = InputItems,
+                Instructions = options.Instructions
+            };
+            
+            if (request.Tools == null) request.Tools = new List<ResponseTool>();
+
+            request.PreviousResponseId = options.PreviousResponseId ?? null;
+            //Convert Tools here
+            foreach (BaseTool tool in options.Tools)
+            {
+                dynamic? responseFormat = JsonConvert.DeserializeObject<dynamic>(tool.ToolParameters.ToString());
+
+                ResponseFunctionTool rftool = new()
+                {
+                    Name = tool.ToolName,
+                    Description = tool.ToolDescription,
+                    Parameters = responseFormat,
+                    Strict =tool.FunctionSchemaIsStrict
+                };
+
+                request.Tools.Add(rftool);
+            }
+
+            if(VectorSearchOptions != null)
+            {
+                request.Tools.Add(new ResponseFileSearchTool
+                {
+                    VectorStoreIds = VectorSearchOptions.VectorIDs
+                });
+            }
+
+            if (AllowComputerUse)
+            {
+                Size screenSize = ComputerToolUtility.GetScreenSize();
+                request.Tools.Add(new ResponseComputerUseTool
+                {
+                    DisplayWidth = screenSize.Width,
+                    DisplayHeight = screenSize.Height,
+                    Environment = ResponseComputerEnvironment.Windows
+                });
+                request.Truncation = ResponseTruncationStrategies.Auto;
+
+                request.Reasoning = new ReasoningConfiguration()
+                {
+                    Summary = ResponseReasoningSummaries.Concise
+                };
+                request.Background = false;
+            }
+
+            //Convert Text Format Here
+            if (options.OutputFormat != null)
+            {
+                dynamic? responseFormat = JsonConvert.DeserializeObject<dynamic>(options.OutputFormat.JsonSchema.ToString());
+
+
+                dynamic? result = options.OutputFormat.JsonSchema.ToObjectFromJson<dynamic>();
+                var jobj = JObject.FromObject(result);
+
+                var config1 = TextConfiguration.CreateJsonSchema(
+                    responseFormat,
+                    options.OutputFormat.JsonSchemaFormatName,
+                    strict: true);
+                var config2 = TextConfiguration.CreateJsonSchema(
+                     result,
+                    options.OutputFormat.JsonSchemaFormatName,
+                    strict: true);
+                var config3 = TextConfiguration.CreateJsonSchema(
+                    jobj,
+                    options.OutputFormat.JsonSchemaFormatName,
+                    strict: true);
+
+
+                request.Text = config2;
+            }
+
+            if (options.ReasoningOptions != null)
+            {
+                request.Reasoning = new ReasoningConfiguration()
+                {
+                    Effort = options.ReasoningOptions.EffortLevel switch
+                    {
+                        ModelReasoningEffortLevel.Low => ResponseReasoningEfforts.Low,
+                        ModelReasoningEffortLevel.Medium => ResponseReasoningEfforts.Medium,
+                        ModelReasoningEffortLevel.High => ResponseReasoningEfforts.High,
+                        _ => ResponseReasoningEfforts.Low
+                    }
+                };
+            }
+
+            return request;
         }
 
         public async Task<ModelResponse> HandleStreaming(Conversation chat, List<ModelItem> messages, ModelResponseOptions options, Runner.StreamingCallbacks streamingCallback = null)
@@ -133,6 +255,11 @@ namespace LombdaAgentSDK
 
         public override async Task<ModelResponse> CreateStreamingResponseAsync(List<ModelItem> messages, ModelResponseOptions options, Runner.StreamingCallbacks streamingCallback = null)
         {
+            return UseResponseAPI ? await StreamingResponseAPIAsync(messages, options, streamingCallback) : await StreamingChatAPIAsync(messages, options, streamingCallback);
+        }
+
+        public async Task<ModelResponse> StreamingChatAPIAsync(List<ModelItem> messages, ModelResponseOptions options, Runner.StreamingCallbacks streamingCallback = null)
+        {
             Conversation chat = Client.Chat.CreateConversation(CurrentModel);
 
             chat = SetupClient(chat, messages, options);
@@ -140,11 +267,52 @@ namespace LombdaAgentSDK
             return await HandleStreaming(chat, messages, options, streamingCallback);
         }
 
+        public async Task<ModelResponse> StreamingResponseAPIAsync(List<ModelItem> messages, ModelResponseOptions options, Runner.StreamingCallbacks streamingCallback = null)
+        {
+            ResponseRequest request = SetupResponseClient(messages, options);
+
+            ModelResponse ResponseOutput = new();
+            ResponseOutput.Model = options.Model;
+            ResponseOutput.OutputFormat = options.OutputFormat ?? null;
+            ResponseOutput.OutputItems = new List<ModelItem>();
+            ResponseOutput.Messages = messages;
+
+            await Client.Responses.StreamResponseRich(request, new ResponseStreamEventHandler
+            {
+                OnEvent = (data) =>
+                {
+                    if (data is ResponseEventOutputTextDelta delta)
+                    {
+                        streamingCallback?.Invoke(delta.Delta);
+                    }
+
+                    if (data is ResponseEventOutputItemDone itemDone)
+                    {
+                        ResponseOutput.OutputItems.Add(ConvertFromProviderOutputItem(itemDone.Item));
+
+                        if (itemDone.Item is ResponseFunctionToolCallItem call)
+                        {
+                            streamingCallback?.Invoke($"INVOKING -> [{call.Name}]");
+                        }
+                    }
+
+                    return ValueTask.CompletedTask;
+                }
+            });
+
+            return ResponseOutput;
+        }
+
         public override async Task<ModelResponse> CreateResponseAsync(List<ModelItem> messages, ModelResponseOptions options)
+        {
+            return UseResponseAPI ? await CreateFromResponseAPIAsync(messages, options) : await CreateFromChatAPIAsync(messages, options);
+        }
+
+        public async Task<ModelResponse> CreateFromChatAPIAsync(List<ModelItem> messages, ModelResponseOptions options)
         {
             Conversation chat = Client.Chat.CreateConversation(CurrentModel);
 
-            chat =  SetupClient(chat, messages, options);
+            chat = SetupClient(chat, messages, options);
 
             //Create Open response
             RestDataOrException<ChatRichResponse> response = await chat.GetResponseRichSafe();
@@ -155,6 +323,19 @@ namespace LombdaAgentSDK
 
             //Return results.
             return new ModelResponse(options.Model, [ConvertLastFromProviderItems(chat),], outputFormat: options.OutputFormat ?? null, ModelItems);
+        }
+
+        public async Task<ModelResponse> CreateFromResponseAPIAsync(List<ModelItem> messages, ModelResponseOptions options)
+        {
+            ResponseRequest request = SetupResponseClient(messages, options);
+
+            ResponseResult response = await Client.Responses.CreateResponse(request);
+
+            List<ModelItem> ModelItems = ConvertOutputItems(response.Output);
+
+            options.PreviousResponseId = response.Id;
+
+            return new ModelResponse(ModelItems, outputFormat: options.OutputFormat ?? null, messages, id: response.Id);
         }
     }
 }

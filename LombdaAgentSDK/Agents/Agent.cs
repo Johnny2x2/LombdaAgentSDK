@@ -33,6 +33,7 @@ namespace LombdaAgentSDK.Agents
             Tools = _tools ?? Tools;
             Options.Instructions = Instructions;
 
+
             if (OutputSchema != null)
             {
                 Options.OutputFormat = OutputSchema.CreateJsonSchemaFormatFromType(true);

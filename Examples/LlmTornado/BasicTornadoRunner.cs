@@ -11,9 +11,8 @@ namespace Examples.LlmTornado
         [Test]
         public async Task BasicTornadoRun()
         {
-            LLMTornadoModelProvider client = new(
-            ChatModel.OpenAi.Gpt41.V41Mini,
-            [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
+            LLMTornadoModelProvider client = 
+                new(ChatModel.OpenAi.Gpt41.V41Mini,[new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),], true);
 
             Agent agent = new Agent(client, "Assistant", "You are a useful assistant.");
 

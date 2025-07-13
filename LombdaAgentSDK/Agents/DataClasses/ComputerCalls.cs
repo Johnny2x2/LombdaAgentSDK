@@ -25,7 +25,7 @@ namespace LombdaAgentSDK.Agents.DataClasses
         Unknown
     }
 
-    public enum MouseButtons { RIGHT, LEFT, MIDDLE, BACK, FORWARD }
+    public enum MouseButtons { Right, Left, Middle, Back, Forward }
 
     public class ComputerToolAction
     {
@@ -46,7 +46,7 @@ namespace LombdaAgentSDK.Agents.DataClasses
         {
             Kind = ModelComputerCallAction.DoubleClick;
             WasDoubleClick = true;
-            MouseButtonClick = MouseButtons.LEFT;
+            MouseButtonClick = MouseButtons.Left;
             MoveCoordinates = new Point(toX, toY);
         }
     }
