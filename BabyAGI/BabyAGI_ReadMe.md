@@ -9,7 +9,7 @@
 
 * Put FunctionApplicationTemplate.zip into a safe folder with read/write access for function creation
 
-* Add the Folder location to BabyAGIConfig in program
+* Add the Folder location to BabyAGIConfig
 
 * OpenAI embedding requires Environment Variable "OPENAI_API_KEY" set
 
