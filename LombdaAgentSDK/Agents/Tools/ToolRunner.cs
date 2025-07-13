@@ -52,7 +52,7 @@ namespace LombdaAgentSDK
         {
             object? result;
             MethodInfo method = function.Method;
-            if (IsGenericTask(method.ReturnType, out Type taskResultType))
+            if (AsyncHelpers.IsGenericTask(method.ReturnType, out Type taskResultType))
             {
                 // Method is async, invoke and await
                 var task = (Task)function.DynamicInvoke(args);
@@ -69,22 +69,5 @@ namespace LombdaAgentSDK
             return result ?? null;
         }
 
-        //Checks if the type is a generic Task<T> and returns the type of T if it is.
-        private static bool IsGenericTask(Type type, out Type taskResultType)
-        {
-            while (type != null && type != typeof(object))
-            {
-                if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>))
-                {
-                    taskResultType = type;//type.GetGenericArguments()[0];
-                    return true;
-                }
-
-                type = type.BaseType!;
-            }
-
-            taskResultType = null;
-            return false;
-        }
     }
 }
