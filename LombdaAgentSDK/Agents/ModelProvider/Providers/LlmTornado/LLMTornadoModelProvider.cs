@@ -5,12 +5,17 @@ using LlmTornado.ChatFunctions;
 using LlmTornado.Code;
 using LlmTornado.Common;
 using LlmTornado.Responses;
+using LlmTornado.Responses.Events;
+using LlmTornado.Threads;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using FunctionCall = LlmTornado.ChatFunctions.FunctionCall;
 
 namespace LombdaAgentSDK
 {
@@ -21,31 +26,38 @@ namespace LombdaAgentSDK
 
         public bool UseResponseAPI { get; set; }
 
+        public bool AllowComputerUse { get; set; }
+        public VectorSearchOptions? VectorSearchOptions { get; set; }
         public LLMTornadoModelProvider(
-            ChatModel model, List<ProviderAuthentication> provider, bool useResponseAPI = false)
+            ChatModel model, List<ProviderAuthentication> provider, bool useResponseAPI = false, 
+            bool allowComputerUse = false, VectorSearchOptions? searchOptions = null)
         {
             Model = model.Name;
             CurrentModel = model;
             Client = new TornadoApi(provider);
             UseResponseAPI = useResponseAPI;
+            AllowComputerUse = allowComputerUse;
+            VectorSearchOptions = searchOptions;
         }
 
         public LLMTornadoModelProvider(
-            ChatModel model, Uri provider, bool useResponseAPI = false)
+            ChatModel model, Uri provider, bool useResponseAPI = false, bool allowComputerUse = false)
         {
             Model = model.Name;
             CurrentModel = model;
             Client = new TornadoApi(provider);
             UseResponseAPI = useResponseAPI;
+            AllowComputerUse = allowComputerUse;
         }
 
         public LLMTornadoModelProvider(
-            ChatModel model, TornadoApi client, bool useResponseAPI = false)
+            ChatModel model, TornadoApi client, bool useResponseAPI = false, bool allowComputerUse = false)
         {
             Model = model;
             CurrentModel = model;
             Client = client;
             UseResponseAPI = useResponseAPI;
+            AllowComputerUse = allowComputerUse;
         }
 
         public Conversation SetupClient(Conversation chat, List<ModelItem> messages, ModelResponseOptions options)
@@ -108,30 +120,40 @@ namespace LombdaAgentSDK
             {
                 dynamic? responseFormat = JsonConvert.DeserializeObject<dynamic>(tool.ToolParameters.ToString());
 
-                var obj = new
-                {
-                    type = "object",
-                    properties = new
-                    {
-                        location = new
-                        {
-                            type = "string",
-                            description = "name of the location"
-                        }
-                    },
-                    required = new List<string> { "location" },
-                    additionalProperties = false
-                };
-
                 ResponseFunctionTool rftool = new()
                 {
                     Name = tool.ToolName,
                     Description = tool.ToolDescription,
-                    Parameters = JObject.FromObject(obj),
-                    Strict = true
+                    Parameters = responseFormat,
+                    Strict =tool.FunctionSchemaIsStrict
                 };
 
                 request.Tools.Add(rftool);
+            }
+
+            if(VectorSearchOptions != null)
+            {
+                request.Tools.Add(new ResponseFileSearchTool
+                {
+                    VectorStoreIds = VectorSearchOptions.VectorIDs
+                });
+            }
+
+            if (AllowComputerUse)
+            {
+                Size screenSize = ComputerToolUtility.GetScreenSize();
+                request.Tools.Add(new ResponseComputerUseTool
+                {
+                    DisplayWidth = screenSize.Width,
+                    DisplayHeight = screenSize.Height,
+                    Environment = ResponseComputerEnvironment.Windows
+                });
+                request.Truncation = ResponseTruncationStrategies.Auto;
+
+                request.Reasoning = new ReasoningConfiguration()
+                {
+                    Summary = ResponseReasoningSummaries.Concise
+                };
             }
 
             //Convert Text Format Here
@@ -221,6 +243,57 @@ namespace LombdaAgentSDK
             chat = SetupClient(chat, messages, options);
 
             return await HandleStreaming(chat, messages, options, streamingCallback);
+        }
+
+        public async Task<ModelResponse> StreamingChatAPIAsync(List<ModelItem> messages, ModelResponseOptions options, Runner.StreamingCallbacks streamingCallback = null)
+        {
+            Conversation chat = Client.Chat.CreateConversation(CurrentModel);
+
+            chat = SetupClient(chat, messages, options);
+
+            return await HandleStreaming(chat, messages, options, streamingCallback);
+        }
+
+        public async Task<ModelResponse> StreamingResponseAPIAsync(List<ModelItem> messages, ModelResponseOptions options, Runner.StreamingCallbacks streamingCallback = null)
+        {
+            ResponseRequest request = SetupResponseClient(messages, options);
+
+            ModelResponse ResponseOutput = new();
+            ResponseOutput.Model = options.Model;
+            ResponseOutput.OutputFormat = options.OutputFormat ?? null;
+            ResponseOutput.OutputItems = new List<ModelItem>();
+            ResponseOutput.Messages = messages;
+
+            await Client.Responses.StreamResponseRich(request, new ResponseStreamEventHandler
+            {
+                OnEvent = (data) =>
+                {
+                    if (data is ResponseEventOutputTextDelta delta)
+                    {
+                        streamingCallback?.Invoke(delta.Delta);
+                    }
+
+                    if (data is ResponseEventOutputItemDone itemDone)
+                    {
+                        if (itemDone.Item is ResponseFunctionToolCallItem call)
+                        {
+                            streamingCallback?.Invoke($"INVOKING -> [{call.Name}]");
+                            //Add the tool call to the response output
+                            ResponseOutput.OutputItems.Add(new ModelFunctionCallItem(
+                                call.Id,
+                                 call.CallId,
+                                call.Name,
+                                ModelStatus.InProgress,
+                                BinaryData.FromString(call.Arguments)
+                                ));
+                        }
+                    }
+
+                    return ValueTask.CompletedTask;
+                }
+            });
+
+            return ResponseOutput;
         }
 
         public override async Task<ModelResponse> CreateResponseAsync(List<ModelItem> messages, ModelResponseOptions options)
