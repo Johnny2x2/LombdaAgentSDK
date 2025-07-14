@@ -250,9 +250,26 @@ namespace LombdaAgentSDK
         private const int KEYEVENTF_KEYDOWN = 0x0000;
         private const int KEYEVENTF_KEYUP = 0x0002;
 
+        /// <summary>
+        /// Translates a character to the corresponding virtual-key code and shift state.
+        /// </summary>
+        /// <remarks>The shift state can be a combination of the following bits: <list type="bullet">
+        /// <item><description>1: Shift key is pressed.</description></item> <item><description>2: Control key is
+        /// pressed.</description></item> <item><description>4: Alt key is pressed.</description></item>
+        /// </list></remarks>
+        /// <param name="ch">The character to be translated into a virtual-key code.</param>
+        /// <returns>A short integer containing the virtual-key code in the low-order byte and the shift state in the high-order
+        /// byte. If the function cannot translate the character, it returns -1.</returns>
         [DllImport("user32.dll")]
         private static extern short VkKeyScan(char ch);
 
+        /// <summary>
+        /// Simulates a key press for the specified key code.
+        /// </summary>
+        /// <remarks>This method sends a key down and key up event with a short delay in between to
+        /// simulate a key press. It is intended for use in scenarios where programmatic key input is
+        /// required.</remarks>
+        /// <param name="keyCode">The virtual key code of the key to press. Must be a valid key code.</param>
         public static void PressKey(byte keyCode)
         {
             keybd_event(keyCode, 0, KEYEVENTF_KEYDOWN, UIntPtr.Zero);
@@ -260,7 +277,15 @@ namespace LombdaAgentSDK
             keybd_event(keyCode, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
         }
 
-        public static void PressKeyDown(string keyCode)
+        /// <summary>
+        /// Simulates a key press for the specified key code.
+        /// </summary>
+        /// <remarks>This method uses the Windows API to simulate a key press event. The key is pressed
+        /// and held for a short duration before being released. The method is intended for use in environments where
+        /// direct keyboard input simulation is required.</remarks>
+        /// <param name="keyCode">A string representing the key to be pressed. The string should contain a single character whose virtual key
+        /// code will be determined and used for the key press simulation.</param>
+        public static void PressKey(string keyCode)
         {
             short vkCode = VkKeyScan(keyCode[0]); // Get virtual key code for the character
             byte keyCod = (byte)(vkCode & 0xFF); // Extract the virtual key code (low-order byte)
@@ -269,6 +294,14 @@ namespace LombdaAgentSDK
             keybd_event(keyCod, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
         }
 
+        /// <summary>
+        /// Simulates typing a list of strings by sending virtual key codes for each character.
+        /// </summary>
+        /// <remarks>This method converts each character in the provided strings to its corresponding
+        /// virtual key code and simulates key presses. If a character requires a shift key, the method simulates
+        /// pressing and releasing the left shift key. A delay is introduced between each key press to mimic natural
+        /// typing.</remarks>
+        /// <param name="texts">A list of strings to be typed. Each string in the list is processed sequentially.</param>
         public static void Type(List<string> texts)
         {
             foreach (string text in texts)
@@ -297,6 +330,14 @@ namespace LombdaAgentSDK
             }
         }
 
+        /// <summary>
+        /// Simulates typing a list of strings by sending virtual key codes for each character.
+        /// </summary>
+        /// <remarks>This method converts each character in the provided strings to its corresponding
+        /// virtual key code and simulates key presses. If a character requires a shift key, the method simulates
+        /// pressing and releasing the left shift key. A delay is introduced between each key press to mimic natural
+        /// typing.</remarks>
+        /// <param name="text">A strings to be typed.</param>
         public static void Type(string text)
         {
             foreach (char ch in text)
@@ -325,33 +366,112 @@ namespace LombdaAgentSDK
         // -------------------
         // Screenshot using GDI
         // -------------------
+        /// <summary>
+        /// The BitBlt function performs a bit-block transfer of the color data corresponding to a rectangle of pixels 
+        /// from the specified source device context into a destination device context.
+        /// </summary>
+        /// <param name="hdcDest"></param>
+        /// <param name="nXDest"></param>
+        /// <param name="nYDest"></param>
+        /// <param name="nWidth"></param>
+        /// <param name="nHeight"></param>
+        /// <param name="hdcSrc"></param>
+        /// <param name="nXSrc"></param>
+        /// <param name="nYSrc"></param>
+        /// <param name="dwRop"></param>
+        /// <returns></returns>
         [DllImport("gdi32.dll")]
         private static extern bool BitBlt(IntPtr hdcDest, int nXDest, int nYDest, int nWidth, int nHeight,
                                           IntPtr hdcSrc, int nXSrc, int nYSrc, int dwRop);
-
+        /// <summary>
+        /// Retrieves a handle to the desktop window.
+        /// </summary>
+        /// <remarks>The desktop window covers the entire screen and is the area on which icons and other
+        /// windows are painted.</remarks>
+        /// <returns>An <see cref="IntPtr"/> representing the handle to the desktop window.</returns>
         [DllImport("user32.dll")]
         private static extern IntPtr GetDesktopWindow();
 
+        /// <summary>
+        /// Retrieves the device context (DC) for the entire window, including title bar, menus, and scroll bars.
+        /// </summary>
+        /// <remarks>The device context must be released after use by calling the <c>ReleaseDC</c>
+        /// function, to avoid resource leaks.</remarks>
+        /// <param name="hWnd">A handle to the window whose DC is to be retrieved. If this value is <see langword="null"/>, the DC for the
+        /// entire screen is retrieved.</param>
+        /// <returns>An <see cref="IntPtr"/> to the device context for the specified window. If the function fails, the return
+        /// value is <see cref="IntPtr.Zero"/>.</returns>
         [DllImport("user32.dll")]
         private static extern IntPtr GetWindowDC(IntPtr hWnd);
 
+        /// <summary>
+        /// Creates a memory device context (DC) compatible with the specified device.
+        /// </summary>
+        /// <remarks>The created memory DC can be used for off-screen drawing and is compatible with the
+        /// device context specified by <paramref name="hdc"/>. The application must call the <c>DeleteDC</c> function
+        /// to delete the memory DC when it is no longer needed.</remarks>
+        /// <param name="hdc">A handle to an existing device context. If this parameter is <see langword="null"/>, the function creates a
+        /// memory DC compatible with the application's current screen.</param>
+        /// <returns>A handle to the newly created memory device context. Returns <see cref="IntPtr.Zero"/> if the function
+        /// fails.</returns>
         [DllImport("gdi32.dll")]
         private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+        /// <summary>
+        /// Creates a bitmap compatible with the device context specified by the given handle.
+        /// </summary>
+        /// <remarks>The bitmap created by this function can be selected into any device context that is
+        /// compatible with the specified device context.</remarks>
+        /// <param name="hdc">A handle to the device context.</param>
+        /// <param name="nWidth">The width, in pixels, of the bitmap to be created.</param>
+        /// <param name="nHeight">The height, in pixels, of the bitmap to be created.</param>
+        /// <returns>A handle to the newly created bitmap. If the function fails, the return value is <see cref="IntPtr.Zero"/>.</returns>
 
         [DllImport("gdi32.dll")]
         private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int nWidth, int nHeight);
 
+        /// <summary>
+        /// Selects an object into the specified device context, replacing the previous object.
+        /// </summary>
+        /// <remarks>The selected object is used for drawing operations in the device context.  The caller
+        /// is responsible for restoring the original object by calling <c>SelectObject</c> with the returned
+        /// handle.</remarks>
+        /// <param name="hdc">A handle to the device context.</param>
+        /// <param name="hgdiobj">A handle to the object to be selected. This can be a pen, brush, bitmap, region, or font.</param>
+        /// <returns>A handle to the object being replaced, or <see cref="IntPtr.Zero"/> if an error occurs.</returns>
         [DllImport("gdi32.dll")]
         private static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);
 
+        /// <summary>
+        /// Deletes the specified device context (DC).
+        /// </summary>
+        /// <remarks>This method is a P/Invoke declaration for the DeleteDC function in the GDI32.dll. It
+        /// is used to release the resources associated with a device context.</remarks>
+        /// <param name="hdc">A handle to the device context to be deleted. This handle must have been created by a previous call to a GDI
+        /// function.</param>
+        /// <returns><see langword="true"/> if the device context is successfully deleted; otherwise, <see langword="false"/>.</returns>
         [DllImport("gdi32.dll")]
         private static extern bool DeleteDC(IntPtr hdc);
 
+        /// <summary>
+        /// Deletes a GDI object.
+        /// </summary>
+        /// <remarks>This method is a P/Invoke declaration for the DeleteObject function in the GDI32.dll.
+        /// It is used to release resources associated with GDI objects such as bitmaps, pens, and brushes.</remarks>
+        /// <param name="hObject">A handle to the GDI object to be deleted.</param>
+        /// <returns><see langword="true"/> if the object is successfully deleted; otherwise, <see langword="false"/>.</returns>
         [DllImport("gdi32.dll")]
         private static extern bool DeleteObject(IntPtr hObject);
 
         private const int SRCCOPY = 0x00CC0020;
 
+        /// <summary>
+        /// Captures a screenshot of the entire screen.
+        /// </summary>
+        /// <remarks>The method captures the current state of the screen and returns it as a bitmap image.
+        /// The caller is responsible for disposing of the returned <see cref="Bitmap"/> object to free
+        /// resources.</remarks>
+        /// <returns>A <see cref="Bitmap"/> object containing the screenshot of the current screen.</returns>
         public static Bitmap TakeScreenshot()
         {
             int width = GetSystemMetrics(SM_CXSCREEN);
@@ -368,6 +488,14 @@ namespace LombdaAgentSDK
             return bmp;
         }
 
+        /// <summary>
+        /// Captures a screenshot of the entire screen and returns it as a byte array in the specified image format.
+        /// </summary>
+        /// <remarks>The method captures the current screen content and converts it into a byte array
+        /// using the specified image format. If no format is provided, the screenshot is saved in PNG format by
+        /// default.</remarks>
+        /// <param name="format">The image format to use for the screenshot. Defaults to PNG if not specified.</param>
+        /// <returns>A byte array containing the screenshot image data in the specified format.</returns>
         public static byte[] TakeScreenshotByteArray(ImageFormat format = null)
         {
             int width = GetSystemMetrics(SM_CXSCREEN);
