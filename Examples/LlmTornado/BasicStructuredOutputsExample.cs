@@ -5,6 +5,7 @@ using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
 using NUnit.Framework;
 using System.Text.Json;
+using System.ComponentModel;
 
 namespace Examples.LlmTornado
 {
@@ -56,10 +57,14 @@ namespace Examples.LlmTornado
             }
         }
 
+        [System.ComponentModel.Description("Explain the solution steps to a math problem")]
         public struct math_reasoning
         {
+            [System.ComponentModel.Description("Steps to complete the Math Problem")]
             public math_step[] steps { get; set; }
-            public string final_answer { get; set; }
+
+            [System.ComponentModel.Description("Final Result to math problem")]
+            public string final_answer{ get; set; }
 
             public void ConsoleWrite()
             {
@@ -73,9 +78,13 @@ namespace Examples.LlmTornado
             }
         }
 
+        [System.ComponentModel.Description("bad description")]
         public struct math_step
         {
+            [System.ComponentModel.Description("Explanation of the math step")]
             public string explanation { get; set; }
+
+            [System.ComponentModel.Description("Result of the step")]
             public string output { get; set; }
         }
     }
