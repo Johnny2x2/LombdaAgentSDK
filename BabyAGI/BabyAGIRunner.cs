@@ -26,11 +26,10 @@ namespace BabyAGI
             ComputerControllerAgent computerTool = new ComputerControllerAgent(this);
             ResearchAgent researchTool = new ResearchAgent();
             SimpleWebSearchAgent websearchTool = new SimpleWebSearchAgent();
-            BabyAGIConfig config = new();
 
             LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
             string instructions = $"""You are a person assistant AGI with the ability to generate tools to answer any user question if you cannot do it directly task your tool to create it.""";
-            Agent agent = new Agent(client, "BabyAGI", instructions, _tools: [config.AttemptToCompleteTask, computerTool.ControlComputer, researchTool.DoResearch, websearchTool.BasicWebSearch]);
+            Agent agent = new Agent(client, "BabyAGI", instructions, _tools: [AttemptToCompleteTask, computerTool.ControlComputer, researchTool.DoResearch, websearchTool.BasicWebSearch]);
 
             Console.WriteLine("Enter a Message");
             Console.Write("[User]: ");
@@ -49,26 +48,13 @@ namespace BabyAGI
                 userInput = Console.ReadLine() ?? "";
             }
     }
-
-}
-    public class BabyAGIConfig
-    {
-        public static string ChromaDbURI = "http://localhost:8001/api/v2/";
-        public static string FunctionsPath = "C:\\Users\\johnl\\source\\repos\\FunctionApplications";
-
-        public BabyAGIConfig()
-        {
-            if (!Directory.Exists(FunctionsPath))
-            {
-                throw new Exception("Functions directory is not setup");
-            }
-        }
-
         [Tool(Description = "Use this before telling a user you are unable to do something", In_parameters_description = ["The task you wish to accomplish."])]
         public async Task<string> AttemptToCompleteTask(string task)
         {
-            FunctionGeneratorAgent generatorSystem = new(FunctionsPath);
+            FunctionGeneratorAgent generatorSystem = new(BabyAGIConfig.FunctionsPath);
             return await generatorSystem.RunAgent(task);
         }
+
     }
+    
 }
