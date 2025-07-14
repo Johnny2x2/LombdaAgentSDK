@@ -1,4 +1,4 @@
-﻿using BabyAGI;
+using BabyAGI;
 using BabyAGI.Agents;
 using BabyAGI.Agents.ResearchAgent;
 using Examples.Demos.FunctionGenerator;
@@ -11,5 +11,6 @@ using LombdaAgentSDK.Agents.Tools;
 
 BabyAGIRunner babyAGI = new();
 await babyAGI.RunAGI();
+
 
 

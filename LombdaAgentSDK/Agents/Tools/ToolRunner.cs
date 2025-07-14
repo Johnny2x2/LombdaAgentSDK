@@ -6,8 +6,18 @@ using System.Text.Json;
 
 namespace LombdaAgentSDK
 {
+    /// <summary>
+    /// Class to Invoke the tools during run
+    /// </summary>
     public static class ToolRunner
     {
+        /// <summary>
+        /// Invoke function from FunctionCallItem and return FunctionOutputItem
+        /// </summary>
+        /// <param name="agent"></param>
+        /// <param name="call"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
         public static async Task<ModelFunctionCallOutputItem> CallFuncToolAsync(Agent agent, ModelFunctionCallItem call)
         {
             List<object> arguments = new();
@@ -26,7 +36,14 @@ namespace LombdaAgentSDK
             return new ModelFunctionCallOutputItem("fc_"+Guid.NewGuid().ToString().Replace("-", "_"), call.CallId, result!, call.Status, call.FunctionName);
         }
 
-        //handles extracting the input parameters from the function call and calling the agent tool
+        
+        /// <summary>
+        /// Invoke Agent from FunctionCallItem and return FunctionOutputItem
+        /// </summary>
+        /// <param name="agent"></param>
+        /// <param name="call"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
         public static async Task<ModelFunctionCallOutputItem> CallAgentToolAsync(Agent agent, ModelFunctionCallItem call)
         {
             if (!agent.agent_tools.TryGetValue(call.FunctionName, out AgentTool? tool))
@@ -47,7 +64,12 @@ namespace LombdaAgentSDK
             return new ModelFunctionCallOutputItem(Guid.NewGuid().ToString(), call.CallId, string.Empty, call.Status, call.FunctionName);
         }
 
-        //Calls the function asynchronously, handling both synchronous and asynchronous methods.
+        /// <summary>
+        /// Handles the actual Method Invoke async/syncr and returns the result
+        /// </summary>
+        /// <param name="function"></param>
+        /// <param name="args"></param>
+        /// <returns></returns>
         private static async Task<object?> CallFuncAsync(Delegate function, object[] args)
         {
             object? result;
