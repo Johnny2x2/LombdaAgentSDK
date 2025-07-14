@@ -72,17 +72,17 @@ namespace Examples.Demos.OpenAIComputerUsePreview
                     Console.WriteLine($"[Computer Call Action]({action}) {action.MouseButtonClick}");
                     switch (action.MouseButtonClick)
                     {
-                        case MouseButtons.LEFT:
+                        case MouseButtons.Left:
                             ComputerToolUtility.MoveAndClick(
                             action.MoveCoordinates.X,
                             action.MoveCoordinates.Y
                             ); break;
-                        case MouseButtons.RIGHT:
+                        case MouseButtons.Right:
                             ComputerToolUtility.MoveAndRightClick(
                             action.MoveCoordinates.X,
                             action.MoveCoordinates.Y
                             ); break;
-                        case MouseButtons.MIDDLE: ComputerToolUtility.MiddleClick(); break;
+                        case MouseButtons.Middle: ComputerToolUtility.MiddleClick(); break;
                         default:
                             break;
                     }

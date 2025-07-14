@@ -162,25 +162,12 @@ namespace LombdaAgentSDK
             {
                 dynamic? responseFormat = JsonConvert.DeserializeObject<dynamic>(options.OutputFormat.JsonSchema.ToString());
 
-
-                dynamic? result = options.OutputFormat.JsonSchema.ToObjectFromJson<dynamic>();
-                var jobj = JObject.FromObject(result);
-
-                var config1 = TextConfiguration.CreateJsonSchema(
+                var config1 = ResponseTextFormatConfiguration.CreateJsonSchema(
                     responseFormat,
                     options.OutputFormat.JsonSchemaFormatName,
                     strict: true);
-                var config2 = TextConfiguration.CreateJsonSchema(
-                     result,
-                    options.OutputFormat.JsonSchemaFormatName,
-                    strict: true);
-                var config3 = TextConfiguration.CreateJsonSchema(
-                    jobj,
-                    options.OutputFormat.JsonSchemaFormatName,
-                    strict: true);
 
-
-                request.Text = config2;
+                request.Text = config1;
             }
 
             if (options.ReasoningOptions != null)
@@ -255,6 +242,11 @@ namespace LombdaAgentSDK
 
         public override async Task<ModelResponse> CreateStreamingResponseAsync(List<ModelItem> messages, ModelResponseOptions options, Runner.StreamingCallbacks streamingCallback = null)
         {
+            if (AllowComputerUse)
+            {
+                throw new Exception("Cannot Stream while using Computer Model, try verbose callbacks");
+            }
+
             return UseResponseAPI ? await StreamingResponseAPIAsync(messages, options, streamingCallback) : await StreamingChatAPIAsync(messages, options, streamingCallback);
         }
 
