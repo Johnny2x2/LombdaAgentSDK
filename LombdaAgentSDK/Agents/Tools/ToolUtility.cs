@@ -6,6 +6,11 @@ namespace LombdaAgentSDK.Agents.Tools
 {
     public static class ToolUtility
     {
+        /// <summary>
+        /// Convert Agents into tools Automatically
+        /// </summary>
+        /// <param name="agent"></param>
+        /// <returns></returns>
         public static AgentTool AsTool(this Agent agent)
         {
             return new AgentTool(agent, new BaseTool().CreateTool(
@@ -21,37 +26,47 @@ namespace LombdaAgentSDK.Agents.Tools
                 );
         }
 
+        /// <summary>
+        /// Automatic conversion of method into a function tool
+        /// </summary>
+        /// <param name="function"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
         public static FunctionTool ConvertFunctionToTool(this Delegate function)
         {
+            List<string> required_inputs = new List<string>();
+            var input_tool_map = new Dictionary<string, ParameterSchema>();
             MethodInfo method = function.Method;
 
+            //Get tool Attribute information (Required)
             var toolAttrs = method.GetCustomAttributes<ToolAttribute>();
 
             if (toolAttrs.Count() == 0) throw new Exception("Function doesn't have Tool Attribute");
 
             ToolAttribute toolAttr = toolAttrs.First();
-
-            List<string> required_inputs = new List<string>();
-
+            
+            //deconstruct the function method parameters
             int i = 0;
-
-            var input_tool_map = new Dictionary<string, ParameterSchema>();
-
             foreach (ParameterInfo param in method.GetParameters())
             {
+                //Name required
                 if (param.Name == null) continue;
 
+                //Set Json compatible type
                 string typeName = param.ParameterType.IsEnum ? "string" : json_util.MapClrTypeToJsonType(param.ParameterType);
 
+                //Configure Schema
                 var schema = new ParameterSchema
                 {
                     Type = typeName,
-                    Description = toolAttr.In_parameters_description[i],
-                    Enum = param.ParameterType.IsEnum ? param.ParameterType.GetEnumNames() : null
+                    Description = toolAttr.In_parameters_description[i], //Add in description to parameter here from attribute
+                    Enum = param.ParameterType.IsEnum ? param.ParameterType.GetEnumNames() : null //Get enum list if parameter is enum
                 };
 
+                //Add Schema to input map
                 input_tool_map[param.Name] = schema;
 
+                //No default value = required
                 if (!param.HasDefaultValue)
                 {
                     required_inputs.Add(param.Name);
@@ -60,23 +75,32 @@ namespace LombdaAgentSDK.Agents.Tools
                 i++;
             }
 
+            //Convert the Input map into Json string of the Function schema
             string funcParamResult = JsonSchemaGenerator.BuildFunctionSchema(input_tool_map, required_inputs);
 
-            FunctionTool newTool = new FunctionTool(
+            return new FunctionTool(
                         toolName: method.Name,
                         toolDescription: toolAttr.Description,
                         toolParameters: BinaryData.FromBytes(Encoding.UTF8.GetBytes(funcParamResult)),
                         function: function,
-                        strictSchema: required_inputs.Count == toolAttr.In_parameters_description.Length
+                        strictSchema: required_inputs.Count == toolAttr.In_parameters_description.Length //Auto set strict schema
                     );
-
-            return newTool;
         }
 
+        /// <summary>
+        /// Parse the input args from response to use in function
+        /// </summary>
+        /// <param name="function"></param>
+        /// <param name="functionCallArguments"></param>
+        /// <returns></returns>
+        /// <exception cref="JsonException"></exception>
+        /// <exception cref="NotImplementedException"></exception>
         public static List<object> ParseFunctionCallArgs(this Delegate function, BinaryData functionCallArguments)
         {
             MethodInfo method = function.Method;
             List<object> arguments = new List<object>();
+
+            //Gather json args from function call
             using var document = JsonDocument.Parse(functionCallArguments);
             var parameters = method.GetParameters();
             var argumentsByName = document.RootElement.EnumerateObject()
@@ -87,8 +111,10 @@ namespace LombdaAgentSDK.Agents.Tools
                 PropertyNameCaseInsensitive = true
             };
 
+            //Convert each value
             foreach (var param in parameters)
             {
+                //Missing a required arg
                 if (!argumentsByName.TryGetValue(param.Name!, out var value))
                 {
                     if (param.HasDefaultValue)
@@ -98,7 +124,7 @@ namespace LombdaAgentSDK.Agents.Tools
                     }
                     throw new JsonException($"Required parameter '{param.Name}' not found in function call arguments.");
                 }
-
+                //converting string back to enum value
                 if (param.ParameterType.IsEnum)
                 {
                     var enumString = value.GetString();
@@ -113,7 +139,7 @@ namespace LombdaAgentSDK.Agents.Tools
                         throw new JsonException($"Invalid value '{enumString}' for enum '{param.ParameterType.Name}'. Valid values: {validValues}");
                     }
                 }
-
+                //Converting to primative type
                 if (param.ParameterType.IsPrimitive || param.ParameterType == typeof(string) || param.ParameterType == typeof(decimal))
                 {
                     arguments.Add(value.ValueKind switch

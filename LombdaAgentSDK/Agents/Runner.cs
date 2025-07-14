@@ -6,11 +6,31 @@ using LlmTornado.Common;
 
 namespace LombdaAgentSDK
 {
+    /// <summary>
+    /// <c>Runner</c> to run the agent loop
+    /// </summary>
     public class Runner
     {
         public delegate void ComputerActionCallbacks(ComputerToolAction computerCall);
         public delegate void RunnerVerboseCallbacks(string runnerAction);
         public delegate void StreamingCallbacks(string streamingResult);
+        /// <summary>
+        /// Invoke the agent loop to begin async
+        /// </summary>
+        /// <param name="agent">Agent to Run</param>
+        /// <param name="input">Message to the Agent</param>
+        /// <param name="guard_rail">Input Guardrail To perform</param>
+        /// <param name="single_turn">Set loop to not loop</param>
+        /// <param name="maxTurns">Max loops to perform</param>
+        /// <param name="messages"> Input messages to add to response</param>
+        /// <param name="computerUseCallback">delegate to send computer actions</param>
+        /// <param name="verboseCallback">delegate to send process info</param>
+        /// <param name="streaming">Enable streaming</param>
+        /// <param name="streamingCallback">delegate to send streaming information (Console.Write)</param>
+        /// <param name="responseID">Previous Response ID from response API</param>
+        /// <returns>Result of the run</returns>
+        /// <exception cref="GuardRailTriggerException">Triggers when Guardrail detects bad input</exception>
+        /// <exception cref="Exception"></exception>
         public static async Task<RunResult> RunAsync(
             Agent agent,
             string input = "",
@@ -18,10 +38,10 @@ namespace LombdaAgentSDK
             bool single_turn = false,
             int maxTurns = 10,
             List<ModelItem>? messages = null,
-            ComputerActionCallbacks computerUseCallback = null,
-            RunnerVerboseCallbacks verboseCallback = null,
+            ComputerActionCallbacks? computerUseCallback = null,
+            RunnerVerboseCallbacks? verboseCallback = null,
             bool streaming = false,
-            StreamingCallbacks streamingCallback = null,
+            StreamingCallbacks? streamingCallback = null,
             string responseID = ""
             )
         {
@@ -33,6 +53,7 @@ namespace LombdaAgentSDK
                 runResult.Messages.AddRange(messages);
             }
 
+            //Set response id
             if (!string.IsNullOrEmpty(responseID))
             {
                 agent.Options.PreviousResponseId = responseID;
@@ -63,17 +84,25 @@ namespace LombdaAgentSDK
             {
                 if (currentTurn >= maxTurns) throw new Exception("Max Turns Reached");
 
-                runResult.Response = await _get_new_response(agent, runResult.Messages, streaming, streamingCallback) ?? runResult.Response;
+                runResult.Response = await _get_new_response(agent, runResult.Messages, streaming, streamingCallback, verboseCallback) ?? runResult.Response;
 
                 currentTurn++;
 
-            } while (await ProcessOutputItems(agent, runResult, verboseCallback, computerUseCallback));
+            } while (await ProcessOutputItems(agent, runResult, verboseCallback, computerUseCallback) && !single_turn);
             //Add output guardrail eventually
             
             return runResult;
         }
 
-        public static async Task<bool> ProcessOutputItems(Agent agent, RunResult runResult, RunnerVerboseCallbacks callback, ComputerActionCallbacks computerUseCallback)
+        /// <summary>
+        /// Add output to messages and handle function and tool calls
+        /// </summary>
+        /// <param name="agent"></param>
+        /// <param name="runResult"></param>
+        /// <param name="callback"></param>
+        /// <param name="computerUseCallback"></param>
+        /// <returns></returns>
+        private static async Task<bool> ProcessOutputItems(Agent agent, RunResult runResult, RunnerVerboseCallbacks? callback, ComputerActionCallbacks? computerUseCallback)
         {
             bool requiresAction = false;
 
@@ -102,13 +131,25 @@ namespace LombdaAgentSDK
 
             return requiresAction;
         }
-        
+
+        /// <summary>
+        /// Handle Tool calls from Agent loop
+        /// </summary>
+        /// <param name="agent"></param>
+        /// <param name="toolCall"></param>
+        /// <returns></returns>
         private static async Task<ModelFunctionCallOutputItem> HandleToolCall(Agent agent, ModelFunctionCallItem toolCall)
         {
             return agent.agent_tools.ContainsKey(toolCall.FunctionName) ? await ToolRunner.CallAgentToolAsync(agent, toolCall) : await ToolRunner.CallFuncToolAsync(agent, toolCall);
         }
 
-        private static async Task HandleVerboseCallback(ModelItem item, RunnerVerboseCallbacks callback)
+        /// <summary>
+        /// Handle verbose responses from Running
+        /// </summary>
+        /// <param name="item"></param>
+        /// <param name="callback"></param>
+        /// <returns></returns>
+        private static async Task HandleVerboseCallback(ModelItem item, RunnerVerboseCallbacks? callback = null)
         {
             if (item is ModelWebCallItem webSearchCall)
             {
@@ -135,28 +176,14 @@ namespace LombdaAgentSDK
             }
         }
 
-        public static async Task<ModelResponse>? _get_new_response(Agent agent, List<ModelItem> messages, bool Streaming = false, StreamingCallbacks streamingCallback = null)
-        {
-            try
-            {
-                if(Streaming)
-                {
-                    return await agent.Client._CreateStreamingResponseAsync(messages, agent.Options, streamingCallback);
-                }
 
-                return await agent.Client._CreateResponseAsync(messages, agent.Options);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.ToString());
-                Console.WriteLine("Removing Last Message thread");
-                RemoveLastMessageThread(messages);
-            }
-
-            return null;
-        }
-
-        public static async Task<ModelComputerCallOutputItem> HandleComputerCall(ModelComputerCallItem computerCall, ComputerActionCallbacks computerCallbacks = null)
+        /// <summary>
+        /// Handle sending data to callbacks from computer calls and send Screenshot after invoke
+        /// </summary>
+        /// <param name="computerCall"></param>
+        /// <param name="computerCallbacks"></param>
+        /// <returns></returns>
+        public static async Task<ModelComputerCallOutputItem> HandleComputerCall(ModelComputerCallItem computerCall, ComputerActionCallbacks? computerCallbacks = null)
         {
             computerCallbacks?.Invoke(computerCall.Action);
 
@@ -166,7 +193,35 @@ namespace LombdaAgentSDK
 
             GC.Collect();
 
-            return new ModelComputerCallOutputItem("cuo_"+Guid.NewGuid().ToString().Replace("-","_"), computerCall.CallId, ModelStatus.Completed, new ModelMessageImageFileContent(BinaryData.FromBytes(data), "image/png"));
+            return new ModelComputerCallOutputItem("cuo_" + Guid.NewGuid().ToString().Replace("-", "_"), computerCall.CallId, ModelStatus.Completed, new ModelMessageImageFileContent(BinaryData.FromBytes(data), "image/png"));
+        }
+
+        /// <summary>
+        /// Get response from the model or If Error delete last message in thread and retry (max agent loops will cap)
+        /// </summary>
+        /// <param name="agent"></param>
+        /// <param name="messages"></param>
+        /// <param name="Streaming"></param>
+        /// <param name="streamingCallback"></param>
+        /// <returns></returns>
+        public static async Task<ModelResponse>? _get_new_response(Agent agent, List<ModelItem> messages, bool Streaming = false, StreamingCallbacks? streamingCallback = null, RunnerVerboseCallbacks? verboseCallback = null)
+        {
+            try
+            {
+                if(Streaming && streamingCallback != null)
+                {
+                    return await agent.Client._CreateStreamingResponseAsync(messages, agent.Options, streamingCallback);
+                }
+                return await agent.Client._CreateResponseAsync(messages, agent.Options);
+            }
+            catch (Exception ex)
+            {
+                verboseCallback?.Invoke(ex.ToString());
+                verboseCallback?.Invoke("Removing Last Message thread");
+                RemoveLastMessageThread(messages);
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -178,6 +233,7 @@ namespace LombdaAgentSDK
             //Remove last messages
             if (messages.Count > 1)
             {
+                //Remove function call and output item for called items
                 if (messages[messages.Count - 1] is ModelFunctionCallOutputItem || messages[messages.Count - 1] is ModelComputerCallOutputItem)
                 {
                     messages.RemoveAt(messages.Count - 1); //Remove last input
