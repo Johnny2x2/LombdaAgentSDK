@@ -2,7 +2,13 @@
 {
     public static class EnumHelper
     {
-        //String helper to parse an enum value from a string input.
+        /// <summary>
+        /// Helper to try to parse trying into enum
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="input"></param>
+        /// <param name="output"></param>
+        /// <returns></returns>
         public static bool TryParseEnum<T>(this string input, out T? output)
         {
             try
@@ -21,9 +27,12 @@
         
     }
 
+
     public static class AsyncHelpers
     {
-        //Checks if the type is a generic Task<T> and returns the type of T if it is.
+        /// <summary>
+        /// Checks if the type is a generic Task<T> and returns the type of T if it is.
+        /// </summary>
         public static bool IsGenericTask(Type type, out Type taskResultType)
         {
             while (type != null && type != typeof(object))
