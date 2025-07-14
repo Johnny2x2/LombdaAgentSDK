@@ -1,5 +1,7 @@
 ﻿using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
+using System.ComponentModel;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -8,8 +10,14 @@ namespace LombdaAgentSDK
 {
     public static class json_util
     {
-        public static ModelOutputFormat CreateJsonSchemaFormatFromType(this Type type, bool jsonSchemaIsStrict = true, string formatDescription = "")
+        public static ModelOutputFormat CreateJsonSchemaFormatFromType(this Type type, bool jsonSchemaIsStrict = true)
         {
+            string formatDescription = "";
+            var descriptions = type.GetCustomAttributes<DescriptionAttribute>();
+            if(descriptions.Count() > 0)
+            {
+                formatDescription = descriptions.First().Description;
+            }
             return new ModelOutputFormat(
                 type.Name,
                 BinaryData.FromBytes(Encoding.UTF8.GetBytes(JsonSchemaGenerator.GenerateSchema(type))),
@@ -94,39 +102,59 @@ namespace LombdaAgentSDK
             });
         }
 
-        private static Dictionary<string, object> GetPropertiesSchema(Type type)
+        private static Dictionary<string, object> GetPropertiesSchema(Type type, bool fromArray = false)
         {
             var properties = new Dictionary<string, object>();
+            if (fromArray)
+            {
+                properties.Add("type", json_util.MapClrTypeToJsonType(type));
+                var subProperties = new Dictionary<string, object>();
+                foreach (var prop in type.GetProperties())
+                {
+                    subProperties[prop.Name] = GetPropertySchema(prop);
+                }
+                properties.Add("properties", subProperties);
+                properties.Add("required", GetRequiredProperties(type));
+                properties.Add("additionalProperties", false);
+                return properties;
+            }
             foreach (var prop in type.GetProperties())
             {
-                properties[prop.Name] = GetPropertySchema(prop.PropertyType);
+                properties[prop.Name] = GetPropertySchema(prop);
             }
             return properties;
         }
 
-        private static object GetPropertySchema(Type type)
+        private static object GetPropertySchema(PropertyInfo prop)
         {
-            if (type == typeof(string)) return new { type = "string" };
-            if (type == typeof(bool)) return new { type = "boolean" };
-            if (type.IsNumeric()) return new { type = "number" };
-            if (type.IsArray)
+            var props = new Dictionary<string, object>();
+            var descriptions = prop.GetCustomAttributes<DescriptionAttribute>();
+            if(descriptions.Count() > 0)
             {
-                var itemType = type.GetElementType();
-                return new
+                props.Add("description", descriptions.First().Description);
+            }
+            if (prop.PropertyType == typeof(string)) props.Add("type", "string");
+            else if (prop.PropertyType == typeof(bool)) props.Add("type", "boolean");
+            else if (prop.PropertyType.IsNumeric()) props.Add("type", "number");
+            else if (prop.PropertyType.IsArray)
+            {
+                props.Add("type", "array");
+                var itemType = prop.PropertyType.GetElementType();
+                props.Add("items", GetPropertiesSchema(itemType, true));
+            }
+            else
+            {
+                // Fallback for nested objects
+                props = new Dictionary<string, object>
                 {
-                    type = "array",
-                    items = GetPropertySchema(itemType)
+                    ["type"] = "object",
+                    ["properties"] = GetPropertiesSchema(prop.PropertyType),
+                    ["required"] = GetRequiredProperties(prop.PropertyType),
+                    ["additionalProperties"] = false
                 };
             }
 
-            // Fallback for nested objects
-            return new Dictionary<string, object>
-            {
-                ["type"] = "object",
-                ["properties"] = GetPropertiesSchema(type),
-                ["required"] = GetRequiredProperties(type),
-                ["additionalProperties"] = false
-            };
+            return props;
         }
 
         private static List<string> GetRequiredProperties(Type type)
