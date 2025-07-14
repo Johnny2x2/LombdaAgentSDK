@@ -6,7 +6,7 @@ using LombdaAgentSDK.Agents.DataClasses;
 using NUnit.Framework;
 using System.Text.Json;
 
-namespace Examples.Basic
+namespace Examples.LlmTornado
 {
     internal class LTBasicStructuredOutputsExample
     {
