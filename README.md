@@ -227,6 +227,17 @@ stateMachine.SetOutputState(resultState);
 List<string?> stateResults = await stateMachine.Run("3");
 ```
 ---
+
+## 📚 Documentation
+
+For comprehensive documentation, please visit the [docs folder](docs/):
+
+- **[Getting Started Guide](docs/GETTING_STARTED.md)** - Step-by-step tutorial for new users
+- **[API Reference](docs/API_REFERENCE.md)** - Complete API documentation  
+- **[Architecture Guide](docs/ARCHITECTURE.md)** - Design principles and architecture overview
+- **[Examples Documentation](docs/EXAMPLES.md)** - Detailed examples and use cases
+- **[Contributing Guide](docs/CONTRIBUTING.md)** - Guidelines for contributors
+
 ## 🚦 Roadmap
 * [ ] Add non async support for agent execution.
 * [ ] Improve logging and diagnostics.
