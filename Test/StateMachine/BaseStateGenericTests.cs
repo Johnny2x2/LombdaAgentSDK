@@ -114,7 +114,7 @@ namespace Test
             var process = new StateProcess<int>(state, 456);
             await state._EnterState(process);
             Assert.That(state.EnteredInputs, Does.Contain(456));
-            Assert.That(state.InputProcesses, Does.Contain(process));
+            Assert.That(state.InputProcesses.Any(item => item.ID == process.ID), Is.True);
         }
 
         [Test]

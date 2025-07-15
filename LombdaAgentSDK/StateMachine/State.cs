@@ -206,7 +206,7 @@ namespace LombdaAgentSDK.StateMachine
 
         private void AddInputProcess(StateProcess process)
         {
-            InputProcesses.Add(new StateProcess<TInput>(process.State, (TInput)process._Input!));
+            InputProcesses.Add(new StateProcess<TInput>(process.State, (TInput)process._Input!, process.ID));
         }
 
         /// <summary>
