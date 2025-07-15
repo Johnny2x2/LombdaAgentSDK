@@ -182,9 +182,9 @@ namespace LombdaAgentSDK.StateMachine
         public CancellationTokenSource StopTrigger = new CancellationTokenSource();
 
         /// <summary>
-        /// You can use this to store runtime properties that you want to access later or in other states. Limit Use This is not thread safe yet.
+        /// You can use this to store runtime properties that you want to access later or in other states.
         /// </summary>
-        public Dictionary<string, object> RuntimeProperties { get; set; } = new Dictionary<string, object>();
+        public ConcurrentDictionary<string, object> RuntimeProperties { get; set; } = new ConcurrentDictionary<string, object>();
 
         /// <summary>
         /// Gets the <see cref="CancellationToken"/> used to signal cancellation of the current operation.
