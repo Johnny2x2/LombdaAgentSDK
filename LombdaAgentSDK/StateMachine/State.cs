@@ -299,24 +299,25 @@ namespace LombdaAgentSDK.StateMachine
         private List<StateProcess> GetFirstValidStateTransitionForEachResult()
         {
             List<StateProcess> newStateProcesses = new();
-
+            //Results Gathered from invoking
             OutputResults.ForEach(result =>
             {
+                //Transitions are selected in order they are added
                 StateTransition?  transition = GetFirstValidStateTransition(result.Result);
 
-                var newState = transition?.NextState;
-
-                if (newState != null)
+                //If not transition is found, we can reattempt the process
+                if (transition != null)
                 {
+                    //Check if transition is convertion type or use the output.Result directly
                     var oresult = transition.type == "in_out" ? transition._ConverterMethodResult : result.Result;
 
                     newStateProcesses.Add(new StateProcess(transition.NextState, oresult));
                 }
                 else
                 {
-                    //ReRun the process 
+                    //ReRun the process that failed
                     StateProcess<TInput> failedProcess = InputProcesses.First(process => process.ID == result.ProcessID);
-
+                    //Cap the amount of times a State can reattempt (Fixed at 3 right now)
                     if (failedProcess.CanReAttempt())
                     {
                         newStateProcesses.Add(failedProcess);
@@ -328,7 +329,7 @@ namespace LombdaAgentSDK.StateMachine
         }
 
         /// <summary>
-        /// Retrieves all valid state transitions based on the current output results and transition rules.
+        /// Retrieves all valid state transitions based on the current output results and transition rules. Used for parallel Transitions
         /// </summary>
         /// <remarks>This method evaluates each output result against defined transitions to determine
         /// valid state processes. If no transitions are valid for a given output, the corresponding process may be
@@ -337,7 +338,7 @@ namespace LombdaAgentSDK.StateMachine
         private List<StateProcess> GetAllValidStateTransitions()
         {
             List<StateProcess> newStateProcesses = new();
-
+            //Results Gathered from invoking
             OutputResults.ForEach((output) =>
             {
                 List<StateProcess> newStateProcessesFromOutput = new();
@@ -347,6 +348,7 @@ namespace LombdaAgentSDK.StateMachine
                 {
                     if (transition.Evaluate(output.Result))
                     {
+                        //Check if transition is convertion type or use the output.Result directly
                         var result = transition.type == "in_out" ? transition._ConverterMethodResult : output.Result;
 
                         newStateProcessesFromOutput.Add(new StateProcess(transition.NextState, result));
