@@ -80,7 +80,7 @@ namespace BabyAGI.Agents
                     break;
                 case ModelComputerCallAction.KeyPress:
                     Console.WriteLine($"[Computer Call Action]({action}) {string.Join(",",action.KeysToPress.ToArray())}");
-                    ComputerToolUtility.PressKeyDown(action.KeysToPress[0]);
+                    ComputerToolUtility.PressKey(action.KeysToPress[0]);
                     break;
                 case ModelComputerCallAction.Move:
                     Console.WriteLine($"[Computer Call Action]({action}) {action.MoveCoordinates}");

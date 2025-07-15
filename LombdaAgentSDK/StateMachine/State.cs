@@ -19,7 +19,8 @@ namespace LombdaAgentSDK.StateMachine
     /// transitions.</remarks>
     public abstract class BaseState
     {
-        
+        private SemaphoreSlim threadLimitor;
+        private int maxThreads = 20;
         internal readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
         public bool BeingReran = false;
         private List<StateTransition<object>> transitions = new();
@@ -113,6 +114,7 @@ namespace LombdaAgentSDK.StateMachine
         /// property to combine input into a single process to avoid running multiple threads for each input.
         /// </summary>
         public bool CombineInput { get => combineInput; set => combineInput = value; }
+
         /// <summary>
         /// Evaluates and returns a list of state processes that meet specific conditions.
         /// </summary>
@@ -121,8 +123,21 @@ namespace LombdaAgentSDK.StateMachine
         public abstract List<StateProcess> CheckConditions();
     }
 
+    /// <summary>
+    /// Represents a base state in a state machine, providing mechanisms for handling input and output processes, state
+    /// transitions, and asynchronous state entry and exit operations.
+    /// </summary>
+    /// <remarks>This abstract class serves as a foundation for implementing specific states in a state
+    /// machine. It manages input processes, output results, and state transitions, and provides asynchronous methods
+    /// for entering and exiting states. Derived classes should implement the <see cref="Invoke(TInput)"/> method to
+    /// define the processing logic for the state.</remarks>
+    /// <typeparam name="TInput">The type of input data processed by the state.</typeparam>
+    /// <typeparam name="TOutput">The type of output data produced by the state.</typeparam>
     public abstract class BaseState<TInput, TOutput> : BaseState
     {
+        private List<StateProcess<TInput>> inputProcesses = new();
+        private List<StateResult<TOutput>> outputResults = new();
+
         public override Type GetInputType() => typeof(TInput);
         public override Type GetOutputType() => typeof(TOutput);
 
@@ -135,14 +150,38 @@ namespace LombdaAgentSDK.StateMachine
         /// Gets the list of input items processed by the input processes.
         /// </summary>
         public List<TInput> Input { get => InputProcesses.Select(process => process.Input).ToList();}
-        /// <summary>
-        /// Gets or sets the collection of input processes.
-        /// </summary>
-        public List<StateProcess<TInput>> InputProcesses { get => _InputProcesses.ConvertAll(item => item.GetProcess<TInput>()); set => _InputProcesses = value.ConvertAll(item => (StateProcess)item)!; }
-        /// <summary>
-        /// Gets or sets the list of output results.
-        /// </summary>
-        public List<StateResult<TOutput>> OutputResults { get => _OutputResults.ConvertAll(item => item.GetResult<TOutput>()); set => _OutputResults = value.ConvertAll(item => (StateResult?)item)!; }
+        ///// <summary>
+        ///// Gets or sets the collection of input processes.
+        ///// </summary>
+        //public List<StateProcess<TInput>> InputProcesses { get => _InputProcesses.ConvertAll(item => item.GetProcess<TInput>()); set => _InputProcesses = value.ConvertAll(item => (StateProcess)item)!; }
+        ///// <summary>
+        ///// Gets or sets the list of output results.
+        ///// </summary>
+        //public List<StateResult<TOutput>> OutputResults { get => _OutputResults.ConvertAll(item => item.GetResult<TOutput>()); set => _OutputResults = value.ConvertAll(item => (StateResult?)item)!; }
+        ///// <summary>
+        ///// Gets or sets the collection of input processes.
+        ///// </summary>
+        public List<StateProcess<TInput>> InputProcesses
+        {
+            get => inputProcesses;
+            set
+            {
+                inputProcesses = value ?? new List<StateProcess<TInput>>();
+                _InputProcesses = inputProcesses.Cast<StateProcess>().ToList();
+            }
+        }
+        ///// <summary>
+        ///// Gets or sets the list of output results.
+        ///// </summary>
+        public List<StateResult<TOutput>> OutputResults
+        {
+            get => outputResults;
+            set
+            {
+                outputResults = value ?? new List<StateResult<TOutput>>();
+                _OutputResults = outputResults.Cast<StateResult>().ToList();
+            }
+        }
         /// <summary>
         /// Gets or sets the collection of state transitions.
         /// </summary>
@@ -179,7 +218,7 @@ namespace LombdaAgentSDK.StateMachine
             WasInvoked = false;
             try
             {
-                _InputProcesses.Add(input!);
+                InputProcesses.Add((StateProcess<TInput>)input!);
                 await this.EnterState((TInput)input!._Input!);
             }
             finally
@@ -188,7 +227,10 @@ namespace LombdaAgentSDK.StateMachine
             }
         }
 
-
+        /// <summary>
+        /// Exits after the state has been invoked and processes are cleared.
+        /// </summary>
+        /// <returns></returns>
         public override async Task _ExitState()
         {
             await _semaphore.WaitAsync();
@@ -242,12 +284,13 @@ namespace LombdaAgentSDK.StateMachine
 
             if (CombineInput)
             {
-                //Invoke Should handle the Input as a whole
+                //Invoke Should handle the Input as a whole (Single Thread can handle processing all the inputs)
                 Tasks.Add(Task.Run(async () => oResults.Add(await InternalInvoke(InputProcesses[0]))));
             }
             else
             {
-                //Default option to process each input in as its own item (This process is resource bound by the single state instance)
+                //Default option to process each input in as its own item
+                //(This process is resource bound by the single state instance)
                 InputProcesses.ForEach(process => Tasks.Add(Task.Run(async () => oResults.Add(await InternalInvoke(process)))));
             }
 
@@ -262,7 +305,7 @@ namespace LombdaAgentSDK.StateMachine
         }
 
         /// <summary>
-        /// Wrapper for Process and result
+        /// StateResult Wrapper for Process and result
         /// </summary>
         /// <param name="input"></param>
         /// <returns></returns>
@@ -287,6 +330,7 @@ namespace LombdaAgentSDK.StateMachine
         {
             return Transitions?.DefaultIfEmpty(null)?.FirstOrDefault(transition => transition?.Evaluate(output) ?? false) ?? null;
         }
+
         /// <summary>
         /// Determines the first valid state transition for each result and returns a list of state processes.
         /// </summary>
