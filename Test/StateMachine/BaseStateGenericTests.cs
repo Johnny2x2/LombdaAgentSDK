@@ -103,8 +103,8 @@ namespace Test
             var state = new TestState();
             var process = new StateProcess<int>(state, 123);
             await state._EnterState(process);
-            Assert.Contains(123, state.EnteredInputs);
-            Assert.Contains(process, state.InputProcesses);
+            Assert.That(state.EnteredInputs, Does.Contain(123));
+            Assert.That(state.InputProcesses.Any(item=>item.ID == process.ID), Is.True);
         }
 
         [Test]
@@ -165,7 +165,7 @@ namespace Test
         public void AddTransition_AddsTransition()
         {
             var state = new TestState();
-            var nextState = new LambdaState<int, string>((input) => input.ToString());
+            var nextState = new LambdaState<string, int>(int.Parse);
             bool called = false;
             TransitionEvent<string> evt = (output) => { called = true; return true; };
             state.AddTransition(evt, nextState);

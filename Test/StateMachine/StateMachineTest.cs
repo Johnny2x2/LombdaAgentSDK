@@ -270,7 +270,7 @@ namespace Test
             ConvertStringToIntState resultState = new();
 
             //summing State should Have 2 Inputs now
-            inputState.AddTransition(_ => true, (result)=> result.ToString(),resultState);
+            inputState.AddTransition(_ => true, (result)=> result.ToString(), resultState);
 
             resultState.AddTransition(_ => true,  new ExitState());
 

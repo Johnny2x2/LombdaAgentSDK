@@ -150,38 +150,65 @@ namespace LombdaAgentSDK.StateMachine
         /// Gets the list of input items processed by the input processes.
         /// </summary>
         public List<TInput> Input { get => InputProcesses.Select(process => process.Input).ToList();}
-        ///// <summary>
-        ///// Gets or sets the collection of input processes.
-        ///// </summary>
+        /// <summary>
+        /// Gets or sets the collection of input processes.
+        /// </summary>
         //public List<StateProcess<TInput>> InputProcesses { get => _InputProcesses.ConvertAll(item => item.GetProcess<TInput>()); set => _InputProcesses = value.ConvertAll(item => (StateProcess)item)!; }
-        ///// <summary>
-        ///// Gets or sets the list of output results.
-        ///// </summary>
+        /// <summary>
+        /// Gets or sets the list of output results.
+        /// </summary>
         //public List<StateResult<TOutput>> OutputResults { get => _OutputResults.ConvertAll(item => item.GetResult<TOutput>()); set => _OutputResults = value.ConvertAll(item => (StateResult?)item)!; }
-        ///// <summary>
-        ///// Gets or sets the collection of input processes.
-        ///// </summary>
+        /// <summary>
+        /// Gets or sets the collection of input processes.
+        /// </summary>
         public List<StateProcess<TInput>> InputProcesses
         {
             get => inputProcesses;
             set
             {
                 inputProcesses = value ?? new List<StateProcess<TInput>>();
-                _InputProcesses = inputProcesses.Cast<StateProcess>().ToList();
+                _InputProcesses = ConvertInputProcesses();
             }
         }
-        ///// <summary>
-        ///// Gets or sets the list of output results.
-        ///// </summary>
+
+        private List<StateProcess> ConvertInputProcesses()
+        {
+            var inputProcs = new List<StateProcess>();
+            foreach (var process in InputProcesses)
+            {
+                inputProcs.Add(new StateProcess(process.State, (object)process.Input!));
+            }
+            return inputProcs;
+        }
+
+        /// <summary>
+        /// Gets or sets the list of output results.
+        /// </summary>
         public List<StateResult<TOutput>> OutputResults
         {
             get => outputResults;
             set
             {
                 outputResults = value ?? new List<StateResult<TOutput>>();
-                _OutputResults = outputResults.Cast<StateResult>().ToList();
+                _OutputResults = ConvertOutputResults();
             }
         }
+
+        private List<StateResult> ConvertOutputResults()
+        {
+            var results = new List<StateResult>();
+            foreach (var result in outputResults)
+            {
+                results.Add(new StateResult(result.ProcessID, result._Result));
+            }
+            return results;
+        }
+
+        private void AddInputProcess(StateProcess process)
+        {
+            InputProcesses.Add(new StateProcess<TInput>(process.State, (TInput)process._Input!));
+        }
+
         /// <summary>
         /// Gets or sets the collection of state transitions.
         /// </summary>
@@ -198,7 +225,7 @@ namespace LombdaAgentSDK.StateMachine
             WasInvoked = false;
             try
             {
-                InputProcesses.Add(input!);
+                AddInputProcess(input);
                 await this.EnterState(input!.Input);
             }
             finally
@@ -212,13 +239,13 @@ namespace LombdaAgentSDK.StateMachine
         /// </summary>
         /// <param name="input"></param>
         /// <returns></returns>
-        public async override Task _EnterState(StateProcess? input)
+        public async override Task _EnterState(StateProcess input)
         {
             await _semaphore.WaitAsync();
             WasInvoked = false;
             try
             {
-                InputProcesses.Add((StateProcess<TInput>)input!);
+                AddInputProcess(input);
                 await this.EnterState((TInput)input!._Input!);
             }
             finally
@@ -236,7 +263,7 @@ namespace LombdaAgentSDK.StateMachine
             await _semaphore.WaitAsync();
             try
             {
-                _InputProcesses.Clear();
+                InputProcesses.Clear();
                 await ExitState();
             }
             finally
