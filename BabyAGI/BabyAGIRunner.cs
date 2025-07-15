@@ -47,7 +47,8 @@ namespace BabyAGI
                 Console.Write("[User]: ");
                 userInput = Console.ReadLine() ?? "";
             }
-    }
+        }
+
         [Tool(Description = "Use this before telling a user you are unable to do something", In_parameters_description = ["The task you wish to accomplish."])]
         public async Task<string> AttemptToCompleteTask(string task)
         {
