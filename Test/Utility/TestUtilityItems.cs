@@ -30,7 +30,7 @@ namespace Test.Utility
         public void TestJsonFormatSchemaCreationOnStruct()
         {
             ModelOutputFormat modelFormat = json_util.CreateJsonSchemaFormatFromType(typeof(AnimalStruct), true);
-            Assert.That(modelFormat.JsonSchemaFormatName, Is.EqualTo("Animal"));
+            Assert.That(modelFormat.JsonSchemaFormatName, Is.EqualTo("AnimalStruct"));
             Assert.That(modelFormat.JsonSchema, Is.Not.Null);
             Assert.That(modelFormat.JsonSchemaIsStrict, Is.True);
         }

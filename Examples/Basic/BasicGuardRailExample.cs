@@ -15,7 +15,7 @@ namespace Examples.Basic
             await TestPassingGuardRail();
 
             // Act & Assert
-            Assert.ThrowsAsync<Exception>(() => TestFailingGuardRail());
+            Assert.ThrowsAsync<GuardRailTriggerException>(() => TestFailingGuardRail());
         }
 
         public async Task TestPassingGuardRail()
