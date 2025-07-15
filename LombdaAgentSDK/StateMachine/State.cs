@@ -150,14 +150,7 @@ namespace LombdaAgentSDK.StateMachine
         /// Gets the list of input items processed by the input processes.
         /// </summary>
         public List<TInput> Input { get => InputProcesses.Select(process => process.Input).ToList();}
-        /// <summary>
-        /// Gets or sets the collection of input processes.
-        /// </summary>
-        //public List<StateProcess<TInput>> InputProcesses { get => _InputProcesses.ConvertAll(item => item.GetProcess<TInput>()); set => _InputProcesses = value.ConvertAll(item => (StateProcess)item)!; }
-        /// <summary>
-        /// Gets or sets the list of output results.
-        /// </summary>
-        //public List<StateResult<TOutput>> OutputResults { get => _OutputResults.ConvertAll(item => item.GetResult<TOutput>()); set => _OutputResults = value.ConvertAll(item => (StateResult?)item)!; }
+       
         /// <summary>
         /// Gets or sets the collection of input processes.
         /// </summary>
@@ -171,6 +164,12 @@ namespace LombdaAgentSDK.StateMachine
             }
         }
 
+        /// <summary>
+        /// Converts the input processes into a list of <see cref="StateProcess"/> objects.
+        /// </summary>
+        /// <remarks>This method iterates over the collection of input processes and creates a new <see
+        /// cref="StateProcess"/>  for each one, using the state and input from the original process.</remarks>
+        /// <returns>A list of <see cref="StateProcess"/> objects, each representing a converted input process.</returns>
         private List<StateProcess> ConvertInputProcesses()
         {
             var inputProcs = new List<StateProcess>();
@@ -194,6 +193,10 @@ namespace LombdaAgentSDK.StateMachine
             }
         }
 
+        /// <summary>
+        /// Converts the output results into a list of <see cref="StateResult"/> objects.
+        /// </summary>
+        /// <returns>A list of <see cref="StateResult"/> objects, each representing a processed result from the output.</returns>
         private List<StateResult> ConvertOutputResults()
         {
             var results = new List<StateResult>();
@@ -204,6 +207,13 @@ namespace LombdaAgentSDK.StateMachine
             return results;
         }
 
+        /// <summary>
+        /// Adds a new input process to the collection of input processes.
+        /// </summary>
+        /// <remarks>The method casts the input of the provided <paramref name="process"/> to the type
+        /// <typeparamref name="TInput"/> and adds it to the input processes collection. Ensure that the input of the
+        /// <paramref name="process"/> is not null and is of the correct type to avoid runtime exceptions.</remarks>
+        /// <param name="process">The state process to be added, which must contain a valid input of type <typeparamref name="TInput"/>.</param>
         private void AddInputProcess(StateProcess process)
         {
             InputProcesses.Add(new StateProcess<TInput>(process.State, (TInput)process._Input!, process.ID));
