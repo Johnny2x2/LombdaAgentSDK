@@ -6,7 +6,7 @@ namespace Examples.Demos.ResearchAgent
 {
     public class ResearchAgent
     {
-        [Test]
+        //[Test]
         public async Task Run()
         {
             //Setup states

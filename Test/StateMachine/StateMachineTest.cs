@@ -15,6 +15,17 @@ namespace Test
                 return 3;
             }
         }
+        public class DummyState : BaseState<int, string>
+        {
+            public override async Task<string> Invoke(int input)
+            {
+                Assert.That(GetInputType(), Is.EqualTo(typeof(int)));
+
+                Assert.That(GetOutputType(), Is.EqualTo(typeof(string)));
+
+                return input.ToString();
+            }
+        }
 
         public class ConvertIntToStringState : BaseState<int, string>
         {
@@ -250,6 +261,30 @@ namespace Test
             Assert.IsTrue(stateResults[0].Contains("36"));
             Assert.IsTrue(stateResults[1].Contains("31"));
             Assert.IsTrue(stateResults[2].Contains("41"));
+        }
+
+        [Test]
+        public async Task TestStateInputOutputTransition()
+        {
+            ConvertStringToIntState inputState = new();
+            ConvertStringToIntState resultState = new();
+
+            //summing State should Have 2 Inputs now
+            inputState.AddTransition(_ => true, (result)=> result.ToString(), resultState);
+
+            resultState.AddTransition(_ => true,  new ExitState());
+
+            StateMachine<string, int?> stateMachine = new();
+
+            stateMachine.SetEntryState(inputState);
+            stateMachine.SetOutputState(resultState);
+
+            List<List<int?>> stateResults = await stateMachine.Run(["3","2","4"]);
+
+            Console.WriteLine($"State Results: {string.Join(", ", stateResults.Select(r => string.Join(", ", r)))}");
+            //Order returned is uncertain
+            Assert.IsTrue(stateResults[0].Contains(3));
+
         }
     }
 }

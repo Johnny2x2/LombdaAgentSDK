@@ -10,7 +10,7 @@ namespace Examples.Demos.CodingAgent
         public static string ProjectBuildPath = "C:\\Users\\jlomba\\source\\repos\\ConsoleTesting";
         public static string ProjectName = "ConsoleTesting";
 
-        [Test]
+        //[Test]
         public async Task Run()
         {
             FileIOUtility.SafeWorkingDirectory =  Path.Combine(CSHARP_CodingAgent.ProjectBuildPath, ProjectName);

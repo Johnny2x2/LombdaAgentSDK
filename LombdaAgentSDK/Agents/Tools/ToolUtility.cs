@@ -78,12 +78,19 @@ namespace LombdaAgentSDK.Agents.Tools
             //Convert the Input map into Json string of the Function schema
             string funcParamResult = JsonSchemaGenerator.BuildFunctionSchema(input_tool_map, required_inputs);
 
+            var strictSchema = true;
+
+            if (toolAttr.In_parameters_description != null)
+            {
+                strictSchema = required_inputs.Count == toolAttr.In_parameters_description.Length;
+            }
+            
             return new FunctionTool(
                         toolName: method.Name,
                         toolDescription: toolAttr.Description,
                         toolParameters: BinaryData.FromBytes(Encoding.UTF8.GetBytes(funcParamResult)),
                         function: function,
-                        strictSchema: required_inputs.Count == toolAttr.In_parameters_description.Length //Auto set strict schema
+                        strictSchema: strictSchema//Auto set strict schema
                     );
         }
 

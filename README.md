@@ -227,6 +227,39 @@ stateMachine.SetOutputState(resultState);
 List<string?> stateResults = await stateMachine.Run("3");
 ```
 ---
+
+### Simple Conversion from different Input to Output types
+```csharp
+ConvertStringToIntState inputState = new();
+ConvertStringToIntState resultState = new();
+
+//Input State will convert string to int
+inputState.AddTransition(_ => true, (result) => result.ToString(), resultState);
+
+resultState.AddTransition(_ => true,  new ExitState());
+
+StateMachine<string, int?> stateMachine = new();
+
+stateMachine.SetEntryState(inputState);
+stateMachine.SetOutputState(resultState);
+
+var stateResults = await stateMachine.Run(["3","2","4"]);
+
+Console.WriteLine($"State Results: {string.Join(", ", stateResults.Select(r => string.Join(", ", r)))}");
+
+Assert.IsTrue(stateResults[0].Contains(3));
+```
+
+## 📚 Documentation
+
+For comprehensive documentation, please visit the [docs folder](docs/):
+
+- **[Getting Started Guide](docs/GETTING_STARTED.md)** - Step-by-step tutorial for new users
+- **[API Reference](docs/API_REFERENCE.md)** - Complete API documentation  
+- **[Architecture Guide](docs/ARCHITECTURE.md)** - Design principles and architecture overview
+- **[Examples Documentation](docs/EXAMPLES.md)** - Detailed examples and use cases
+- **[Contributing Guide](docs/CONTRIBUTING.md)** - Guidelines for contributors
+
 ## 🚦 Roadmap
 * [ ] Add non async support for agent execution.
 * [ ] Improve logging and diagnostics.
