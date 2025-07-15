@@ -36,7 +36,7 @@ namespace Examples.Demos.OpenAIComputerUsePreview
     [Experimental("computerPreview")]
     public class WindowsComputerUseExample
     {
-        [Test]
+        //[Test]
         public async Task RunTest()
         {
             OpenAIModelClient openAIModelClient = new OpenAIModelClient("computer-use-preview", enableComputerCalls: true);

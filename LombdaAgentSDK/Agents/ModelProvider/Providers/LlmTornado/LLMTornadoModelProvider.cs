@@ -28,9 +28,16 @@ namespace LombdaAgentSDK
 
         public bool AllowComputerUse { get; set; }
         public VectorSearchOptions? VectorSearchOptions { get; set; }
+        public bool EnableWebSearch { get; set; } = false;
+
+        //Need to add in some Converters first
+        //public bool EnableCodeInterpreter { get; set; } = false;
+        //Need MPC
+        //Need LocalShell
+
         public LLMTornadoModelProvider(
             ChatModel model, List<ProviderAuthentication> provider, bool useResponseAPI = false, 
-            bool allowComputerUse = false, VectorSearchOptions? searchOptions = null)
+            bool allowComputerUse = false, VectorSearchOptions? searchOptions = null, bool enableWebSearch = false)
         {
             Model = model.Name;
             CurrentModel = model;
@@ -38,6 +45,7 @@ namespace LombdaAgentSDK
             UseResponseAPI = useResponseAPI;
             AllowComputerUse = allowComputerUse;
             VectorSearchOptions = searchOptions;
+            EnableWebSearch = enableWebSearch;
         }
 
         public LLMTornadoModelProvider(
@@ -183,6 +191,17 @@ namespace LombdaAgentSDK
                     }
                 };
             }
+
+            if(EnableWebSearch)
+            {
+                request.Tools.Add(new ResponseWebSearchTool());
+            }
+
+            //Need to add Convertion methods to model provider converts for ResponseConverter
+            //if (EnableCodeInterpreter)
+            //{
+            //    request.Tools.Add(new ResponseCodeInterpreterTool());
+            //}
 
             return request;
         }

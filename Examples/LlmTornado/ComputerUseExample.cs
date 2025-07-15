@@ -9,7 +9,7 @@ namespace Examples.LlmTornado
     public class LTComputerUseExample
     {
         //requires Teir 3 account & access to use computer-use-preview currently
-        [Test]
+        //[Test]
         public async Task Run()
         {
             LLMTornadoModelProvider client =
