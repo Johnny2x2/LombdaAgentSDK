@@ -14,11 +14,11 @@ using System.Threading.Tasks;
 namespace Examples.Demos.CodingAgent.states
 {
     //Design the states
-    class CSharpCodingState : BaseState<string, ProgramResultOutput>
+    class ToolCodingState : BaseState<string, ProgramResultOutput>
     {
-        public CSHARP_CodingAgent StateAgent { get; set; }
+        public ToolCodingAgent StateAgent { get; set; }
 
-        public CSharpCodingState(CSHARP_CodingAgent stateAgent) 
+        public ToolCodingState(ToolCodingAgent stateAgent) 
         { 
             StateAgent = stateAgent;
         }

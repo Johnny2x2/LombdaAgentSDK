@@ -8,11 +8,11 @@ using NUnit.Framework;
 
 namespace Examples.Demos.CodingAgent
 {
-    public class CSHARP_CodingAgent
+    public class ToolCodingAgent
     {
         public string FunctionsPath = "C:\\Users\\johnl\\source\\repos\\FunctionApplications";
         public string ProjectName = "";
-        public CSHARP_CodingAgent(string functionsPath) 
+        public ToolCodingAgent(string functionsPath) 
         { 
             FunctionsPath = functionsPath;
         }
@@ -26,7 +26,7 @@ namespace Examples.Demos.CodingAgent
             FunctionGeneratorUtility.CreateNewProject(FunctionsPath, ProjectName, context.functionBreakDown.Description);
 
             //Setup states
-            CSharpCodingState codeState = new CSharpCodingState(this);//Program a solution
+            ToolCodingState codeState = new ToolCodingState(this);//Program a solution
             CSharpBuildState buildState = new CSharpBuildState(this); //Execute a solution 
             CodeReviewerState reviewState = new CodeReviewerState(this);//How to fix the code
             FunctionEnricherState enricherState = new FunctionEnricherState(this);

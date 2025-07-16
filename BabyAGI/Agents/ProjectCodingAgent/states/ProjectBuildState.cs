@@ -1,4 +1,7 @@
-﻿using BabyAGI.Utility;
+﻿using BabyAGI.Agents.ProjectCodingAgent.DataModels;
+using BabyAGI.Utility;
+using Examples.Demos.CodingAgent;
+
 using LombdaAgentSDK.StateMachine;
 using System;
 using System.Collections.Generic;
@@ -7,17 +10,17 @@ using System.Text;
 using System.Threading.Tasks;
 
 
-namespace Examples.Demos.CodingAgent.states
+namespace Examples.Demos.ProjectCodingAgent.states
 {
     //Need to generate result struct
-    class CSharpBuildState : BaseState<ProgramResultOutput, CodeBuildInfoOutput>
+    class ProjectBuildState : BaseState<ProjectResultOutput, CodeProjectBuildInfoOutput>
     {
-        public CSHARP_CodingAgent StateAgent { get; set; }
-        public CSharpBuildState(CSHARP_CodingAgent stateAgent) 
+        public CodingProjectsAgent StateAgent { get; set; }
+        public ProjectBuildState(CodingProjectsAgent stateAgent) 
         {
             StateAgent = stateAgent;
         }
-        public override async Task<CodeBuildInfoOutput> Invoke(ProgramResultOutput programResult)
+        public override async Task<CodeProjectBuildInfoOutput> Invoke(ProjectResultOutput programResult)
         {
             //Write over files in project
             foreach (CodeItem script in programResult.Result.items)
@@ -30,7 +33,7 @@ namespace Examples.Demos.CodingAgent.states
             CodeBuildInfo codeInfo = FunctionGeneratorUtility.BuildAndRunProject(StateAgent.FunctionsPath, StateAgent.ProjectName, "net8.0", programResult.Result.Sample_EXE_Args, true);
 
             //Report the results of the build
-            return new CodeBuildInfoOutput(codeInfo, programResult);
+            return new CodeProjectBuildInfoOutput(codeInfo, programResult);
         }
     }
 }

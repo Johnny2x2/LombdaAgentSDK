@@ -1,6 +1,5 @@
-﻿using BabyAGI.Agents.CSharpCodingAgent.states;
-using BabyAGI.BabyAGIStateMachine.DataModels;
-using BabyAGI.Utility;
+﻿using BabyAGI.BabyAGIStateMachine.DataModels;
+using BabyAGI.BabyAGIStateMachine.States;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
 using LombdaAgentSDK;
@@ -13,32 +12,16 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BabyAGI.BabyAGIStateMachine.States
+namespace BabyAGI.Agents.ProjectCodingAgent.states
 {
-    public struct TaskBreakdownResult
-    {
-        public TaskItem[] Tasks { get; set; }
-        public string OverallStrategy { get; set; }
-    }
-
-    public struct TaskItem
-    {
-        public int TaskId { get; set; }
-        public string Description { get; set; }
-        public string ExpectedOutcome { get; set; }
-        public string[] Dependencies { get; set; }
-        public string Complexity { get; set; } // "Low", "Medium", "High"
-        public string SuccessCriteria { get; set; }
-    }
-
-    public class BATaskCreationState : BaseState<string, TaskBreakdownResult>
+    public class ProjectCodeTaskCreatorState : BaseState<string, TaskBreakdownResult>
     {
         public override async Task<TaskBreakdownResult> Invoke(string input)
         {
             var currentTask = new QueueTask();
 
             string prompt = $@"
-            User Goal: {input}
+            Project Goal: {input}
 
             Context: This is part of a task management system where tasks will be executed sequentially by automated agents.
             Each task should be:
@@ -86,13 +69,17 @@ namespace BabyAGI.BabyAGIStateMachine.States
 
             Agent agent = new Agent(
                 client,
-                "Function Executor",
+                "Task Generator",
                 instructions,
                 _output_schema: typeof(TaskBreakdownResult));
 
             RunResult result = await Runner.RunAsync(agent, prompt);
 
             TaskBreakdownResult taskResults = result.ParseJson<TaskBreakdownResult>();
+
+           
+
+            
 
             return taskResults;
         }

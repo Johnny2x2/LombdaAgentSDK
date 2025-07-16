@@ -15,8 +15,8 @@ namespace Examples.Demos.CodingAgent
 {
     class CodeReviewerState : BaseState<CodeBuildInfoOutput, string>
     {
-        public CSHARP_CodingAgent StateAgent {  get; set; }
-        public CodeReviewerState(CSHARP_CodingAgent stateAgent)
+        public ToolCodingAgent StateAgent {  get; set; }
+        public CodeReviewerState(ToolCodingAgent stateAgent)
         {
             StateAgent = stateAgent;
         }

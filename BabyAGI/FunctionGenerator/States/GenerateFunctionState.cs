@@ -29,7 +29,7 @@ namespace BabyAGI.FunctionGenerator.States
         }
         async Task RunAgent(FunctionBreakDown function)
         {
-            CSHARP_CodingAgent codeAgent = new CSHARP_CodingAgent(StateController.FunctionsPath);
+            CodingProjectsAgent codeAgent = new CSHARP_CodingAgent(StateController.FunctionsPath);
             await codeAgent.RunCodingAgent(new FunctionBreakDownInput("", function));
         }
     }

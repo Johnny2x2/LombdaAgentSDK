@@ -33,9 +33,9 @@ namespace BabyAGI.Agents.CSharpCodingAgent.states
 
     internal class FunctionEnricherState : BaseState<CodeBuildInfoOutput, CodeBuildInfoOutput>
     {
-        public CSHARP_CodingAgent StateAgent { get; set; }
+        public ToolCodingAgent StateAgent { get; set; }
 
-        public FunctionEnricherState(CSHARP_CodingAgent stateAgent)
+        public FunctionEnricherState(ToolCodingAgent stateAgent)
         {
             StateAgent = stateAgent;
         }
