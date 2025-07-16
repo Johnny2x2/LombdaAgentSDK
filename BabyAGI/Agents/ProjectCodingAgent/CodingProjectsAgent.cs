@@ -1,5 +1,7 @@
 ﻿using BabyAGI.Agents.CSharpCodingAgent.states;
+using BabyAGI.Agents.ProjectCodingAgent.DataModels;
 using BabyAGI.Agents.ProjectCodingAgent.states;
+using BabyAGI.BabyAGIStateMachine.DataModels;
 using BabyAGI.BabyAGIStateMachine.States;
 using BabyAGI.Utility;
 using Examples.Demos.CodingAgent;
@@ -22,51 +24,56 @@ namespace Examples.Demos.ProjectCodingAgent
             FunctionsPath = functionsPath;
         }
 
-        public FunctionBreakDownInput Context {  get; set; }
+        public string Context {  get; set; }
 
-        public async Task<CodeBuildInfoOutput> RunProjectCodingAgent(FunctionBreakDownInput context)
+        public async Task<ProgramApprovalResult> RunProjectCodingAgent(string context)
         {
-            ProjectName = context.functionBreakDown.FunctionName;
-
             Context = context;
 
-            FunctionGeneratorUtility.CreateNewProject(FunctionsPath, ProjectName, context.functionBreakDown.Description);
-
             //Setup states
-            ProjectCodeTaskCreatorState taskGenerator = new ProjectCodeTaskCreatorState();
+            ProjectDesignState designState = new ProjectDesignState(this); //Design the project
+            ProjectCodeTaskCreatorState taskGenerator = new ProjectCodeTaskCreatorState(); //Generate tasks
+            ProjectManagerState taskManagerState = new ProjectManagerState(); // Manage tasks
             ProjectCodingState codeState = new ProjectCodingState(this);//Program a solution
             ProjectBuildState buildState = new ProjectBuildState(this); //Execute a solution 
             ProjectReviewerState reviewState = new ProjectReviewerState(this);//How to fix the code
-            TaskManagerState taskManagerState = new TaskManagerState();
-
-            taskGenerator.AddTransition(_ => true, taskManagerState);
-            taskManagerState.AddTransition((task)=> task.TaskId != 0, codeState); //If there is a task move to code state
-            taskManagerState.AddTransition(_ => true, new ExitState()); //If no tasks available, generate new tasks
+            ProjectApprovalState approvalState = new ProjectApprovalState(this); //Approve the project
 
             //Setup connections
-            codeState.AddTransition(_=>true, buildState);//Program a solution
+            //Design the project
+            designState.AddTransition(taskGenerator); //Design the project and move to task generator
 
-            buildState.AddTransition<TaskBreakdownResult>(
-                (result) => result.BuildInfo.BuildResult.BuildCompleted && result.BuildInfo.ExecutableResult.ExecutionCompleted, 
-                (result) => new TaskBreakdownResult(), //If program works, move to enricher
-                taskManagerState); //Executed a solution move to next task
+            //Generate the task
+            taskGenerator.AddTransition(taskManagerState); //Generate tasks and move to task manager
 
+            //Manage the tasks
+            taskManagerState.AddTransition((task)=> task.TaskId != 0, codeState); //If there is a task move to code state
+            taskManagerState.AddTransition(approvalState); //If no tasks available, generate new tasks
+
+            //Code the project
+            codeState.AddTransition(buildState);//Program a solution
+
+            // Build the project
             buildState.AddTransition(
-                (result) => !result.BuildInfo.BuildResult.BuildCompleted && !result.BuildInfo.ExecutableResult.ExecutionCompleted, 
-                reviewState); //If program fails review the code
+                (result) => result.BuildInfo.BuildResult!.BuildCompleted && result.BuildInfo.ExecutableResult!.ExecutionCompleted, 
+                (result) => new TaskBreakdownResult(), //If program works, move to next task with empty new task required
+                taskManagerState); //Executed a solution, now move to next task
+            buildState.AddTransition(reviewState); //If program failed review the code
 
-            reviewState.AddTransition(_ => true, codeState); //How to fix the code
+            //Review the failed code
+            reviewState.AddTransition(codeState); //How to fix the code
 
+            //Approve the project
+            approvalState.AddTransition((result) => result.Approval.Approved, new ExitState()); //If project is approved exit DONE!!!
+            approvalState.AddTransition((output) => new ProgramDesignResult() { ApprovalResult = output }, taskGenerator); //If project is not approved, go back to task manager
 
             //Setup manager
-            StateMachine<string, CodeBuildInfoOutput> stateMachine = new();
+            StateMachine<string, ProgramApprovalResult> stateMachine = new();
 
-            stateMachine.SetEntryState(codeState);
-            stateMachine.SetOutputState(buildState);
+            stateMachine.SetEntryState(designState);
+            stateMachine.SetOutputState(approvalState);
 
-            string inputPrompt = $"User Request {context.Context} \n\n Function context: {context.ToString()}";
-
-            return (await stateMachine.Run(inputPrompt))[0]!;
+            return (await stateMachine.Run(context))[0]!;
         }
 
         //Create validation functions

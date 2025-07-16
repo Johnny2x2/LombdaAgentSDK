@@ -1,4 +1,5 @@
-﻿using Examples.Demos.CodingAgent;
+﻿using BabyAGI.BabyAGIStateMachine.DataModels;
+using Examples.Demos.CodingAgent;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
 using LombdaAgentSDK;
@@ -6,15 +7,10 @@ using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
 using LombdaAgentSDK.StateMachine;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Examples.Demos.ProjectCodingAgent.states
 {
-    class ProjectReviewerState : BaseState<CodeBuildInfoOutput, string>
+    class ProjectReviewerState : BaseState<CodeBuildInfoOutput, TaskItem>
     {
         public CodingProjectsAgent StateAgent {  get; set; }
         public ProjectReviewerState(CodingProjectsAgent stateAgent)
@@ -22,7 +18,7 @@ namespace Examples.Demos.ProjectCodingAgent.states
             StateAgent = stateAgent;
         }
 
-        public override async Task<string> Invoke(CodeBuildInfoOutput codeBuildInfo)
+        public override async Task<TaskItem> Invoke(CodeBuildInfoOutput codeBuildInfo)
         {
             string instructions = $"""
                     You are an expert programmer for c#. Given the generated C# project errors help the coding agent by finding all the files with errors 
@@ -58,7 +54,15 @@ namespace Examples.Demos.ProjectCodingAgent.states
 
             CodeReview review = result.ParseJson<CodeReview>();
 
-            return review.ToString();
+            return new TaskItem
+            {
+                TaskId = 1738,
+                Description = review.ReviewSummary,
+                ExpectedOutcome = review.ToString(),
+                Dependencies = Array.Empty<string>(),
+                Complexity = "Medium",
+                SuccessCriteria = "N/A"
+            };
         }
 
     }

@@ -1,6 +1,7 @@
 ﻿using Examples.Demos.CodingAgent;
 using Examples.Demos.FunctionGenerator;
 using Examples.Demos.FunctionGenerator.States;
+using Examples.Demos.ProjectCodingAgent;
 using LombdaAgentSDK.StateMachine;
 using System;
 using System.Collections.Generic;
@@ -29,7 +30,7 @@ namespace BabyAGI.FunctionGenerator.States
         }
         async Task RunAgent(FunctionBreakDown function)
         {
-            CodingProjectsAgent codeAgent = new CSHARP_CodingAgent(StateController.FunctionsPath);
+            ToolCodingAgent codeAgent = new ToolCodingAgent(StateController.FunctionsPath);
             await codeAgent.RunCodingAgent(new FunctionBreakDownInput("", function));
         }
     }

@@ -51,7 +51,7 @@ namespace BabyAGI.Utility
         public string ProjectName { get; set; }
         public ExecutableOutputResult? ExecutableResult { get; set; }
 
-        public BuildOutputResult? BuildResult { get; set; }
+        public BuildOutputResult BuildResult { get; set; }
 
         public CodeBuildInfo() { }
 

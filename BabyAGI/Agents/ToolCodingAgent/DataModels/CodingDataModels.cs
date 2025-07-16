@@ -3,6 +3,17 @@ using BabyAGI.Utility;
 
 namespace Examples.Demos.CodingAgent
 {
+    public struct FunctionEnrichment
+    {
+        public string description { get; set; }
+        public CommandLineArgs[] commandline_argument_examples { get; set; }
+    }
+
+    public struct CommandLineArgs
+    {
+        public string input_args_array { get; set; }
+    }
+
     public struct ProgramResult
     {
         public string Sample_EXE_Args {  get; set; }

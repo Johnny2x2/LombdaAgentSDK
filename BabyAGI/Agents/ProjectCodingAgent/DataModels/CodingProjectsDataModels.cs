@@ -1,6 +1,8 @@
-﻿using BabyAGI.BabyAGIStateMachine.States;
+﻿using BabyAGI.BabyAGIStateMachine.DataModels;
+using BabyAGI.BabyAGIStateMachine.States;
 using BabyAGI.Utility;
 using Examples.Demos.CodingAgent;
+using Examples.Demos.FunctionGenerator.States;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,4 +34,21 @@ namespace BabyAGI.Agents.ProjectCodingAgent.DataModels
             ProgramResult = codeResult;
         }
     }
+
+
+    public struct ProgramDesignResult
+    {
+        public ProgramDesign Design { get; set; }
+        public string Request { get; set; }
+        public ProgramApprovalResult ApprovalResult { get; set; }
+    }
+
+    public class ProgramApprovalResult
+    {
+        public string Id { get; } = Guid.NewGuid().ToString();
+        public ProgramApproval Approval { get; set; }
+        public CodeBuildInfoOutput CodeBuildInfo { get; set; }
+    }
+
+
 }

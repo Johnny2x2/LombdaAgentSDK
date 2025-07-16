@@ -1,14 +1,10 @@
-﻿using BabyAGI.BabyAGIStateMachine.States;
+﻿using BabyAGI.BabyAGIStateMachine.DataModels;
 using LombdaAgentSDK.StateMachine;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
 
 namespace BabyAGI.Agents.ProjectCodingAgent.states
 {
-    public class TaskManagerState : BaseState<TaskBreakdownResult, TaskItem>
+    public class ProjectManagerState : BaseState<TaskBreakdownResult, TaskItem>
     {
         public override async Task<TaskItem> Invoke(TaskBreakdownResult input)
         {

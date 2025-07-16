@@ -1,4 +1,5 @@
-﻿using BabyAGI.BabyAGIStateMachine.DataModels;
+﻿using BabyAGI.Agents.ProjectCodingAgent.DataModels;
+using BabyAGI.BabyAGIStateMachine.DataModels;
 using BabyAGI.BabyAGIStateMachine.States;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
@@ -14,14 +15,55 @@ using System.Threading.Tasks;
 
 namespace BabyAGI.Agents.ProjectCodingAgent.states
 {
-    public class ProjectCodeTaskCreatorState : BaseState<string, TaskBreakdownResult>
+    public class ProjectCodeTaskCreatorState : BaseState<ProgramDesignResult, TaskBreakdownResult>
     {
-        public override async Task<TaskBreakdownResult> Invoke(string input)
+        public ProgramDesignResult? CurrentDesignRequirements { get; set; }
+        public Dictionary<string, ProgramApprovalResult> ProgramApprovalResults { get; set; } = new();
+        public List<List<TaskItem>> GeneratedTask { get; set; } = new();
+
+        public override async Task<TaskBreakdownResult> Invoke(ProgramDesignResult input)
         {
-            var currentTask = new QueueTask();
+            if(CurrentDesignRequirements == null)
+            {
+                // If we already have design requirements, use them
+                CurrentDesignRequirements = input;
+            }
+
+            string historicApprovalAttempts = "";
+
+            for(int i = 0; i < ProgramApprovalResults.Count; i++)
+            {
+                var kvp = ProgramApprovalResults.ElementAt(i);
+                //Task ran before the appproval
+                historicApprovalAttempts += string.Join("\n", GeneratedTask[i]);
+                historicApprovalAttempts += $"Failed: {kvp.Value.Approval.Reason}\n\n";
+                historicApprovalAttempts += "------------------------------------------";
+            }
+
+
+            if (input.ApprovalResult != null)
+            {
+                // If we have an approval result, add it to the list
+                ProgramApprovalResults[input.ApprovalResult.Id] = input.ApprovalResult!;
+            }
+
 
             string prompt = $@"
-            Project Goal: {input}
+            Project Goal: {CurrentDesignRequirements?.Request}
+
+            Program Design Description: {CurrentDesignRequirements?.Design.Description}
+
+            Input Args: {CurrentDesignRequirements?.Design.ExpectedInputArgs}
+
+            Expected Results: {CurrentDesignRequirements?.Design.ExpectedResult}
+
+            Success Criteria: {CurrentDesignRequirements?.Design.SuccessCriteria}
+            
+            Current Approval Status:
+            { string.Join("\n", ProgramApprovalResults.Select(kvp => $"Failed: {kvp.Value.Approval.Reason}")) }
+
+            Previous Approval Attempts:
+            {historicApprovalAttempts}
 
             Context: This is part of a task management system where tasks will be executed sequentially by automated agents.
             Each task should be:
@@ -77,9 +119,7 @@ namespace BabyAGI.Agents.ProjectCodingAgent.states
 
             TaskBreakdownResult taskResults = result.ParseJson<TaskBreakdownResult>();
 
-           
-
-            
+            GeneratedTask.Add(new(taskResults.Tasks));
 
             return taskResults;
         }

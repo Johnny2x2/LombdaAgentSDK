@@ -1,7 +1,6 @@
 ﻿using BabyAGI.Agents.ProjectCodingAgent.DataModels;
-using BabyAGI.BabyAGIStateMachine.States;
+using BabyAGI.BabyAGIStateMachine.DataModels;
 using Examples.Demos.CodingAgent;
-using Examples.Demos.FunctionGenerator.States;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
 using LombdaAgentSDK;

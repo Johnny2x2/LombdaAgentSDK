@@ -20,16 +20,7 @@ using System.Threading.Tasks;
 
 namespace BabyAGI.Agents.CSharpCodingAgent.states
 {
-    public struct FunctionEnrichment
-    {
-        public string description {  get; set; }
-        public CommandLineArgs[] commandline_argument_examples { get; set; }
-    }
 
-    public struct CommandLineArgs
-    { 
-        public string input_args_array { get; set; }
-    }
 
     internal class FunctionEnricherState : BaseState<CodeBuildInfoOutput, CodeBuildInfoOutput>
     {

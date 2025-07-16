@@ -15,22 +15,7 @@ using System.Threading.Tasks;
 
 namespace BabyAGI.BabyAGIStateMachine.States
 {
-    public struct TaskBreakdownResult
-    {
-        public TaskItem[] Tasks { get; set; }
-        public string OverallStrategy { get; set; }
-    }
-
-    public struct TaskItem
-    {
-        public int TaskId { get; set; }
-        public string Description { get; set; }
-        public string ExpectedOutcome { get; set; }
-        public string[] Dependencies { get; set; }
-        public string Complexity { get; set; } // "Low", "Medium", "High"
-        public string SuccessCriteria { get; set; }
-    }
-
+   
     public class BATaskCreationState : BaseState<string, TaskBreakdownResult>
     {
         public override async Task<TaskBreakdownResult> Invoke(string input)
