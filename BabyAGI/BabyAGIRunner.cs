@@ -11,16 +11,21 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Intrinsics.X86;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
+using static LombdaAgentSDK.Runner;
 
 namespace BabyAGI
 {
     public class BabyAGIRunner
     {
         public string MainThreadId { get; set; }
+        public StreamingCallbacks StreamingCallback { get; set; }
+        public Action<string> LoggingCallbacks { get; set; }
         public async Task RunAGI()
         {
+            
             // Seems to require a little persuasion to get to use tool instead of openAI being like nah I can't do that.
             //Stop the process with EXIT()
             ComputerControllerAgent computerTool = new ComputerControllerAgent(this);
@@ -34,20 +39,20 @@ namespace BabyAGI
             Console.WriteLine("Enter a Message");
             Console.Write("[User]: ");
             string userInput = Console.ReadLine() ?? "";
-            RunResult result = await Runner.RunAsync(agent, userInput, streaming: true, streamingCallback: Console.Write);
+            RunResult result = await Runner.RunAsync(agent, userInput, streaming: true, streamingCallback: StreamingCallback);
             MainThreadId = result.Response.Id;
             Console.WriteLine("");
             Console.Write("[User]: ");
             userInput = Console.ReadLine() ?? "";
             while (!userInput.Equals("EXIT()"))
             {
-                result = await Runner.RunAsync(agent, userInput, messages: result.Messages, streaming: true, streamingCallback: Console.Write, responseID: MainThreadId);
+                result = await Runner.RunAsync(agent, userInput, messages: result.Messages, streaming: true, streamingCallback: StreamingCallback, responseID: MainThreadId);
                 MainThreadId = result.Response.Id;
                 Console.WriteLine("");
                 Console.Write("[User]: ");
                 userInput = Console.ReadLine() ?? "";
             }
-    }
+        }
         [Tool(Description = "Use this before telling a user you are unable to do something", In_parameters_description = ["The task you wish to accomplish."])]
         public async Task<string> AttemptToCompleteTask(string task)
         {
@@ -56,5 +61,5 @@ namespace BabyAGI
         }
 
     }
-    
+
 }

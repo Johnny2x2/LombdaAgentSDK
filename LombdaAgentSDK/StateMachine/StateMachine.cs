@@ -1,4 +1,5 @@
 ﻿using OpenAI.Responses;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -6,6 +7,332 @@ using System.Threading.Tasks;
 
 namespace LombdaAgentSDK.StateMachine
 {
+    public delegate void VerboseLogHandler(string message);
+    /// <summary>
+    /// Represents a state machine that manages the execution of state processes with support for concurrency and
+    /// cancellation. [SUGGEST USING StateMachine&lt;TInput, TOutput&gt;]
+    /// </summary>
+    /// <remarks>The <see cref="StateMachine"/> class provides mechanisms to initialize, run, and manage state
+    /// processes. It supports concurrent execution of processes up to a specified maximum number of threads, and allows
+    /// for graceful stopping and cancellation of operations. The state machine can be reset and reused for multiple
+    /// runs.</remarks>
+    public class StateMachine
+    {
+        public Action OnTick;
+        public VerboseLogHandler? VerboseLog;
+
+        private static SemaphoreSlim semaphore = new(1, 1);
+        private SemaphoreSlim threadLimitor;
+        private int maxThreads = 20;
+        private List<StateProcess> activeProcesses = new();
+
+        /// <summary>
+        /// List of processes that will be run in the state machine this tick.
+        /// </summary>
+        public List<StateProcess> ActiveProcesses => activeProcesses;
+
+        /// <summary>
+        /// Trigger to stop the state machine.
+        /// </summary>
+        public CancellationTokenSource StopTrigger = new CancellationTokenSource();
+
+        /// <summary>
+        /// You can use this to store runtime properties that you want to access later or in other states.
+        /// </summary>
+        public ConcurrentDictionary<string, object> RuntimeProperties { get; set; } = new ConcurrentDictionary<string, object>();
+
+        /// <summary>
+        /// Gets the <see cref="CancellationToken"/> used to signal cancellation of the current operation.
+        /// </summary>
+        public CancellationToken CancelToken { get => StopTrigger.Token; }
+
+        /// <summary>
+        /// Occurs when a cancellation is triggered.
+        /// </summary>
+        /// <remarks>Subscribe to this event to handle cancellation logic in your application.  This event
+        /// is typically raised when an operation needs to be cancelled,  allowing subscribers to perform necessary
+        /// cleanup or rollback actions.</remarks>
+        public event Action? CancellationTriggered;
+
+        /// <summary>
+        /// Occurs when the finished action is triggered.
+        /// </summary>
+        /// <remarks>Subscribe to this event to execute custom logic when the finished action is
+        /// triggered.</remarks>
+        public event Action? FinishedTriggered;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the process is complete.
+        /// </summary>
+        public bool IsFinished { get; set; } = false;
+
+        /// <summary>
+        /// Gets or sets the final result of the computation.
+        /// </summary>
+        public object? _FinalResult { get; set; }
+
+        /// <summary>
+        /// Gets or sets the maximum number of threads that can be used by the application.
+        /// </summary>
+        public int MaxThreads { get => maxThreads; set => maxThreads = value; }
+
+        public StateMachine() { 
+            threadLimitor = new(MaxThreads, maxThreads); 
+        }
+
+        /// <summary>
+        /// Marks the current operation as finished.
+        /// </summary>
+        /// <remarks>Sets the <see cref="IsFinished"/> property to <see langword="true"/>, indicating that
+        /// the operation is complete.</remarks>
+        public void Finish() { IsFinished = true; }
+
+        /// <summary>
+        /// Used to stop the state machine and cancel any ongoing operations.
+        /// </summary>
+        public void Stop() => StopTrigger.Cancel();
+
+        /// <summary>
+        /// Asynchronously exits all active processes.
+        /// </summary>
+        /// <remarks>This method initiates the exit sequence for each active process and waits for all
+        /// processes to complete their exit operations.  It runs the exit operations concurrently to improve
+        /// performance.</remarks>
+        /// <returns></returns>
+        private async Task ExitAllProcesses()
+        {
+            VerboseLog?.Invoke("Exiting all processes...");
+            List<Task> Tasks = new List<Task>();
+
+            //Exit all processes
+            activeProcesses.ForEach(process => {
+                Tasks.Add(Task.Run(async () => await process.State._ExitState()));
+            });
+
+            await Task.WhenAll(Tasks);
+            Tasks.Clear();
+        }
+
+        /// <summary>
+        /// Processes each active process asynchronously, ensuring that the number of concurrent executions is limited
+        /// by the thread limiter.
+        /// </summary>
+        /// <remarks>This method runs each active process in parallel, respecting the concurrency limits
+        /// imposed by the <c>threadLimitor</c>. It waits for all processes to complete before returning.</remarks>
+        /// <returns></returns>
+        private async Task ProcessTick()
+        {
+            OnTick?.Invoke(); //Invoke the tick event  
+            List<Task> Tasks = new List<Task>();
+
+            VerboseLog?.Invoke($"Processing {activeProcesses.Count} active processes...");
+
+            activeProcesses.ForEach(process => Tasks.Add(Task.Run(async () =>
+            {
+                await threadLimitor.WaitAsync(); //Wait for a thread to be available
+                try
+                {
+                    VerboseLog?.Invoke($"Invoking state: {process.State.GetType().Name}");
+                    await process.State._Invoke(); //Invoke the state process
+                }
+                finally
+                {
+                    threadLimitor.Release(); //Release the thread back to the pool
+                }
+
+            })));
+
+            //Wait for collection
+            await Task.WhenAll(Tasks);
+            Tasks.Clear();
+        }
+
+        /// <summary>
+        /// Initializes the specified state process by setting its current state machine and adding it to the active
+        /// processes.
+        /// </summary>
+        /// <remarks>This method ensures thread-safe access to the state machine by using a semaphore. It
+        /// sets the current state machine for the process if it is not already set and adds the process to the list of
+        /// active processes. After initialization, it enters the state of the process.</remarks>
+        /// <param name="process">The state process to initialize. This parameter cannot be null.</param>
+        /// <returns></returns>
+        private async Task InitilizeProcess(StateProcess process)
+        {
+            if (process.State == null) throw new ArgumentNullException(nameof(process.State), "Run Start State cannot be null");
+
+            await semaphore.WaitAsync(); //Wait for the state machine to be available
+            //Gain access to state machine
+            try
+            {
+                process.State.CurrentStateMachine ??= this; //Set the current state machine if not already set
+                activeProcesses.Add(process);
+            }
+            finally 
+            { 
+                semaphore.Release(); 
+            }
+            VerboseLog?.Invoke($"Entering state: {process.State.GetType().Name}");
+            //Internal lock on access to state
+            await process.State._EnterState(process); //preset input
+        }
+
+        /// <summary>
+        /// Initializes all new state processes asynchronously.
+        /// </summary>
+        /// <remarks>This method clears the current active processes and initializes each new state
+        /// process concurrently. After initialization, it ensures that only distinct state processes, based on their
+        /// state ID, remain active.</remarks>
+        /// <param name="newStateProcesses">A list of <see cref="StateProcess"/> objects representing the new state processes to be initialized.</param>
+        /// <returns></returns>
+        private async Task InitilizeAllNewProcesses(List<StateProcess> newStateProcesses)
+        {
+            //Clear all of the active processes
+            activeProcesses.Clear();
+            VerboseLog?.Invoke($"Initializing {newStateProcesses.Count} new state processes...");
+            //If there are no new processes, return
+            if (newStateProcesses.Count == 0) return;
+
+            //Initialize each new state process concurrently
+            List<Task> Tasks = new List<Task>();
+            foreach (StateProcess stateProcess in newStateProcesses)
+            {
+                Tasks.Add(Task.Run(async () => await InitilizeProcess(stateProcess)));
+            }
+            await Task.WhenAll(Tasks);
+            Tasks.Clear();
+            
+            //This is to remove running the same state twice with two processes.. it gets input from _EnterState
+            activeProcesses = activeProcesses.DistinctBy(state => state.State.ID).ToList();
+
+            VerboseLog?.Invoke($"Initialization Complete.");
+        }
+
+        /// <summary>
+        /// Retrieves a list of new state processes based on the current conditions.
+        /// </summary>
+        /// <remarks>This method evaluates each active process and collects new state processes that meet
+        /// specific conditions. The returned list may be empty if no new state processes are identified.</remarks>
+        /// <returns>A list of <see cref="StateProcess"/> objects representing the new state processes that meet the specified
+        /// conditions. The list will be empty if no new processes are found.</returns>
+        private async Task<List<StateProcess>> GetNewProcesses()
+        {
+            List<StateProcess> newStateProcesses = new();
+
+            activeProcesses.ForEach(process => {
+                newStateProcesses.AddRange(process.State.CheckConditions());
+            });
+
+            return newStateProcesses;
+        }
+
+        /// <summary>
+        /// Determines whether the current operation is finished and triggers the necessary actions if so.
+        /// </summary>
+        /// <remarks>If the operation is finished, this method will asynchronously exit all processes and
+        /// invoke the <see cref="FinishedTriggered"/> event.</remarks>
+        /// <returns><see langword="true"/> if the operation is finished and the exit processes have been triggered; otherwise,
+        /// <see langword="false"/>.</returns>
+        private async Task<bool> CheckIfFinished()
+        {
+            if (IsFinished)
+            {
+                await ExitAllProcesses();
+                FinishedTriggered?.Invoke();
+                VerboseLog?.Invoke("State Machine Finished.");
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Determines whether the cancellation has been requested and handles the cancellation process.
+        /// </summary>
+        /// <remarks>If the cancellation is requested, this method triggers the <see
+        /// cref="CancellationTriggered"/> event, exits all processes asynchronously, and returns <see
+        /// langword="true"/>. Otherwise, it returns <see langword="false"/>.</remarks>
+        /// <returns><see langword="true"/> if the cancellation has been requested and handled; otherwise, <see
+        /// langword="false"/>.</returns>
+        private async Task<bool> CheckIfCancelled()
+        {
+            if (StopTrigger.IsCancellationRequested)
+            {
+                CancellationTriggered?.Invoke();
+                VerboseLog?.Invoke("State Machine Cancelled.");
+                await ExitAllProcesses();
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Resets the current state machine, preparing the system for a new execution cycle.
+        /// </summary>
+        /// <remarks>This method sets the <see cref="IsFinished"/> flag to <see langword="false"/>, resets
+        /// the stop trigger,  and clears the list of active processes. It should be called before starting a new run to
+        /// ensure  that the system is in a clean state.</remarks>
+        public void ResetRun()
+        {
+            IsFinished = false;
+            StopTrigger.TryReset();
+            ActiveProcesses.Clear();
+        }
+
+        /// <summary>
+        /// Executes the process using the specified initial state and input, and returns the index and resulting
+        /// output. This method is an overload that allows for specifying an index and a resulting state for recompiling results from Input Array.
+        /// </summary>
+        /// <param name="runStartState">The initial state from which the process begins execution.</param>
+        /// <param name="input">The input object used during the execution of the process.</param>
+        /// <param name="index">An integer representing the index associated with the current execution context.</param>
+        /// <param name="ResultingState">The state object that will hold the output after execution completes.</param>
+        /// <returns>A tuple containing the index and a list of objects representing the output from the resulting state.</returns>
+        public async Task<(int,List<object>)> Run(BaseState runStartState, object input, int index, BaseState ResultingState)
+        {
+            await Run(runStartState, input);
+            return (index, ResultingState._Output);
+        }
+
+        /// <summary>
+        /// Executes the state machine starting from the specified initial state, optionally using the provided input.
+        /// </summary>
+        /// <remarks>The method initializes the state machine and processes each state until a stop
+        /// condition is met.  It handles state transitions and ensures that all processes are properly initialized and
+        /// exited.</remarks>
+        /// <param name="runStartState">The initial state from which the state machine execution begins. This parameter cannot be null.</param>
+        /// <param name="input">An optional input object that can be used by the state machine during execution. This parameter can be null.</param>
+        /// <returns>A task that represents the asynchronous operation of running the state machine.</returns>
+        public async Task Run(BaseState runStartState, object? input = null)
+        {
+            ResetRun(); //Reset the state machine before running
+
+            //Initialize the process with the starting state and input
+            await InitilizeProcess(new StateProcess(runStartState, input));
+
+            //Run the state machine until it is finished or cancelled
+            while (!StopTrigger.IsCancellationRequested || IsFinished)
+            {
+                //Collect each state Result
+                await ProcessTick();
+
+                //stop the state machine if needed & exit all states
+                if (await CheckIfFinished()) break;
+
+                if (await CheckIfCancelled()) break;
+
+                //Create List of transitions to new states from conditional movement
+                List<StateProcess> newStateProcesses = await GetNewProcesses();
+
+                //Exit the current Processes
+                await ExitAllProcesses();
+
+                //Add currentStateMachine to each item and only Enter State if it is new
+                //Add The inputs for the next run to each states to process
+                //Reset Active Processes Here
+                await InitilizeAllNewProcesses(newStateProcesses);
+            }
+        }
+    }
+
     /// <summary>
     /// Represents a state machine that processes inputs of type <typeparamref name="TInput"/> and produces outputs of
     /// type <typeparamref name="TOutput"/>.
@@ -16,6 +343,7 @@ namespace LombdaAgentSDK.StateMachine
     /// <typeparam name="TOutput">The type of output that the state machine produces.</typeparam>
     public class StateMachine<TInput, TOutput> : StateMachine
     {
+        public new Action<TOutput> OnFinish;
         /// <summary>
         /// Provides a mechanism for comparing two <see cref="RunOutputCollection{TOutput}"/> objects based on their
         /// index values.
@@ -107,8 +435,8 @@ namespace LombdaAgentSDK.StateMachine
             // Create a list of tasks to run the state machine for each input
             for (int i = 0; i < inputs.Length; i++)
             {
-                var runResult =  await base.Run(StartState, inputs[i], i+1, ResultState);
-                RunOutputCollection<TOutput?> runOutput = new(runResult.Item1, runResult.Item2.ConvertAll(item=> (TOutput)item)!);
+                var runResult = await base.Run(StartState, inputs[i], i + 1, ResultState);
+                RunOutputCollection<TOutput?> runOutput = new(runResult.Item1, runResult.Item2.ConvertAll(item => (TOutput)item)!);
                 oResults.Add(runOutput);
             }
 
@@ -156,318 +484,7 @@ namespace LombdaAgentSDK.StateMachine
 
     }
 
-    /// <summary>
-    /// Represents a state machine that manages the execution of state processes with support for concurrency and
-    /// cancellation. [SUGGEST USING StateMachine&lt;TInput, TOutput&gt;]
-    /// </summary>
-    /// <remarks>The <see cref="StateMachine"/> class provides mechanisms to initialize, run, and manage state
-    /// processes. It supports concurrent execution of processes up to a specified maximum number of threads, and allows
-    /// for graceful stopping and cancellation of operations. The state machine can be reset and reused for multiple
-    /// runs.</remarks>
-    public class StateMachine
-    {
-        private static SemaphoreSlim semaphore = new(1, 1);
-        private SemaphoreSlim threadLimitor;
-        private int maxThreads = 20;
-        private List<StateProcess> activeProcesses = new();
 
-        /// <summary>
-        /// List of processes that will be run in the state machine this tick.
-        /// </summary>
-        public List<StateProcess> ActiveProcesses => activeProcesses;
-
-        /// <summary>
-        /// Trigger to stop the state machine.
-        /// </summary>
-        public CancellationTokenSource StopTrigger = new CancellationTokenSource();
-
-        /// <summary>
-        /// You can use this to store runtime properties that you want to access later or in other states.
-        /// </summary>
-        public ConcurrentDictionary<string, object> RuntimeProperties { get; set; } = new ConcurrentDictionary<string, object>();
-
-        /// <summary>
-        /// Gets the <see cref="CancellationToken"/> used to signal cancellation of the current operation.
-        /// </summary>
-        public CancellationToken CancelToken { get => StopTrigger.Token; }
-
-        /// <summary>
-        /// Occurs when a cancellation is triggered.
-        /// </summary>
-        /// <remarks>Subscribe to this event to handle cancellation logic in your application.  This event
-        /// is typically raised when an operation needs to be cancelled,  allowing subscribers to perform necessary
-        /// cleanup or rollback actions.</remarks>
-        public event Action? CancellationTriggered;
-
-        /// <summary>
-        /// Occurs when the finished action is triggered.
-        /// </summary>
-        /// <remarks>Subscribe to this event to execute custom logic when the finished action is
-        /// triggered.</remarks>
-        public event Action? FinishedTriggered;
-
-        /// <summary>
-        /// Gets or sets a value indicating whether the process is complete.
-        /// </summary>
-        public bool IsFinished { get; set; } = false;
-
-        /// <summary>
-        /// Gets or sets the final result of the computation.
-        /// </summary>
-        public object? _FinalResult { get; set; }
-
-        /// <summary>
-        /// Gets or sets the maximum number of threads that can be used by the application.
-        /// </summary>
-        public int MaxThreads { get => maxThreads; set => maxThreads = value; }
-
-        public StateMachine() { 
-            threadLimitor = new(MaxThreads, maxThreads); 
-        }
-
-        /// <summary>
-        /// Marks the current operation as finished.
-        /// </summary>
-        /// <remarks>Sets the <see cref="IsFinished"/> property to <see langword="true"/>, indicating that
-        /// the operation is complete.</remarks>
-        public void Finish() { IsFinished = true; }
-
-        /// <summary>
-        /// Used to stop the state machine and cancel any ongoing operations.
-        /// </summary>
-        public void Stop() => StopTrigger.Cancel();
-
-        /// <summary>
-        /// Asynchronously exits all active processes.
-        /// </summary>
-        /// <remarks>This method initiates the exit sequence for each active process and waits for all
-        /// processes to complete their exit operations.  It runs the exit operations concurrently to improve
-        /// performance.</remarks>
-        /// <returns></returns>
-        private async Task ExitAllProcesses()
-        {
-            List<Task> Tasks = new List<Task>();
-
-            //Exit all processes
-            activeProcesses.ForEach(process => {
-                Tasks.Add(Task.Run(async () => await process.State._ExitState()));
-            });
-
-            await Task.WhenAll(Tasks);
-            Tasks.Clear();
-        }
-
-        /// <summary>
-        /// Processes each active process asynchronously, ensuring that the number of concurrent executions is limited
-        /// by the thread limiter.
-        /// </summary>
-        /// <remarks>This method runs each active process in parallel, respecting the concurrency limits
-        /// imposed by the <c>threadLimitor</c>. It waits for all processes to complete before returning.</remarks>
-        /// <returns></returns>
-        private async Task ProcessTick()
-        {
-            List<Task> Tasks = new List<Task>();
-
-            activeProcesses.ForEach(process => Tasks.Add(Task.Run(async () =>
-            {
-                await threadLimitor.WaitAsync(); //Wait for a thread to be available
-                try
-                {
-                    await process.State._Invoke(); //Invoke the state process
-                }
-                finally
-                {
-                    threadLimitor.Release(); //Release the thread back to the pool
-                }
-
-            })));
-
-            //Wait for collection
-            await Task.WhenAll(Tasks);
-            Tasks.Clear();
-        }
-
-        /// <summary>
-        /// Initializes the specified state process by setting its current state machine and adding it to the active
-        /// processes.
-        /// </summary>
-        /// <remarks>This method ensures thread-safe access to the state machine by using a semaphore. It
-        /// sets the current state machine for the process if it is not already set and adds the process to the list of
-        /// active processes. After initialization, it enters the state of the process.</remarks>
-        /// <param name="process">The state process to initialize. This parameter cannot be null.</param>
-        /// <returns></returns>
-        private async Task InitilizeProcess(StateProcess process)
-        {
-            if (process.State == null) throw new ArgumentNullException(nameof(process.State), "Run Start State cannot be null");
-
-            await semaphore.WaitAsync(); //Wait for the state machine to be available
-            //Gain access to state machine
-            try
-            {
-                process.State.CurrentStateMachine ??= this; //Set the current state machine if not already set
-                activeProcesses.Add(process);
-            }
-            finally 
-            { 
-                semaphore.Release(); 
-            }
-
-            //Internal lock on access to state
-            await process.State._EnterState(process); //preset input
-        }
-
-        /// <summary>
-        /// Initializes all new state processes asynchronously.
-        /// </summary>
-        /// <remarks>This method clears the current active processes and initializes each new state
-        /// process concurrently. After initialization, it ensures that only distinct state processes, based on their
-        /// state ID, remain active.</remarks>
-        /// <param name="newStateProcesses">A list of <see cref="StateProcess"/> objects representing the new state processes to be initialized.</param>
-        /// <returns></returns>
-        private async Task InitilizeAllNewProcesses(List<StateProcess> newStateProcesses)
-        {
-            //Clear all of the active processes
-            activeProcesses.Clear();
-
-            //If there are no new processes, return
-            if (newStateProcesses.Count == 0) return;
-
-            //Initialize each new state process concurrently
-            List<Task> Tasks = new List<Task>();
-            foreach (StateProcess stateProcess in newStateProcesses)
-            {
-                Tasks.Add(Task.Run(async () => await InitilizeProcess(stateProcess)));
-            }
-            await Task.WhenAll(Tasks);
-            Tasks.Clear();
-
-            //This is to remove running the same state twice with two processes.. it gets input from _EnterState
-            activeProcesses = activeProcesses.DistinctBy(state => state.State.ID).ToList();
-        }
-
-        /// <summary>
-        /// Retrieves a list of new state processes based on the current conditions.
-        /// </summary>
-        /// <remarks>This method evaluates each active process and collects new state processes that meet
-        /// specific conditions. The returned list may be empty if no new state processes are identified.</remarks>
-        /// <returns>A list of <see cref="StateProcess"/> objects representing the new state processes that meet the specified
-        /// conditions. The list will be empty if no new processes are found.</returns>
-        private async Task<List<StateProcess>> GetNewProcesses()
-        {
-            List<StateProcess> newStateProcesses = new();
-
-            activeProcesses.ForEach(process => {
-                newStateProcesses.AddRange(process.State.CheckConditions());
-            });
-
-            return newStateProcesses;
-        }
-
-        /// <summary>
-        /// Determines whether the current operation is finished and triggers the necessary actions if so.
-        /// </summary>
-        /// <remarks>If the operation is finished, this method will asynchronously exit all processes and
-        /// invoke the <see cref="FinishedTriggered"/> event.</remarks>
-        /// <returns><see langword="true"/> if the operation is finished and the exit processes have been triggered; otherwise,
-        /// <see langword="false"/>.</returns>
-        private async Task<bool> CheckIfFinished()
-        {
-            if (IsFinished)
-            {
-                await ExitAllProcesses();
-                FinishedTriggered?.Invoke();
-                return true;
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// Determines whether the cancellation has been requested and handles the cancellation process.
-        /// </summary>
-        /// <remarks>If the cancellation is requested, this method triggers the <see
-        /// cref="CancellationTriggered"/> event, exits all processes asynchronously, and returns <see
-        /// langword="true"/>. Otherwise, it returns <see langword="false"/>.</remarks>
-        /// <returns><see langword="true"/> if the cancellation has been requested and handled; otherwise, <see
-        /// langword="false"/>.</returns>
-        private async Task<bool> CheckIfCancelled()
-        {
-            if (StopTrigger.IsCancellationRequested)
-            {
-                CancellationTriggered?.Invoke();
-                await ExitAllProcesses();
-                return true;
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// Resets the current state machine, preparing the system for a new execution cycle.
-        /// </summary>
-        /// <remarks>This method sets the <see cref="IsFinished"/> flag to <see langword="false"/>, resets
-        /// the stop trigger,  and clears the list of active processes. It should be called before starting a new run to
-        /// ensure  that the system is in a clean state.</remarks>
-        public void ResetRun()
-        {
-            IsFinished = false;
-            StopTrigger.TryReset();
-            ActiveProcesses.Clear();
-        }
-
-        /// <summary>
-        /// Executes the process using the specified initial state and input, and returns the index and resulting
-        /// output. This method is an overload that allows for specifying an index and a resulting state for recompiling results from Input Array.
-        /// </summary>
-        /// <param name="runStartState">The initial state from which the process begins execution.</param>
-        /// <param name="input">The input object used during the execution of the process.</param>
-        /// <param name="index">An integer representing the index associated with the current execution context.</param>
-        /// <param name="ResultingState">The state object that will hold the output after execution completes.</param>
-        /// <returns>A tuple containing the index and a list of objects representing the output from the resulting state.</returns>
-        public async Task<(int,List<object>)> Run(BaseState runStartState, object input, int index, BaseState ResultingState)
-        {
-            await Run(runStartState, input);
-            return (index, ResultingState._Output);
-        }
-
-        /// <summary>
-        /// Executes the state machine starting from the specified initial state, optionally using the provided input.
-        /// </summary>
-        /// <remarks>The method initializes the state machine and processes each state until a stop
-        /// condition is met.  It handles state transitions and ensures that all processes are properly initialized and
-        /// exited.</remarks>
-        /// <param name="runStartState">The initial state from which the state machine execution begins. This parameter cannot be null.</param>
-        /// <param name="input">An optional input object that can be used by the state machine during execution. This parameter can be null.</param>
-        /// <returns>A task that represents the asynchronous operation of running the state machine.</returns>
-        public async Task Run(BaseState runStartState, object? input = null)
-        {
-            ResetRun(); //Reset the state machine before running
-
-            //Initialize the process with the starting state and input
-            await InitilizeProcess(new StateProcess(runStartState, input));
-
-            //Run the state machine until it is finished or cancelled
-            while (!StopTrigger.IsCancellationRequested || IsFinished)
-            {
-                //Collect each state Result
-                await ProcessTick();
-
-                //stop the state machine if needed & exit all states
-                if (await CheckIfFinished()) break;
-
-                if (await CheckIfCancelled()) break;
-
-                //Create List of transitions to new states from conditional movement
-                List<StateProcess> newStateProcesses = await GetNewProcesses();
-
-                //Exit the current Processes
-                await ExitAllProcesses();
-
-                //Add currentStateMachine to each item and only Enter State if it is new
-                //Add The inputs for the next run to each states to process
-                //Reset Active Processes Here
-                await InitilizeAllNewProcesses(newStateProcesses);
-            }
-        }
-    }
 
     /// <summary>
     /// Represents a collection of output results from a run, along with an index indicating the position of the input array.

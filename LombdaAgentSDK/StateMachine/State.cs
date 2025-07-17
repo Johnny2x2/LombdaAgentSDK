@@ -10,6 +10,10 @@ using System.Threading.Tasks;
 
 namespace LombdaAgentSDK.StateMachine
 {
+    public delegate void StateEnteredEvent<T>(StateProcess<T> input);
+    public delegate void StateExitEvent(BaseState input);
+    public delegate void StateInvokeEvent<T>(StateProcess<T> input);
+
     /// <summary>
     /// Represents the base class for defining a state within a state machine.
     /// </summary>
@@ -32,6 +36,21 @@ namespace LombdaAgentSDK.StateMachine
         private bool combineInput = false;
         private bool transitioned = false;
         private string id = Guid.NewGuid().ToString();
+
+        /// <summary>
+        /// Gets or sets the event that is triggered when a state is entered.
+        /// </summary>
+        public StateEnteredEvent<object>? OnStateEntered { get; set; }
+
+        /// <summary>
+        /// Gets or sets the event that is triggered when a state is exited.
+        /// </summary>
+        public StateExitEvent? OnStateExited { get; set; }
+
+        /// <summary>
+        /// Gets or sets the event that is triggered when a state is invoked.
+        /// </summary>
+        public StateInvokeEvent<object>? OnStateInvoked { get; set; }
 
         /// <summary>
         /// State identifier.
@@ -135,6 +154,29 @@ namespace LombdaAgentSDK.StateMachine
     /// <typeparam name="TOutput">The type of output data produced by the state.</typeparam>
     public abstract class BaseState<TInput, TOutput> : BaseState
     {
+        /// <summary>
+        /// Occurs when a state is entered in the state process.
+        /// </summary>
+        /// <remarks>This event is triggered whenever a new state is entered within the <see
+        /// cref="StateProcess{TInput}"/>. Subscribers can use this event to perform actions or handle logic specific to
+        /// the entry of a state.</remarks>
+        public new StateEnteredEvent<TInput>? OnStateEntered { get; set; }
+
+        /// <summary>
+        /// Occurs when a state has been exited.
+        /// </summary>
+        /// <remarks>This event is triggered whenever a state transition results in exiting a state. 
+        /// Subscribers can use this event to perform cleanup or other actions when a state is exited.</remarks>
+        public new StateExitEvent? OnStateExited { get; set; }
+
+        /// <summary>
+        /// Occurs when a state is invoked within the state process.
+        /// </summary>
+        /// <remarks>This event is triggered each time a state is invoked, allowing subscribers to handle
+        /// or respond to the invocation.</remarks>
+        public new StateInvokeEvent<TInput>? OnStateInvoked { get; set; }
+
+
         private List<StateProcess<TInput>> inputProcesses = new();
         private List<StateResult<TOutput>> outputResults = new();
 
@@ -237,6 +279,7 @@ namespace LombdaAgentSDK.StateMachine
             {
                 AddInputProcess(input);
                 await this.EnterState(input!.Input);
+                OnStateEntered?.Invoke(input);
             }
             finally
             {
@@ -257,6 +300,7 @@ namespace LombdaAgentSDK.StateMachine
             {
                 AddInputProcess(input);
                 await this.EnterState((TInput)input!._Input!);
+                OnStateEntered?.Invoke(new StateProcess<TInput>(input.State, (TInput)input._Input, input.ID));
             }
             finally
             {
@@ -275,6 +319,7 @@ namespace LombdaAgentSDK.StateMachine
             {
                 InputProcesses.Clear();
                 await ExitState();
+                OnStateExited?.Invoke(this);
             }
             finally
             {
@@ -348,6 +393,7 @@ namespace LombdaAgentSDK.StateMachine
         /// <returns></returns>
         private async Task<StateResult<TOutput>> InternalInvoke(StateProcess<TInput> input)
         {
+            OnStateInvoked?.Invoke(input);
             return new StateResult<TOutput>(input.ID, await Invoke(input.Input));
         }
 
