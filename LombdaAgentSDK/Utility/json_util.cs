@@ -194,11 +194,11 @@ namespace LombdaAgentSDK
         private static object GetPropertySchema(PropertyInfo prop)
         {
             var props = new Dictionary<string, object>();
-            var descriptions = prop.GetCustomAttributes<DescriptionAttribute>();
-            if(descriptions.Count() > 0)
-            {
-                props.Add("description", descriptions.First().Description);
-            }
+            //var descriptions = prop.GetCustomAttributes<DescriptionAttribute>();
+            //if(descriptions.Count() > 0)
+            //{
+            //    props.Add("description", descriptions.First().Description);
+            //}
             if (prop.PropertyType == typeof(string)) props.Add("type", "string");
             else if (prop.PropertyType == typeof(bool)) props.Add("type", "boolean");
             else if (prop.PropertyType.IsNumeric()) props.Add("type", "number");
