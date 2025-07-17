@@ -16,8 +16,10 @@ namespace Examples.Demos.ProjectCodingAgent
 {
     public class CodingProjectsAgent
     {
-        public string FunctionsPath = "C:\\Users\\johnl\\source\\repos\\FunctionApplications";
+        public string FunctionsPath { get; set; }
         public string ProjectName = "";
+        public ProgramDesignResult ProjectRequirements = new ProgramDesignResult();
+        public bool InEditMode = false; //If true, the agent will edit the project instead of creating a new one
 
         public CodingProjectsAgent(string functionsPath) 
         { 
@@ -26,9 +28,11 @@ namespace Examples.Demos.ProjectCodingAgent
 
         public string Context {  get; set; }
 
-        public async Task<ProgramApprovalResult> RunProjectCodingAgent(string context)
+        public async Task<ProgramApprovalResult> RunProjectCodingAgent(string context, string existingProjectName = "")
         {
             Context = context;
+            InEditMode = !string.IsNullOrEmpty(existingProjectName);
+            ProjectName = existingProjectName;
 
             //Setup states
             ProjectDesignState designState = new ProjectDesignState(this); //Design the project
@@ -48,7 +52,7 @@ namespace Examples.Demos.ProjectCodingAgent
 
             //Manage the tasks
             taskManagerState.AddTransition((task)=> task.TaskId != 0, codeState); //If there is a task move to code state
-            taskManagerState.AddTransition(approvalState); //If no tasks available, generate new tasks
+            taskManagerState.AddTransition((output)=> ProjectRequirements, approvalState); //If no tasks available, generate new tasks
 
             //Code the project
             codeState.AddTransition(buildState);//Program a solution
@@ -58,6 +62,7 @@ namespace Examples.Demos.ProjectCodingAgent
                 (result) => result.BuildInfo.BuildResult!.BuildCompleted && result.BuildInfo.ExecutableResult!.ExecutionCompleted, 
                 (result) => new TaskBreakdownResult(), //If program works, move to next task with empty new task required
                 taskManagerState); //Executed a solution, now move to next task
+
             buildState.AddTransition(reviewState); //If program failed review the code
 
             //Review the failed code
@@ -65,7 +70,7 @@ namespace Examples.Demos.ProjectCodingAgent
 
             //Approve the project
             approvalState.AddTransition((result) => result.Approval.Approved, new ExitState()); //If project is approved exit DONE!!!
-            approvalState.AddTransition((output) => new ProgramDesignResult() { ApprovalResult = output }, taskGenerator); //If project is not approved, go back to task manager
+            approvalState.AddTransition(IfApprovalFailed, (output) => ProjectRequirements, taskGenerator); //If project is not approved, go back to task manager
 
             //Setup manager
             StateMachine<string, ProgramApprovalResult> stateMachine = new();
@@ -74,6 +79,13 @@ namespace Examples.Demos.ProjectCodingAgent
             stateMachine.SetOutputState(approvalState);
 
             return (await stateMachine.Run(context))[0]!;
+        }
+
+        //Check if the approval failed and return true if it did
+        public bool IfApprovalFailed(ProgramApprovalResult result)
+        {
+            ProjectRequirements.ApprovalResult = result;
+            return !result.Approval.Approved;
         }
 
         //Create validation functions

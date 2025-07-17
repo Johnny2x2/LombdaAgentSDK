@@ -19,12 +19,6 @@ using System.Threading.Tasks;
 
 namespace BabyAGI.Agents.ProjectCodingAgent.states
 {
-    [Description("Output a list of command line args for the exe execution to test the project (The system will handle adding the exe to the command line so don't include that)")]
-    public struct ProjectInputs
-    {
-        [Description("args to run into the exe to test the project")]
-        public CommandLineArgs[] commandline_argument_examples { get; set; }
-    }
 
     public class ProjectApprovalState : BaseState<ProgramDesignResult, ProgramApprovalResult>
     {
@@ -61,21 +55,22 @@ namespace BabyAGI.Agents.ProjectCodingAgent.states
                 client,
                 "inputgetter",
                 getterInstructions,
-                _tools: [StateAgent.ReadFileTool, StateAgent.GetFilesTool, TestExeProgram],
+                _tools: [StateAgent.ReadFileTool, StateAgent.GetFilesTool],
                 _output_schema: typeof(ProjectInputs));
 
             RunResult result = await Runner.RunAsync(inputAgent, prompt);
 
-            ProjectInputs inpts = result.ParseJson< ProjectInputs >();
+            ProjectInputs inpts = result.ParseJson<ProjectInputs>();
+
             if (inpts.commandline_argument_examples == null || inpts.commandline_argument_examples.Length == 0)
             {
                 throw new Exception("No command line args were generated for the project. Please check the input getter agent.");
             }
 
             ConcurrentBag<(string,ExecutableOutputResult)> exeResult = new();
-            foreach (CommandLineArgs args in inpts.commandline_argument_examples)
+            foreach (string args in inpts.commandline_argument_examples)
             {
-                exeResult.Add((args.input_args_array, await FunctionGeneratorUtility.FindAndRunExecutableAndCaptureOutput(StateAgent.FunctionsPath, StateAgent.ProjectName, "net8.0", args.input_args_array)));
+                exeResult.Add((args, await FunctionGeneratorUtility.FindAndRunExecutableAndCaptureOutput(StateAgent.FunctionsPath, StateAgent.ProjectName, "net8.0", args)));
             }
 
             string exeResults = string.Join("\n\n", exeResult.Select(r => 
@@ -92,7 +87,7 @@ namespace BabyAGI.Agents.ProjectCodingAgent.states
                 client,
                 "approver",
                 approvalInstructions,
-                _tools: [StateAgent.ReadFileTool, StateAgent.GetFilesTool, TestExeProgram],
+                _tools: [StateAgent.ReadFileTool, StateAgent.GetFilesTool],
                 _output_schema: typeof(ProgramApproval));
 
             RunResult approvalResult = await Runner.RunAsync(approvalAgent, $"Output Results: {exeResults}");

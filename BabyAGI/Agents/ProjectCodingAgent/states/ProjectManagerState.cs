@@ -23,9 +23,15 @@ namespace BabyAGI.Agents.ProjectCodingAgent.states
                     throw new InvalidOperationException("TaskQueue in the state machine runtime properties is not of type Queue<TaskItem>.");
                 }
 
-                foreach (var task in input.Tasks)
+                if(input.Tasks != null)
                 {
-                    ((Queue<TaskItem>)Tasks).Enqueue(task);
+                    if(input.Tasks?.Length > 0)
+                    {
+                        foreach (var task in input.Tasks)
+                        {
+                            ((Queue<TaskItem>)Tasks).Enqueue(task);
+                        }
+                    }
                 }
 
                 if (((Queue<TaskItem>)Tasks).Count > 0)

@@ -13,9 +13,9 @@ using LombdaAgentSDK.Agents.Tools;
 using LombdaAgentSDK.StateMachine;
 
 
-CodingProjectsAgent codingAgent = new("C:\\Users\\johnl\\source\\repos\\FunctionApplications");
+CodingProjectsAgent codingAgent = new("C:\\Users\\jlomba\\source\\GeneratedProjects");
 
-await codingAgent.RunProjectCodingAgent("Create a C# console application to get the results from a given website link");
+await codingAgent.RunProjectCodingAgent("Can you fix my state machine?","State Machine Flow Application");
 //BabyAGIRunner babyAGI = new();
 //await babyAGI.RunAGI();
 

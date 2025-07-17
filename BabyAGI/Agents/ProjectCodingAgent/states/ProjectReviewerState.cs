@@ -1,4 +1,5 @@
-﻿using BabyAGI.BabyAGIStateMachine.DataModels;
+﻿using BabyAGI.Agents.ProjectCodingAgent.DataModels;
+using BabyAGI.BabyAGIStateMachine.DataModels;
 using Examples.Demos.CodingAgent;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
@@ -10,7 +11,26 @@ using LombdaAgentSDK.StateMachine;
 
 namespace Examples.Demos.ProjectCodingAgent.states
 {
-    class ProjectReviewerState : BaseState<CodeBuildInfoOutput, TaskItem>
+    public class ReviewHistoy
+    {
+        public string errorDetails { get; set; }
+        public CodeReview codeReview { get; set; }
+        public ReviewHistoy(string errorDetails, CodeReview codeReview)
+        {
+            this.errorDetails = errorDetails;
+            this.codeReview = codeReview;
+        }
+
+        public override string ToString()
+        {
+            return $"""
+                    Error Details: {errorDetails}
+                    Code Review: {codeReview.ToString()}
+                    """;
+        }
+    }
+
+    class ProjectReviewerState : BaseState<CodeProjectBuildInfoOutput, TaskItem>
     {
         public CodingProjectsAgent StateAgent {  get; set; }
         public ProjectReviewerState(CodingProjectsAgent stateAgent)
@@ -18,18 +38,30 @@ namespace Examples.Demos.ProjectCodingAgent.states
             StateAgent = stateAgent;
         }
 
-        public override async Task<TaskItem> Invoke(CodeBuildInfoOutput codeBuildInfo)
+        public List<ReviewHistoy> errorHistory { get; set; } = new();
+
+        
+        public override async Task<TaskItem> Invoke(CodeProjectBuildInfoOutput codeBuildInfo)
         {
             string instructions = $"""
                     You are an expert programmer for c#. Given the generated C# project errors help the coding agent by finding all the files with errors 
                     and suggestions on how to fix them.
 
-                    Original Program Request was: 
-
-                    {codeBuildInfo.ProgramResult.ProgramRequest}
+                    Current Project Name: {StateAgent.ProjectName}
+                    
+                    Currrent Project Task:
+                    {codeBuildInfo.ProgramResult.CurrentTask.Description}
+                    
+                    Expected Task Outcome:
+                    {codeBuildInfo.ProgramResult.CurrentTask.ExpectedOutcome}
+                    
+                    Task Success Criteria:
+                    {codeBuildInfo.ProgramResult.CurrentTask.SuccessCriteria}
+                    
+                    Task Complexity: {codeBuildInfo.ProgramResult.CurrentTask.Complexity} 
                     """;
 
-            LLMTornadoModelProvider client = new(   ChatModel.OpenAi.Gpt41.V41Mini,
+            LLMTornadoModelProvider client = new(   ChatModel.OpenAi.Gpt41.V41,
                                                     [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
 
             Agent agent = new Agent(
@@ -39,20 +71,39 @@ namespace Examples.Demos.ProjectCodingAgent.states
                 _tools: [StateAgent.ReadFileTool, StateAgent.GetFilesTool],
                 _output_schema: typeof(CodeReview));
 
-            string Prompt = $"""
-                    Build Errors: {codeBuildInfo.BuildInfo.BuildResult.Error}
+            string executableResults = "";
+            if(codeBuildInfo.BuildInfo.ExecutableResult != null)
+            {
+                executableResults = $"""
+                    Executable Output: {codeBuildInfo.BuildInfo.ExecutableResult.Output}
 
-                    Application Results: 
+                    Executable Error: {codeBuildInfo.BuildInfo.ExecutableResult.Error}
+                    """;
+            }
+
+            string ErrorDetails = $"""
+                    Build Errors: {codeBuildInfo.BuildInfo.BuildResult.Error}
+                    {codeBuildInfo.BuildInfo.BuildResult.Output}
+                    
                     Input Args: {codeBuildInfo.ProgramResult.Result.Sample_EXE_Args}
 
-                    Returned Result: {codeBuildInfo.BuildInfo.ExecutableResult.Output}
-
-                    Error messages: {codeBuildInfo.BuildInfo.ExecutableResult.Error}
+                    Executable Results:
+                    {executableResults}
                     """;
 
-            RunResult result = await Runner.RunAsync(agent, Prompt);
+            string Prompt = $"""
+                    {ErrorDetails}
+
+                    Previous Code Reviews:
+                    {string.Join("\n\n", errorHistory.Select(r => r.ToString()))}
+                    """;
+
+            
+            RunResult result = await Runner.RunAsync(agent, Prompt, maxTurns:50);
 
             CodeReview review = result.ParseJson<CodeReview>();
+
+            errorHistory.Add(new ReviewHistoy(ErrorDetails, review));
 
             return new TaskItem
             {

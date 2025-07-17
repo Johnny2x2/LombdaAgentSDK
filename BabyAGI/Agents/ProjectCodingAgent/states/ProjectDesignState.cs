@@ -27,19 +27,34 @@ namespace BabyAGI.Agents.ProjectCodingAgent.states
 
         public override async Task<ProgramDesignResult> Invoke(string request)
         {
-            string instructions = $"""
-                    You are an expert program designer for C#. Given the request, design a C# program that stasfies the usesr's request. 
-                    Define the program's Input Args, Expected Outcome, and Success Criteria for completion.
-                    """;
 
             LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Mini,
                                                     [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
 
-            Agent agent = new Agent(
+            string instructions = $"""
+                    You are an expert program designer for C# console applications. Given the request, design a C# console program that stasfies the usesr's request. 
+                    Define the program's Input Args, Expected Outcome, and Success Criteria for completion.
+                    """;
+
+            Agent designAgent = new Agent(
                 client,
                 "Code Designer",
                 instructions,
                 _output_schema: typeof(ProgramDesign));
+
+            string editInstructions = $"""
+                    You are an expert program designer for C# console applications. Given the request, edit the existing C# console program that stasfies the usesr's request. 
+                    Define the program's Input Args, Expected Outcome, and Success Criteria for completion.
+                    """;
+
+            Agent editAgent = new Agent(
+                client,
+                "Code Editor",
+                instructions,
+                _tools: [StateAgent.ReadFileTool, StateAgent.GetFilesTool],
+                _output_schema: typeof(ProgramDesign));
+
+            Agent agent = StateAgent.InEditMode ? editAgent : designAgent;
 
             string Prompt = $"""
                     My program design request is for: {request}
@@ -49,30 +64,44 @@ namespace BabyAGI.Agents.ProjectCodingAgent.states
 
             ProgramDesign design = result.ParseJson<ProgramDesign>();
 
-            if(string.IsNullOrEmpty(StateAgent.ProjectName))
+            if(StateAgent.InEditMode)
+            {
+                design.ProjectName = StateAgent.ProjectName;
+            }
+            else
+            {
+                StateAgent.ProjectName = CreateNewProject(StateAgent.FunctionsPath, design.ProjectName, design.Description);
+            }
+            
+            StateAgent.ProjectRequirements = new ProgramDesignResult() { Design = design, Request = request };
+
+            if (string.IsNullOrEmpty(StateAgent.ProjectName))
             {
                 throw new Exception("Project name cannot be empty. Please provide a valid project name.");
             }
 
-            StateAgent.ProjectName = CreateNewProject(StateAgent.FunctionsPath, design.ProjectName, design.Description);
-
-            return new ProgramDesignResult() { Design = design, Request = request };
+            return StateAgent.ProjectRequirements;
         }
 
         //Check if directory exists, if is does then make a (ProjectName)_1 and check if that that exists, if it does then make a (ProjectName)_2 and so on until it finds a directory that does not exist
         private string CreateNewProject(string functionsPath, string projectName, string description)
         {
-            string projectPath = Path.Combine(functionsPath, projectName);
+            string projectNewName = projectName; 
             int counter = 1;
-            while (Directory.Exists(projectPath))
+
+            while (Directory.Exists(Path.Combine(functionsPath, projectNewName)))
             {
-                projectPath = Path.Combine(functionsPath, $"{projectName}_{counter}");
+                projectNewName = $"{projectNewName}_{counter}";
                 counter++;
             }
-            FunctionGeneratorUtility.CreateNewProject(functionsPath, projectName, description);
-            // Optionally, create a README or other initial files
-            File.WriteAllText(Path.Combine(projectPath, "README.md"), $"# {projectName}\n\n{description}");
-            return projectName;
+
+            if(!FunctionGeneratorUtility.CreateNewProject(functionsPath, projectNewName, description))
+            {
+                throw new Exception($"Failed to create project directory at {Path.Combine(functionsPath, projectNewName)}. Please check permissions or path validity.");
+            }
+            
+            
+            return projectNewName;
         }
 
     }

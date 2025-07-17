@@ -199,16 +199,34 @@ namespace BabyAGI.Utility
                 throw new InvalidOperationException("FunctionsDirectory is not set. Please set FunctionsDirectory before writing directories.");
             }
 
-            string projectPath = Path.Combine(FunctionsDirectory, projectName,"FunctionApplication");
-
-            string directoryPath = Path.GetDirectoryName(Path.Combine(projectPath,filePath));
-
-            if (!string.IsNullOrEmpty(directoryPath) && !Directory.Exists(directoryPath))
+            string projectPath = Path.Combine(FunctionsDirectory, projectName, "FunctionApplication");
+            string BaseFileName = Path.GetFileName(filePath);
+            string nfilePath = Path.Combine(projectPath, filePath);
+            string? nfileDirectory = Path.GetDirectoryName(nfilePath);
+            
+            if (!string.IsNullOrEmpty(nfileDirectory))
             {
-                Directory.CreateDirectory(directoryPath);
+                if(!Directory.Exists(nfileDirectory))
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(nfileDirectory)!);
+                }
             }
 
-            File.WriteAllText(Path.Combine(directoryPath, filePath), content);
+            //Handle when the file path does not contain the project path
+            if (!nfilePath.Contains(projectPath))
+            {
+                nfilePath = Path.Combine(projectPath, BaseFileName);
+            }
+
+            try
+            {
+                File.WriteAllText(nfilePath, content);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error writing to file: {ex.Message}");
+                return false; // Return false if there was an error writing the file
+            }
 
             return true;
         }
@@ -224,6 +242,7 @@ namespace BabyAGI.Utility
 
             File.WriteAllText(descriptionPath, content);
         }
+
         public static string ReadProjectDescription(string FunctionsDirectory, string projectName)
         {
             if (string.IsNullOrEmpty(FunctionsDirectory))
@@ -347,8 +366,22 @@ namespace BabyAGI.Utility
                 {
                     if (runProject)
                     {
-                        // Run the executable and capture its output
-                        codeBuildInfo.ExecutableResult = RunExecutableAndCaptureOutput(executablePath, args);
+                        CancellationTokenSource s_cts = new CancellationTokenSource();
+                        try
+                        {
+                            s_cts.CancelAfter(TimeSpan.FromSeconds(30)); // Set a timeout for the operation
+                            // Run the executable and capture its output
+                            codeBuildInfo.ExecutableResult = RunExecutableAndCaptureOutput(executablePath, args);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            Console.WriteLine("Executable Timed out.");
+                            codeBuildInfo.ExecutableResult = new ExecutableOutputResult() { Error = "\nProgram Execution timed out.\n" };
+                        }
+                        finally
+                        {
+                            s_cts.Dispose();
+                        }
                     }
                 }
                 else
@@ -367,10 +400,22 @@ namespace BabyAGI.Utility
         public static async Task<ExecutableOutputResult> FindAndRunExecutableAndCaptureOutput(string pathToFunctions, string projectToRun, string framework = "", string args = "")
         {
             string executablePath = FindExecutable(pathToFunctions, projectToRun, framework);
-
-            if (!string.IsNullOrEmpty(executablePath))
+            CancellationTokenSource s_cts = new CancellationTokenSource();
+            try
             {
-                return await RunExecutableAndCaptureOutputAsync(executablePath, args);
+                if (!string.IsNullOrEmpty(executablePath))
+                {
+                    s_cts.CancelAfter(TimeSpan.FromSeconds(20)); // Set a timeout for the operation
+                    return await RunExecutableAndCaptureOutputAsync(executablePath, args, s_cts.Token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine("\nProgram Execution timed out.\n");
+            }
+            finally
+            {
+                s_cts.Dispose();
             }
 
             return new ExecutableOutputResult();
@@ -406,6 +451,7 @@ namespace BabyAGI.Utility
         // Function to run the executable and capture its output
         public static ExecutableOutputResult RunExecutableAndCaptureOutput(string executablePath, string? arguments = "")
         {
+            Console.WriteLine($"Running executable: {executablePath} with arguments: {arguments}");
             Process process = new Process();
             process.StartInfo.FileName = executablePath;
             process.StartInfo.Arguments = arguments; // Pass any arguments to the executable here
@@ -424,19 +470,21 @@ namespace BabyAGI.Utility
                 result.Output = process.StandardOutput.ReadToEnd();
                 result.Error = process.StandardError.ReadToEnd();
 
-                process.WaitForExit();
-
-                if (process.ExitCode == 0)
+                if(process.WaitForExit(30000)) // Wait for up to 30 seconds for the process to exit
                 {
-                    Console.WriteLine("Executable Output:");
-                    Console.WriteLine(result.Output);
+                    if (process.ExitCode == 0)
+                    {
+                        Console.WriteLine("Executable Output:");
+                        Console.WriteLine(result.Output);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Executable Error:");
+                        Console.WriteLine(result.Error);
+                    }
+                    result.ExecutionCompleted = true;
                 }
-                else
-                {
-                    Console.WriteLine("Executable Error:");
-                    Console.WriteLine(result.Error);
-                }
-                result.ExecutionCompleted = true;
+                
                 return result;
             }
             catch (Exception ex)
@@ -446,7 +494,7 @@ namespace BabyAGI.Utility
                 return result;
             }
         }
-        public static async Task<ExecutableOutputResult> RunExecutableAndCaptureOutputAsync(string executablePath, string? arguments = "")
+        public static async Task<ExecutableOutputResult> RunExecutableAndCaptureOutputAsync(string executablePath, string? arguments = "", CancellationToken cancellationToken = default)
         {
             Process process = new Process();
             process.StartInfo.FileName = executablePath;
@@ -462,11 +510,13 @@ namespace BabyAGI.Utility
             {
                 process.Start();
 
-                // Read the output and error streams
-                result.Output = process.StandardOutput.ReadToEnd();
-                result.Error = process.StandardError.ReadToEnd();
+                Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+                Task<string> errorTask = process.StandardError.ReadToEndAsync();
 
-                await process.WaitForExitAsync();
+                await Task.WhenAll(outputTask, errorTask, process.WaitForExitAsync(cancellationToken));
+
+                result.Output = outputTask.Result;
+                result.Error = errorTask.Result;
 
                 if (process.ExitCode == 0)
                 {

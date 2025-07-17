@@ -15,9 +15,12 @@ using System.Threading.Tasks;
 
 namespace Examples.Demos.ProjectCodingAgent.states
 {
+    
     //Design the states
     class ProjectCodingState : BaseState<TaskItem, ProjectResultOutput>
     {
+        public string CurrentProgramCode = "using System;";
+
         public CodingProjectsAgent StateAgent { get; set; }
 
         public ProjectCodingState(CodingProjectsAgent stateAgent) 
@@ -35,30 +38,46 @@ Do not provide placeholder code, but rather do your best like you are the best s
 
 Current Project Name: {StateAgent.ProjectName}
 
-Overall context:
+Current Task:
 {input.Description}
 
 Expected Outcome:
 {input.ExpectedOutcome}
 
-Success Criteria:
+Task Success Criteria:
 {input.SuccessCriteria}
 
 Task Complexity: {input.Complexity} 
+
+Current Program Code:
+{CurrentProgramCode}
 """;
+            string instructions = $"""
+                    You are an expert C# programmer. Your task is to write detailed and working code for the following project based on the context provided. 
+                    Try to keep Program.cs as consice as possible using mulple files to organize the code.
+                    """;
 
             LLMTornadoModelProvider client = new(
-           ChatModel.OpenAi.Gpt41.V41Mini,
+           ChatModel.OpenAi.Gpt41.V41,
            [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
 
             Agent agent = new Agent(client, 
                 "Code Assistant",
-                "You are an expert C# programmer. Your task is to write detailed and working code for the following project based on the context provided.",
+                instructions,
+                _tools: [StateAgent.ReadFileTool, StateAgent.GetFilesTool],
                 _output_schema: typeof(ProgramResult));
 
-            RunResult result = await Runner.RunAsync(agent, prompt);
+            RunResult result = await Runner.RunAsync(agent, prompt, verboseCallback:Console.WriteLine, maxTurns:100);
 
             ProgramResult program = result.ParseJson<ProgramResult>();
+
+            foreach (var script in program.items)
+            {
+                if(script.filePath.Contains("Program.cs"))
+                {
+                    CurrentProgramCode = script.code;
+                }
+            }
 
             return new ProjectResultOutput(program, input);
         }
