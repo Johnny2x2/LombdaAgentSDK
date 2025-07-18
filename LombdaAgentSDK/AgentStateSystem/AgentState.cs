@@ -3,17 +3,35 @@ using LombdaAgentSDK.StateMachine;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
+using static LombdaAgentSDK.Runner;
 
 namespace LombdaAgentSDK.AgentStateSystem
 {
-    public abstract class AgentState<TInput, TOutput> : BaseState<TInput, TOutput>
+    public interface IAgentState
     {
+        public RunnerVerboseCallbacks? RunnerVerboseCallbacks { get; set; }
+        public StreamingCallbacks? StreamingCallbacks { get; set; }
+        public Agent StateAgent { get; set; }
+        public event Action<string>? RunningVerboseCallback;
+
+        public event Action<string>? RunningStreamingCallback;
+    }
+
+    public abstract class AgentState<TInput, TOutput> : BaseState<TInput, TOutput>, IAgentState
+    {
+        public RunnerVerboseCallbacks? RunnerVerboseCallbacks { get; set; }
+        public StreamingCallbacks? StreamingCallbacks { get; set; }
+        public Agent StateAgent { get; set; }
+        public event Action<string>? RunningVerboseCallback;
+
+        public event Action<string>? RunningStreamingCallback;
+
         /// <summary>
         /// Gets or sets the current state agent responsible for managing state Agent verbose.
         /// </summary>
-        public Agent StateAgent { get; set; }
 
         /// <summary>
         /// Initializes the state agent, preparing it for operation.
@@ -32,26 +50,39 @@ namespace LombdaAgentSDK.AgentStateSystem
             CurrentStateMachine = stateMachine;
             CurrentStateMachine.States.Add(this); //Keep States alive in the StateMachine
             StateAgent = InitilizeStateAgent();
+
+            RunnerVerboseCallbacks += ReceiveVerbose;
+            StreamingCallbacks += ReceiveStreaming;
         }
 
-        public async Task<string> BeginRunnerAsync(Agent agent, string input)
+        public void ReceiveVerbose(string message)
         {
-            return (await Runner.RunAsync(agent, input)).Text ?? "";
+            RunningVerboseCallback?.Invoke(message);
         }
 
-        public async Task<T> BeginRunnerAsync<T>(Agent agent, string input)
+        public void ReceiveStreaming(string message)
         {
-            return (await Runner.RunAsync(agent, input)).ParseJson<T>();
+            RunningStreamingCallback?.Invoke(message);
         }
 
-        public async Task<string> BeginRunnerAsync(string input)
+        public async Task<string> BeginRunnerAsync(Agent agent, string input, bool streaming = false)
         {
-            return (await Runner.RunAsync(StateAgent, input)).Text ?? "";
+            return (await Runner.RunAsync(agent, input, verboseCallback: RunnerVerboseCallbacks,streamingCallback:StreamingCallbacks ,streaming: streaming)).Text ?? "";
         }
 
-        public async Task<T> BeginRunnerAsync<T>(string input)
+        public async Task<T> BeginRunnerAsync<T>(Agent agent, string input, bool streaming = false)
         {
-            return (await Runner.RunAsync(StateAgent, input)).ParseJson<T>();
+            return (await Runner.RunAsync(agent, input, verboseCallback: RunnerVerboseCallbacks, streamingCallback: StreamingCallbacks, streaming: streaming)).ParseJson<T>();
+        }
+
+        public async Task<string> BeginRunnerAsync(string input, bool streaming = false)
+        {
+            return (await Runner.RunAsync(StateAgent, input, verboseCallback: RunnerVerboseCallbacks, streamingCallback: StreamingCallbacks, streaming: streaming)).Text ?? "";
+        }
+
+        public async Task<T> BeginRunnerAsync<T>(string input, bool streaming = false)
+        {
+            return (await Runner.RunAsync(StateAgent, input, verboseCallback: RunnerVerboseCallbacks, streamingCallback: StreamingCallbacks, streaming: streaming)).ParseJson<T>();
         }
     }
 }

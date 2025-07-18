@@ -38,7 +38,7 @@ namespace BabyAGI.Agents
             RunResult result = await Runner.RunAsync(
                 agent,
                 input: task,
-                verboseCallback: MainRunner.ControlAgentVerboseCallback,
+                verboseCallback: MainRunner.VerboseCallback,
                 computerUseCallback: HandleComputerAction,
                 responseID: MainRunner.MainThreadId,
                 maxTurns: 50

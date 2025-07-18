@@ -21,17 +21,36 @@ namespace LombdaAgentSDK.AgentStateSystem
 
         public event Action<string>? verboseEvent;
         public event Action<string>? streamingEvent;
+        public event Action<string>? RootVerboseEvent;
+        public event Action<string>? RootStreamingEvent;
         public event Action<StateMachine.StateMachine> StateMachineAdded;
         public event Action<StateMachine.StateMachine> StateMachineRemoved;
 
         public StreamingCallbacks? StreamingCallback;
 
-        public RunnerVerboseCallbacks? ControlAgentVerboseCallback; 
+        public RunnerVerboseCallbacks? VerboseCallback;
+
+        public StreamingCallbacks? MainStreamingCallback;
+
+        public RunnerVerboseCallbacks? MainVerboseCallback;
 
         public LombdaAgent()
         {
+            InitializeAgent();
             StreamingCallback += RecieveStreamingCallbacks;
-            ControlAgentVerboseCallback += RecieveVerboseCallbacks;
+            VerboseCallback += RecieveVerboseCallbacks;
+            MainStreamingCallback += RootStreamingCallback;
+            MainVerboseCallback += RootVerboseCallback;
+        }
+
+        private void RootStreamingCallback(string message)
+        {
+            RootStreamingEvent?.Invoke(message);
+        }
+
+        private void RootVerboseCallback(string message)
+        {
+            RootVerboseEvent?.Invoke(message);
         }
 
         private void RecieveStreamingCallbacks(string message)
@@ -54,6 +73,7 @@ namespace LombdaAgentSDK.AgentStateSystem
             CurrentStateMachines.Add(stateMachine);
             StateMachineRemoved.Invoke(stateMachine);
         }
+
         public abstract void InitializeAgent();
 
         public async Task<string> AddToConversation(string userInput, bool streaming = true)
@@ -63,7 +83,7 @@ namespace LombdaAgentSDK.AgentStateSystem
                 throw new InvalidOperationException("ControlAgent is not set. Please set ControlAgent before adding to conversation.");
             }
 
-            CurrentResult = await Runner.RunAsync(ControlAgent, userInput, messages: CurrentResult.Messages, verboseCallback: ControlAgentVerboseCallback, streaming: streaming, streamingCallback: StreamingCallback, responseID: string.IsNullOrEmpty(MainThreadId) ? "" : MainThreadId);
+            CurrentResult = await Runner.RunAsync(ControlAgent, userInput, messages: CurrentResult.Messages, verboseCallback: MainVerboseCallback, streaming: streaming, streamingCallback: MainStreamingCallback, responseID: string.IsNullOrEmpty(MainThreadId) ? "" : MainThreadId);
             MainThreadId = CurrentResult.Response.Id;
 
             return CurrentResult.Text ?? "Error getting Response";

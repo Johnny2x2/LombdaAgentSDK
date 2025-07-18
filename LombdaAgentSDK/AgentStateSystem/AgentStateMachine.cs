@@ -16,8 +16,28 @@ namespace LombdaAgentSDK.AgentStateSystem
             ControlAgent = lombdaAgent;
             InitilizeStates();
             OnBegin += AddToControl;
+            //Add OnFinish and CancellationTriggered events to remove from control
             OnFinish += (output) => RemoveFromControl();
             CancellationTriggered += RemoveFromControl;
+            //Add new States Event Handlers for Verbose and Streaming Callbacks from State
+            OnStateEntered += (state) =>
+            {
+                if(state is IAgentState agentState)
+                {
+                    ControlAgent.VerboseCallback +=agentState.RunnerVerboseCallbacks;
+                    ControlAgent.StreamingCallback += agentState.StreamingCallbacks;
+                }
+                
+            };
+            //Remove Verbose and Streaming Callbacks from State when exited
+            OnStateExited += (state) =>
+            {
+                if (state is IAgentState agentState)
+                {
+                    ControlAgent.VerboseCallback -= agentState.RunnerVerboseCallbacks;
+                    ControlAgent.StreamingCallback -= agentState.StreamingCallbacks;
+                }
+            };
         }
 
         private void AddToControl()

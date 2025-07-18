@@ -311,9 +311,10 @@ namespace LombdaAgentSDK.StateMachine
         {
             if (StopTrigger.IsCancellationRequested)
             {
-                CancellationTriggered?.Invoke();
-                VerboseLog?.Invoke("State Machine Cancelled.");
+                //what if invoking the state? How do we handle that?
                 await ExitAllProcesses();
+                VerboseLog?.Invoke("State Machine Cancelled.");
+                CancellationTriggered?.Invoke();
                 return true;
             }
             return false;

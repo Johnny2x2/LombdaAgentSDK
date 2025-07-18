@@ -13,7 +13,6 @@ namespace LombdaAgentSDK.StateMachine
     public delegate void StateEnteredEvent<T>(StateProcess<T> input);
     public delegate void StateExitEvent(BaseState input);
     public delegate void StateInvokeEvent<T>(StateProcess<T> input);
-
     /// <summary>
     /// Represents the base class for defining a state within a state machine.
     /// </summary>
@@ -24,8 +23,8 @@ namespace LombdaAgentSDK.StateMachine
     public abstract class BaseState
     {
         private SemaphoreSlim threadLimitor;
-        private int maxThreads = 20;
         internal readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
+        private int maxThreads = 20;
         public bool BeingReran = false;
         private List<StateTransition<object>> transitions = new();
         private List<object> input = new();

@@ -1,22 +1,74 @@
 using BabyAGI;
 using Examples.Demos.FunctionGenerator;
 using LombdaAgentSDK.StateMachine;
+using System.Data;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace WinFormsAgentUI
 {
     public partial class AgentDebug : Form
     {
+        private delegate void TextUpdateDelegate(string item);
         BabyAGIRunner Agent { get; set; }
+        public string LatestResponse{ get; set; } = string.Empty;
         public AgentDebug()
         {
             InitializeComponent();
             Agent = new BabyAGIRunner();
-            Agent.StateMachineAdded += Agent_StateMachineAdded;
+            Agent.verboseEvent += Agent_VerboseLog;
+            Agent.streamingEvent += Agent_VerboseLog;
+            Agent.RootVerboseEvent += Root_VerboseLog;
+            Agent.RootStreamingEvent += StreamChat;
+            Agent.StateMachineAdded += AddStateWatcher;
+            Agent.StateMachineRemoved += RemoveStateWatcher;
         }
 
-        void Agent_StateMachineAdded(StateMachine sm)
+        void AddState(StateProcess stateProcess)
         {
-            Agent.ControlAgentVerboseCallback += Agent_VerboseLog;
+            AddListBoxItem(stateProcess.State.GetType().Name);
+        }
+
+        void RemoveState(BaseState state)
+        {
+            RemoveListBoxItem(state.GetType().Name);
+        }
+
+        private void AddListBoxItem(string item)
+        {
+            if (listBox1.InvokeRequired) // Check if invoking is required
+            {
+                // If on a different thread, use Invoke to call this method on the UI thread
+                listBox1.Invoke(new TextUpdateDelegate(AddListBoxItem), item);
+            }
+            else
+            {
+                // If on the UI thread, directly add the item
+                listBox1.Items.Add(item);
+            }
+        }
+        private void RemoveListBoxItem(string item)
+        {
+            if (listBox1.InvokeRequired) // Check if invoking is required
+            {
+                // If on a different thread, use Invoke to call this method on the UI thread
+                listBox1.Invoke(new TextUpdateDelegate(RemoveListBoxItem), item);
+            }
+            else
+            {
+                // If on the UI thread, directly add the item
+                listBox1.Items.Remove(item);
+            }
+        }
+        void AddStateWatcher(StateMachine stateMachine)
+        {
+           stateMachine.OnStateEntered += AddState;
+           stateMachine.OnStateExited += RemoveState;
+        }
+
+        void RemoveStateWatcher(StateMachine stateMachine)
+        {
+            stateMachine.OnStateEntered -= AddState;
+            stateMachine.OnStateExited -= RemoveState;
         }
 
         void Agent_VerboseLog(string e)
@@ -24,16 +76,34 @@ namespace WinFormsAgentUI
             SystemRichTextBox.AppendText(e + Environment.NewLine);
         }
 
-        private void SendButton_Click(object sender, EventArgs e)
+        void Root_VerboseLog(string e)
         {
-            List<Task> tasks = new();
-            Task.Run(async () => await Agent.StartNewConversation(InputRichTextBox.Text, streaming: true));
-            Task.WhenAll(tasks);
+            SystemRichTextBox.AppendText("[Control Agent]: " + e + Environment.NewLine);
+        }
+
+        private async void SendButton_Click(object sender, EventArgs e)
+        {
+            var text = InputRichTextBox.Text.Trim();
+            AddToChat("User", text);
+            InputRichTextBox.Clear();
+            ChatRichTextBox.AppendText($"[Assistant]: ");
+            await StartAssistantResponse(text);
+        }
+
+        private async Task<string> StartAssistantResponse(string text)
+        {
+            return await Agent.AddToConversation(text, streaming: true); 
         }
 
         public void AddToChat(string role, string message)
         {
             ChatRichTextBox.AppendText($"[{role}]: "+message + Environment.NewLine);
+        }
+
+        public void StreamChat(string message)
+        {
+            ChatRichTextBox.AppendText(message);
+            ChatRichTextBox.ScrollToCaret();
         }
 
     }

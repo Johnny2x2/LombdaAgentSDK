@@ -41,6 +41,7 @@
             InputRichTextBox = new RichTextBox();
             tableLayoutPanel1 = new TableLayoutPanel();
             SystemRichTextBox = new RichTextBox();
+            listBox1 = new ListBox();
             menuStrip1.SuspendLayout();
             RootTableLayoutPanel.SuspendLayout();
             MainTableLayoutPanel.SuspendLayout();
@@ -77,14 +78,14 @@
             // 
             RootTableLayoutPanel.ColumnCount = 2;
             RootTableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            RootTableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 181F));
+            RootTableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
             RootTableLayoutPanel.Controls.Add(MainTableLayoutPanel, 0, 0);
             RootTableLayoutPanel.Controls.Add(tableLayoutPanel1, 1, 0);
             RootTableLayoutPanel.Dock = DockStyle.Fill;
             RootTableLayoutPanel.Location = new Point(0, 24);
             RootTableLayoutPanel.Name = "RootTableLayoutPanel";
             RootTableLayoutPanel.RowCount = 1;
-            RootTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 92.0477142F));
+            RootTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             RootTableLayoutPanel.Size = new Size(840, 503);
             RootTableLayoutPanel.TabIndex = 2;
             // 
@@ -101,7 +102,7 @@
             MainTableLayoutPanel.RowCount = 2;
             MainTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 73.64185F));
             MainTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 26.3581486F));
-            MainTableLayoutPanel.Size = new Size(653, 497);
+            MainTableLayoutPanel.Size = new Size(414, 497);
             MainTableLayoutPanel.TabIndex = 0;
             // 
             // ChatRichTextBox
@@ -110,7 +111,7 @@
             ChatRichTextBox.Location = new Point(3, 3);
             ChatRichTextBox.Name = "ChatRichTextBox";
             ChatRichTextBox.ReadOnly = true;
-            ChatRichTextBox.Size = new Size(647, 360);
+            ChatRichTextBox.Size = new Size(408, 360);
             ChatRichTextBox.TabIndex = 0;
             ChatRichTextBox.Text = "";
             // 
@@ -121,7 +122,7 @@
             panel1.Dock = DockStyle.Fill;
             panel1.Location = new Point(3, 369);
             panel1.Name = "panel1";
-            panel1.Size = new Size(647, 125);
+            panel1.Size = new Size(408, 125);
             panel1.TabIndex = 1;
             // 
             // InputTableLayoutPanel
@@ -136,7 +137,7 @@
             InputTableLayoutPanel.RowCount = 2;
             InputTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             InputTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 30F));
-            InputTableLayoutPanel.Size = new Size(647, 125);
+            InputTableLayoutPanel.Size = new Size(408, 125);
             InputTableLayoutPanel.TabIndex = 0;
             // 
             // InputButtonTableLayoutPanel
@@ -153,13 +154,13 @@
             InputButtonTableLayoutPanel.Name = "InputButtonTableLayoutPanel";
             InputButtonTableLayoutPanel.RowCount = 1;
             InputButtonTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
-            InputButtonTableLayoutPanel.Size = new Size(641, 30);
+            InputButtonTableLayoutPanel.Size = new Size(402, 30);
             InputButtonTableLayoutPanel.TabIndex = 0;
             // 
             // SendButton
             // 
             SendButton.Dock = DockStyle.Fill;
-            SendButton.Location = new Point(569, 3);
+            SendButton.Location = new Point(330, 3);
             SendButton.MaximumSize = new Size(80, 20);
             SendButton.MinimumSize = new Size(60, 20);
             SendButton.Name = "SendButton";
@@ -175,7 +176,7 @@
             InputRichTextBox.Location = new Point(3, 3);
             InputRichTextBox.MinimumSize = new Size(0, 100);
             InputRichTextBox.Name = "InputRichTextBox";
-            InputRichTextBox.Size = new Size(641, 100);
+            InputRichTextBox.Size = new Size(402, 100);
             InputRichTextBox.TabIndex = 1;
             InputRichTextBox.Text = "";
             // 
@@ -184,13 +185,14 @@
             tableLayoutPanel1.ColumnCount = 1;
             tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
             tableLayoutPanel1.Controls.Add(SystemRichTextBox, 0, 1);
+            tableLayoutPanel1.Controls.Add(listBox1, 0, 0);
             tableLayoutPanel1.Dock = DockStyle.Fill;
-            tableLayoutPanel1.Location = new Point(662, 3);
+            tableLayoutPanel1.Location = new Point(423, 3);
             tableLayoutPanel1.Name = "tableLayoutPanel1";
             tableLayoutPanel1.RowCount = 2;
             tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Percent, 33.1991959F));
             tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Percent, 66.8008041F));
-            tableLayoutPanel1.Size = new Size(175, 497);
+            tableLayoutPanel1.Size = new Size(414, 497);
             tableLayoutPanel1.TabIndex = 1;
             // 
             // SystemRichTextBox
@@ -198,9 +200,18 @@
             SystemRichTextBox.Dock = DockStyle.Fill;
             SystemRichTextBox.Location = new Point(3, 168);
             SystemRichTextBox.Name = "SystemRichTextBox";
-            SystemRichTextBox.Size = new Size(169, 326);
+            SystemRichTextBox.Size = new Size(408, 326);
             SystemRichTextBox.TabIndex = 0;
             SystemRichTextBox.Text = "";
+            // 
+            // listBox1
+            // 
+            listBox1.FormattingEnabled = true;
+            listBox1.ItemHeight = 15;
+            listBox1.Location = new Point(3, 3);
+            listBox1.Name = "listBox1";
+            listBox1.Size = new Size(329, 154);
+            listBox1.TabIndex = 1;
             // 
             // AgentDebug
             // 
@@ -240,5 +251,6 @@
         private RichTextBox InputRichTextBox;
         private TableLayoutPanel tableLayoutPanel1;
         private RichTextBox SystemRichTextBox;
+        private ListBox listBox1;
     }
 }
