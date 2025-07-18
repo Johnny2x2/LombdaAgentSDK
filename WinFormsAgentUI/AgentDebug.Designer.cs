@@ -167,6 +167,7 @@
             SendButton.TabIndex = 0;
             SendButton.Text = "Send";
             SendButton.UseVisualStyleBackColor = true;
+            SendButton.Click += SendButton_Click;
             // 
             // InputRichTextBox
             // 

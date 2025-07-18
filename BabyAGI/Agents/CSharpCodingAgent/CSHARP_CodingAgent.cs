@@ -1,7 +1,7 @@
 ﻿using BabyAGI.Agents.CSharpCodingAgent.states;
+using BabyAGI.FunctionGenerator.DataModels;
 using BabyAGI.Utility;
 using Examples.Demos.CodingAgent.states;
-using Examples.Demos.FunctionGenerator.States;
 using LombdaAgentSDK.Agents.Tools;
 using LombdaAgentSDK.StateMachine;
 using NUnit.Framework;

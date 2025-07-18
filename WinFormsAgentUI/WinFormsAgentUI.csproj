@@ -8,4 +8,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\BabyAGI\BabyAGI.csproj" />
+    <ProjectReference Include="..\Examples\Examples.csproj" />
+    <ProjectReference Include="..\LombdaAgentSDK\LombdaAgentSDK.csproj" />
+  </ItemGroup>
+
 </Project>

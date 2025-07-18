@@ -40,17 +40,17 @@ namespace LombdaAgentSDK.StateMachine
         /// <summary>
         /// Gets or sets the event that is triggered when a state is entered.
         /// </summary>
-        public StateEnteredEvent<object>? OnStateEntered { get; set; }
+        public event StateEnteredEvent<object>? OnStateEntered;
 
         /// <summary>
         /// Gets or sets the event that is triggered when a state is exited.
         /// </summary>
-        public StateExitEvent? OnStateExited { get; set; }
+        public event StateExitEvent? OnStateExited;
 
         /// <summary>
         /// Gets or sets the event that is triggered when a state is invoked.
         /// </summary>
-        public StateInvokeEvent<object>? OnStateInvoked { get; set; }
+        public event StateInvokeEvent<object>? OnStateInvoked;
 
         /// <summary>
         /// State identifier.
@@ -89,6 +89,7 @@ namespace LombdaAgentSDK.StateMachine
         /// Internal invoke to abstract BaseState from Type specifics.
         /// </summary>
         /// <returns></returns>
+        /// 
         public abstract Task _Invoke();
 
         /// <summary>
@@ -502,6 +503,17 @@ namespace LombdaAgentSDK.StateMachine
         }
 
         /// <summary>
+        /// Adds a transition to the specified next state.
+        /// </summary>
+        /// <remarks>This method creates a transition that is always valid, allowing the state machine to
+        /// move to the specified <paramref name="nextState"/>.</remarks>
+        /// <param name="nextState">The state to transition to. Cannot be null.</param>
+        public void AddTransition(BaseState nextState)
+        {
+            Transitions.Add(new StateTransition<TOutput>(_ => true, nextState));
+        }
+
+        /// <summary>
         /// Adds a transition to the current state, specifying the event and the next state to transition to.
         /// </summary>
         /// <param name="methodToInvoke">The event that triggers the transition. This event is associated with the output type <typeparamref
@@ -511,6 +523,7 @@ namespace LombdaAgentSDK.StateMachine
         {
             Transitions.Add(new StateTransition<TOutput>(methodToInvoke, nextState));
         }
+
         /// <summary>
         /// Adds a state transition to the current state.
         /// </summary>
@@ -525,6 +538,29 @@ namespace LombdaAgentSDK.StateMachine
             var transition = new StateTransition<TOutput, T>(methodToInvoke, conversionMethod, nextState);
             Transitions.Add(transition);
         }
+
+        /// <summary>
+        /// Adds a state transition to the current state with an optional event handler and conver the result.
+        /// </summary>
+        /// <typeparam name="T">The type of the input parameter for the conversion method.</typeparam>
+        /// <param name="conversionMethod">The method used to convert the current state's output to the next state's input.</param>
+        /// <param name="nextState">The state to transition to after the conversion.</param>
+        /// <param name="methodToInvoke">An optional event handler that determines whether the transition should occur.  If <see langword="null"/>,
+        /// the transition will always occur.</param>
+        public void AddTransition<T>(ConversionMethod<TOutput, T> conversionMethod, BaseState nextState, TransitionEvent<TOutput>? methodToInvoke = null)
+        {
+            if (methodToInvoke != null)
+            {
+                var transition = new StateTransition<TOutput, T>(methodToInvoke, conversionMethod, nextState);
+                Transitions.Add(transition);
+            }
+            else
+            {
+                var transition = new StateTransition<TOutput, T>(_ => true, conversionMethod, nextState);
+                Transitions.Add(transition);
+            }
+        }
+
     }
 
     /// <summary>

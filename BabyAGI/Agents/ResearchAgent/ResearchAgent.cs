@@ -1,38 +1,36 @@
 ﻿using BabyAGI.Agents.ResearchAgent.DataModels;
 using BabyAGI.Agents.ResearchAgent.States;
 using LombdaAgentSDK.Agents.Tools;
+using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.StateMachine;
 
 namespace BabyAGI.Agents.ResearchAgent
 {
-    public class ResearchAgent
+    public class ResearchAgent : AgentStateMachine<string, ReportData>
     {
-        [Tool(Description = "Use this tool for doing deep web research", In_parameters_description = ["The topic you wish to research."])]
-        public async Task<string> DoResearch(string topic)
+        public ResearchAgent(LombdaAgent lombdaAgent) : base(lombdaAgent)
+        {
+
+        }
+
+        public override void InitilizeStates()
         {
             //Setup states
-            PlanningState plannerState = new PlanningState(); //custom init so you can add input here
-            ResearchState ResearchState = new ResearchState();
-            ReportingState reportingState = new ReportingState();
+            PlanningState plannerState = new PlanningState(this); //custom init so you can add input here
+            ResearchState ResearchState = new ResearchState(this);
+            ReportingState reportingState = new ReportingState(this);
 
             //Setup Transitions between states
-            plannerState.AddTransition((result)=> result.items.Length > 0, ResearchState); //Check if a plan was generated or Rerun
+            plannerState.AddTransition((result) => result.items.Length > 0, ResearchState); //Check if a plan was generated or Rerun
 
-            ResearchState.AddTransition(_ => true, reportingState); //Use Lambda expression For passthrough to reporting state
+            ResearchState.AddTransition(reportingState); //Use Lambda expression For passthrough to reporting state
 
-            reportingState.AddTransition(_ => true, new ExitState()); //Use Lambda expression For passthrough to Exit
+            reportingState.AddTransition(new ExitState()); //Use Lambda expression For passthrough to Exit
 
             //Create State Machine Runner with String as input and ReportData as output
-            StateMachine<string, ReportData> stateMachine = new();
 
-            stateMachine.SetEntryState(plannerState);
-            stateMachine.SetOutputState(reportingState);
-
-            //Run the state machine
-            List<ReportData> reports = await stateMachine.Run("topic");
-
-            //Report on the last state with Results
-            return reports[0].FinalReport;
+            SetEntryState(plannerState);
+            SetOutputState(reportingState);
         }
     }
 }

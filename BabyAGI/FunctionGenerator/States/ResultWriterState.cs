@@ -1,9 +1,11 @@
-﻿using Examples.Demos.FunctionGenerator;
+﻿using BabyAGI.FunctionGenerator.DataModels;
+using Examples.Demos.FunctionGenerator;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
 using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
+using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.StateMachine;
 using System;
 using System.Collections.Generic;
@@ -13,30 +15,14 @@ using System.Threading.Tasks;
 
 namespace BabyAGI.FunctionGenerator.States
 {
-    public struct FinalResult
+    public class ResultWriterState : AgentState<FunctionResultReviewOutput, FinalResult>
     {
-        public string AssistantMessage { get; set; }
-        public string FinalResultSummary { get; set; }
-    }
+        string OriginalTask = "";
+        List<string> SavedResults = new List<string>();
+        public ResultWriterState(StateMachine stateMachine) : base(stateMachine) {}
 
-    public class ResultWriterState : BaseState<FunctionResultReviewOutput, FinalResult>
-    {
-        public FunctionGeneratorAgent StateController { get; set; }
-        public ResultWriterState(FunctionGeneratorAgent stateController) { StateController = stateController; }
-
-        public override async Task<FinalResult> Invoke(FunctionResultReviewOutput input)
+        public override Agent InitilizeStateAgent()
         {
-            string prompt =
-                   $@"User Request:
-                   {StateController.OriginalTask}
-
-                    review summary: 
-                    {input.functionResultReview.InformationSummary}
-
-                    Collected Result: 
-                    {string.Join("\n\n", StateController.SavedResults)}
-                    ";
-
             string instructions = $"""
                     You are an expert Report Writer who has collected results that were deemed to contain enough information to answer the users question.  
                     Please write a reponse to the users question to the best of your ability.
@@ -45,15 +31,48 @@ namespace BabyAGI.FunctionGenerator.States
             LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Mini,
                                                     [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
 
-            Agent agent = new Agent(
+            return new Agent(
                 client,
                 "Result Writer",
                 instructions,
                 _output_schema: typeof(FinalResult));
+        }
 
-            RunResult result = await Runner.RunAsync(agent, prompt);
+        public override async Task<FinalResult> Invoke(FunctionResultReviewOutput input)
+        {
+            if (string.IsNullOrEmpty(OriginalTask))
+            {
+                OriginalTask = CurrentStateMachine.RuntimeProperties.TryGetValue("OrginalTask", out object orginalTask) ? orginalTask.ToString() : string.Empty;
+                if (string.IsNullOrEmpty(OriginalTask))
+                {
+                    throw new InvalidOperationException("Original task is not set in the runtime properties.");
+                }
+            }
 
-            FinalResult response = result.ParseJson<FinalResult>();
+            if(CurrentStateMachine.RuntimeProperties.TryGetValue("SavedResults", out object savedResultsObj))
+            {
+                if (savedResultsObj is List<string> savedResults)
+                {
+                    SavedResults = savedResults;
+                }
+                else
+                {
+                    throw new InvalidOperationException("SavedResults should always be a List<string>.");
+                }
+            }
+
+            string prompt =
+                $@"User Request:
+                {OriginalTask}
+
+                review summary: 
+                {input.functionResultReview.InformationSummary}
+
+                Collected Result: 
+                {string.Join("\n\n", SavedResults)}
+                ";
+
+            FinalResult response = await BeginRunnerAsync<FinalResult>( prompt);
 
             return response;
         }

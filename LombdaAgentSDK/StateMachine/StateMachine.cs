@@ -18,8 +18,38 @@ namespace LombdaAgentSDK.StateMachine
     /// runs.</remarks>
     public class StateMachine
     {
-        public Action OnTick;
-        public VerboseLogHandler? VerboseLog;
+        /// <summary>
+        /// Occurs when the state machine beings.
+        /// </summary>
+        /// <remarks>Subscribe to this event to perform actions at the start of an operation.  Ensure that
+        /// any event handlers are added before the operation begins to  guarantee they are invoked.</remarks>
+        public event Action OnBegin;
+
+        /// <summary>
+        /// Occurs at each loop of the machine.
+        /// </summary>
+        /// <remarks>Subscribe to this event to execute custom logic at each timer tick. Ensure that the
+        /// event handler executes quickly to avoid delaying subsequent ticks.</remarks>
+        public event Action OnTick;
+        /// <summary>
+        /// Gets or sets the handler for verbose logging events.
+        /// </summary>
+        public event Action<string>? VerboseLog;
+
+        /// <summary>
+        /// Gets or sets the event that is triggered when a state is entered.
+        /// </summary>
+        public event Action<StateProcess>? OnStateEntered;
+
+        /// <summary>
+        /// Gets or sets the event that is triggered when a state is exited.
+        /// </summary>
+        public event Action<BaseState>? OnStateExited;
+
+        /// <summary>
+        /// Gets or sets the event that is triggered when a state is invoked.
+        /// </summary>
+        public event Action<StateProcess>? OnStateInvoked;
 
         private static SemaphoreSlim semaphore = new(1, 1);
         private SemaphoreSlim threadLimitor;
@@ -76,6 +106,18 @@ namespace LombdaAgentSDK.StateMachine
         /// </summary>
         public int MaxThreads { get => maxThreads; set => maxThreads = value; }
 
+        /// <summary>
+        /// Gets or sets the collection of states.
+        /// </summary>
+        public List<BaseState> States { get => states; set => states = value; }
+
+        /// <summary>
+        /// Represents a collection of states managed by the system.
+        /// </summary>
+        /// <remarks>This list holds instances of <see cref="BaseState"/> and is used to track the various
+        /// states within the application. It can be modified to add or remove states as needed.</remarks>
+        private List<BaseState> states = new List<BaseState>();
+
         public StateMachine() { 
             threadLimitor = new(MaxThreads, maxThreads); 
         }
@@ -106,11 +148,19 @@ namespace LombdaAgentSDK.StateMachine
 
             //Exit all processes
             activeProcesses.ForEach(process => {
-                Tasks.Add(Task.Run(async () => await process.State._ExitState()));
+                Tasks.Add(Task.Run(async () => await BeginExit(process)));
             });
 
             await Task.WhenAll(Tasks);
             Tasks.Clear();
+        }
+
+        private async Task BeginExit(StateProcess process)
+        {
+            VerboseLog?.Invoke("Exiting State...");
+            await process.State._ExitState();
+            OnStateExited?.Invoke(process.State);   
+            VerboseLog?.Invoke("StateExited.");
         }
 
         /// <summary>
@@ -133,6 +183,7 @@ namespace LombdaAgentSDK.StateMachine
                 try
                 {
                     VerboseLog?.Invoke($"Invoking state: {process.State.GetType().Name}");
+                    OnStateInvoked?.Invoke(process.GetProcess<object>()); //Invoke the state invoked event
                     await process.State._Invoke(); //Invoke the state process
                 }
                 finally
@@ -173,6 +224,7 @@ namespace LombdaAgentSDK.StateMachine
             }
             VerboseLog?.Invoke($"Entering state: {process.State.GetType().Name}");
             //Internal lock on access to state
+            OnStateEntered?.Invoke(process.GetProcess<object>()); //Invoke the state entered event
             await process.State._EnterState(process); //preset input
         }
 
@@ -216,12 +268,15 @@ namespace LombdaAgentSDK.StateMachine
         /// conditions. The list will be empty if no new processes are found.</returns>
         private async Task<List<StateProcess>> GetNewProcesses()
         {
+            VerboseLog?.Invoke("Validating State conditions for transitions");
             List<StateProcess> newStateProcesses = new();
 
             activeProcesses.ForEach(process => {
+                var newStates = process.State.CheckConditions();
+                VerboseLog?.Invoke($"State {process.State.GetType().Name} : produced new states:\n {string.Join("\n",newStates.Select(nproces=> nproces.State.GetType().Name))}");
                 newStateProcesses.AddRange(process.State.CheckConditions());
             });
-
+            VerboseLog?.Invoke("Finished Validations");
             return newStateProcesses;
         }
 
@@ -272,6 +327,7 @@ namespace LombdaAgentSDK.StateMachine
         /// ensure  that the system is in a clean state.</remarks>
         public void ResetRun()
         {
+            VerboseLog?.Invoke("Resetting StateMachine");
             IsFinished = false;
             StopTrigger.TryReset();
             ActiveProcesses.Clear();
@@ -303,6 +359,8 @@ namespace LombdaAgentSDK.StateMachine
         /// <returns>A task that represents the asynchronous operation of running the state machine.</returns>
         public async Task Run(BaseState runStartState, object? input = null)
         {
+            OnBegin?.Invoke(); //Invoke the begin event
+
             ResetRun(); //Reset the state machine before running
 
             //Initialize the process with the starting state and input

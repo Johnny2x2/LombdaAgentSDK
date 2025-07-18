@@ -1,9 +1,11 @@
-﻿using Examples.Demos.CodingAgent;
+﻿using BabyAGI.FunctionGenerator.DataModels;
+using Examples.Demos.CodingAgent;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
 using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
+using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.StateMachine;
 using OpenAI.Responses;
 using System;
@@ -14,57 +16,10 @@ using System.Threading.Tasks;
 
 namespace Examples.Demos.FunctionGenerator.States
 {
-    public struct FunctionBreakDownResults
+
+    public class BreakDownTaskState: AgentState<FunctionFoundResultOutput, FunctionBreakDownResults>
     {
-        public FunctionBreakDown[] FunctionsToGenerate {  get; set; }
-    }
-
-    public struct FunctionBreakDown 
-    { 
-        public string FunctionName { get; set; }
-        public string Description { get; set; }
-        public ParameterType[] MainInputParameters {  get; set; }
-        public ParameterType OutputParameter { get; set; }
-        public string ProgramCode { get; set; }
-    }
-
-    public struct FunctionBreakDownInput
-    {
-        public string Context { get; set; }
-        public FunctionBreakDown functionBreakDown { get; set; }
-
-        public FunctionBreakDownInput() { }
-        public FunctionBreakDownInput(string context, FunctionBreakDown _functionBreakDown) 
-        {
-            Context = context;
-            functionBreakDown = _functionBreakDown;
-        }
-
-        public override string ToString()
-        {
-            return $@" 
-                    Name: {functionBreakDown.FunctionName}
-                    Description: {functionBreakDown.Description}
-                    Input parameters: {{{string.Join(",", functionBreakDown.MainInputParameters)}}}
-                    Output parameters: {{{functionBreakDown.OutputParameter}}} ";
-        }
-    }
-
-    public struct ParameterType
-    {
-        public string name { get; set; }
-        public string description { get; set; }
-        public string type { get; set; }
-
-        public override string ToString()
-        {
-            return $@"{{ ""Name"":""{name}"",""description"":""{description}"",""type"":""{type}""}}";
-        }
-    }
-
-    public class BreakDownTaskState:BaseState<FunctionFoundResultOutput, FunctionBreakDownResults>
-    {
-        private const string Format = @"
+        private const string instructions = @"
             You are an expert software assistant helping to break down a user's request into smaller functions for a microservice-inspired architecture. 
             The system is designed to be modular, with each function being small and designed optimally for potential future reuse.
             
@@ -76,9 +31,6 @@ namespace Examples.Demos.FunctionGenerator.States
             >Make sure descriptions are detailed so an engineer could build it to spec.
             >Every sub function you create should be designed to be reusable by turning things into parameters, vs hardcoding them.
 
-            User request:
-
-            {0}
 
             Each function should have the following structure:
 
@@ -110,20 +62,21 @@ namespace Examples.Demos.FunctionGenerator.States
 
             Now, provide the breakdown for the user's request.";
 
-        public async override Task<FunctionBreakDownResults> Invoke(FunctionFoundResultOutput input)
-        {
-            string instructions = string.Format(Format, input.UserInput);
+        public BreakDownTaskState(StateMachine stateMachine) : base(stateMachine) { }
 
+        public override Agent InitilizeStateAgent()
+        {
             LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Mini, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
 
-            Agent agent = new Agent(client,
+            return new Agent(client,
                 "Assistant",
-                "You are an expert software assistant.",
+                instructions,
                 _output_schema: typeof(FunctionBreakDownResults));
+        }
 
-            RunResult result = await Runner.RunAsync(agent, instructions);
-            FunctionBreakDownResults bdResult = result.ParseJson<FunctionBreakDownResults>();
-            return bdResult;
+        public async override Task<FunctionBreakDownResults> Invoke(FunctionFoundResultOutput input)
+        {
+            return await BeginRunnerAsync<FunctionBreakDownResults>(input.UserInput);
         }
     }
 }

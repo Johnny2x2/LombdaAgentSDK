@@ -10,22 +10,42 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using LlmTornado.Responses;
+using LombdaAgentSDK.AgentStateSystem;
 
 namespace BabyAGI.Agents.ResearchAgent.States
 {
-    class ResearchState : BaseState<WebSearchPlan, string>
+    class ResearchState : AgentState<WebSearchPlan, string>
     {
-        bool RunParallel { get; set; } = false;
-        public ResearchState(bool runParallel = false) { RunParallel = runParallel; }
+        public ResearchState(StateMachine stateMachine, bool runParallel = false):base(stateMachine) { }
 
         public override async Task<string> Invoke(WebSearchPlan plan)
         {
             Console.WriteLine("[Starting WebSearch from StateMachine]");
 
-            return RunParallel ? await InvokeParallel(plan) : await InvokeThreaded(plan);
+            return await InvokeThreaded(plan);
         }
 
-        public async Task<RunResult> RunResearchAgent(WebSearchItem item)
+        public async Task<string> RunResearchAgent(WebSearchItem item)
+        {
+            //Using the manual runner to run the agent
+            return await BeginRunnerAsync(InitilizeStateAgent(), item.query);
+        }
+
+        public async Task<string> InvokeThreaded(WebSearchPlan plan)
+        {
+            List<Task<string>> researchTask = new();
+
+            plan.items.ToList()
+                .ForEach(item =>
+                    researchTask.Add(Task.Run(async () => await RunResearchAgent(item))));
+
+            string[] researchResults = await Task.WhenAll(researchTask);
+
+            return string.Join("[RESEARCH RESULT]\n\n\n", researchResults);
+        }
+
+        
+        public override Agent InitilizeStateAgent()
         {
             string instructions = """
                     You are a research assistant. Given a search term, you search the web for that term and
@@ -34,32 +54,8 @@ namespace BabyAGI.Agents.ResearchAgent.States
                     grammar. This will be consumed by someone synthesizing a report, so its vital you capture the 
                     essence and ignore any fluff. Do not include any additional commentary other than the summary itself.
                     """;
-            Agent agent = new Agent(new OpenAIModelClient("gpt-4o-mini", enableWebSearch: true), "Search agent", instructions);
-            return await Runner.RunAsync(agent, item.query);
-        }
 
-        public async Task<string> InvokeParallel(WebSearchPlan plan)
-        {
-            ConcurrentBag<RunResult> researchResults = new ConcurrentBag<RunResult>();
-
-            await Parallel.ForEachAsync(
-                plan.items.AsEnumerable(),
-                async (item, CancellationToken) => researchResults.Add((await RunResearchAgent(item))));
-
-            return string.Join("[RESEARCH RESULT]\n\n\n", researchResults.ToList().Select(result => result.Text));
-        }
-
-        public async Task<string> InvokeThreaded(WebSearchPlan plan)
-        {
-            List<Task<RunResult>> researchTask = new List<Task<RunResult>>();
-
-            plan.items.ToList()
-                .ForEach(item =>
-                    researchTask.Add(Task.Run(async () => await RunResearchAgent(item))));
-
-            RunResult[] researchResults = await Task.WhenAll(researchTask);
-
-            return string.Join("[RESEARCH RESULT]\n\n\n", researchResults.ToList().Select(result => result.Text));
+            return new Agent(new OpenAIModelClient("gpt-4o-mini", enableWebSearch: true), "Search agent", instructions);
         }
     }
 }

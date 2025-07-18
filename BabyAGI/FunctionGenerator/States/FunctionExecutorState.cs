@@ -1,4 +1,5 @@
 ﻿using BabyAGI.Agents.CSharpCodingAgent.states;
+using BabyAGI.FunctionGenerator.DataModels;
 using BabyAGI.Utility;
 using Examples.Demos.CodingAgent;
 using Examples.Demos.FunctionGenerator;
@@ -8,6 +9,7 @@ using LlmTornado.Code;
 using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
+using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.StateMachine;
 using OpenAI.Responses;
 using System;
@@ -18,43 +20,14 @@ using System.Threading.Tasks;
 
 namespace BabyAGI.FunctionGenerator.States
 {
-    public class FunctionExecutionResult
+    public class FunctionExecutorState : AgentState<FunctionFoundResultOutput, FunctionExecutionResult>
     {
-        public ExecutableOutputResult ExecutionResult { get; set; }
-        public FunctionFoundResultOutput functionFoundResultOutput { get; set; }
-
-        public CommandLineArgs generatedArgs { get; set; }
-        public FunctionExecutionResult(ExecutableOutputResult executionResult, FunctionFoundResultOutput functionFoundResultOutput, CommandLineArgs generatedArgs)
-        {
-            ExecutionResult = executionResult;
-            this.functionFoundResultOutput = functionFoundResultOutput;
-            this.generatedArgs = generatedArgs;
-        }
-    }
-    public class FunctionExecutorState : BaseState<FunctionFoundResultOutput, FunctionExecutionResult>
-    {
-        public FunctionGeneratorAgent StateController { get; set; }
-        public FunctionExecutorState(FunctionGeneratorAgent stateController) { StateController = stateController; }
+        string functionsPath = "";
+        public FunctionExecutorState(StateMachine stateMachine):base(stateMachine) {  }
         public string PreviousErrors { get; set; } = "";
 
-        public override async Task<FunctionExecutionResult> Invoke(FunctionFoundResultOutput input)
+        public override Agent InitilizeStateAgent()
         {
-            string prompt =
-                    $@"User Request:
-                        {input.UserInput}
-                        
-                       Function To Execute: {input.FoundResult.FunctionName}  
-
-                       Function Description:
-                        {FunctionGeneratorUtility.ReadProjectDescription(StateController.FunctionsPath, input.FoundResult.FunctionName)}
-
-                       Errors To Correct From Last run:
-                        {PreviousErrors}
-
-                       Sample Working Args on file: 
-                        {FunctionGeneratorUtility.ReadProjectArgs(StateController.FunctionsPath, input.FoundResult.FunctionName)}
-                    ";
-
             string instructions = $"""
                     You are an expert programmer for c#. Your task is to generate input args to run for the following EXE execution given by the user prompt.
                     """;
@@ -62,17 +35,41 @@ namespace BabyAGI.FunctionGenerator.States
             LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Mini,
                                                     [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
 
-            Agent agent = new Agent(
+            return new Agent(
                 client,
                 "Function Executor",
                 instructions,
                 _output_schema: typeof(CommandLineArgs));
+        }
 
-            RunResult result = await Runner.RunAsync(agent, prompt);
+        public override async Task<FunctionExecutionResult> Invoke(FunctionFoundResultOutput input)
+        {
+            if (string.IsNullOrEmpty(functionsPath))
+            {
+                functionsPath = CurrentStateMachine.RuntimeProperties.TryGetValue("FunctionsPath", out object? path) ? path?.ToString() : null;
+                if (string.IsNullOrEmpty(functionsPath))
+                    throw new InvalidOperationException("FunctionsPath is not set in the runtime properties.");
+            }
 
-            CommandLineArgs lineArgs = result.ParseJson<CommandLineArgs>();
+            string prompt =
+                    $@"User Request:
+                        {input.UserInput}
+                        
+                       Function To Execute: {input.FoundResult.FunctionName}  
 
-            ExecutableOutputResult outputResult = await FunctionGeneratorUtility.FindAndRunExecutableAndCaptureOutput(StateController.FunctionsPath, input.FoundResult.FunctionName, "net8.0", lineArgs.input_args_array);
+                       Function Description:
+                        {FunctionGeneratorUtility.ReadProjectDescription(functionsPath, input.FoundResult.FunctionName)}
+
+                       Errors To Correct From Last run:
+                        {PreviousErrors}
+
+                       Sample Working Args on file: 
+                        {FunctionGeneratorUtility.ReadProjectArgs(functionsPath, input.FoundResult.FunctionName)}
+                    ";
+
+            CommandLineArgs lineArgs = await BeginRunnerAsync<CommandLineArgs>(prompt);
+
+            ExecutableOutputResult outputResult = await FunctionGeneratorUtility.FindAndRunExecutableAndCaptureOutput(functionsPath, input.FoundResult.FunctionName, "net8.0", lineArgs.input_args_array);
 
             PreviousErrors = outputResult.ExecutionCompleted ? "" : outputResult.Error;
 

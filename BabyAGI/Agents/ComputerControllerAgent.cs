@@ -4,20 +4,23 @@ using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
+using LombdaAgentSDK.AgentStateSystem;
+using System.Threading.Tasks;
 using static System.Runtime.CompilerServices.RuntimeHelpers;
 
 namespace BabyAGI.Agents
 {
     public class ComputerControllerAgent
     {
-        BabyAGIRunner MainRunner { get; set; }
+        LombdaAgent MainRunner { get; set; }
 
-        public ComputerControllerAgent( BabyAGIRunner MainRunner ) => this.MainRunner = MainRunner;
+        public ComputerControllerAgent(LombdaAgent MainRunner ) => this.MainRunner = MainRunner;
 
-        //requires Teir 3 account & access to use computer-use-preview currently
-        [Tool(Description = "Use this agent to accomplish task that require computer input or output like mouse movement, clicking, screen shots", In_parameters_description = ["The task you wish to accomplish."])]
-        public async Task<string> ControlComputer(string task)
+
+
+        public async Task<string> RunComputerAgent(string task)
         {
+
             LLMTornadoModelProvider client =
                 new(ChatModel.OpenAi.Codex.ComputerUsePreview,
                 [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),],
@@ -26,21 +29,21 @@ namespace BabyAGI.Agents
 
 
             Agent agent = new Agent(
-                client, 
+                client,
                 "Assistant",
                 "You are a useful assistant that controls a computer to complete the users task. After the task is complete please report what you did and the state of the PC."
                 );
-            
+
             //Runner needs to return callbacks for Computer Action
             RunResult result = await Runner.RunAsync(
-                agent, 
-                input:task, 
-                verboseCallback:Console.WriteLine, 
+                agent,
+                input: task,
+                verboseCallback: MainRunner.ControlAgentVerboseCallback,
                 computerUseCallback: HandleComputerAction,
-                responseID:MainRunner.MainThreadId,
-                maxTurns:50
+                responseID: MainRunner.MainThreadId,
+                maxTurns: 50
                 );
-            
+
             return result.Text ?? "Task Finished";
         }
 
