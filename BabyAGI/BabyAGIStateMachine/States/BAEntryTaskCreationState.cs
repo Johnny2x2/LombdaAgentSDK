@@ -6,8 +6,10 @@ using LlmTornado.Code;
 using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
+using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.StateMachine;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,25 +18,14 @@ using System.Threading.Tasks;
 namespace BabyAGI.BabyAGIStateMachine.States
 {
    
-    public class BATaskCreationState : AgentState<string, TaskBreakdownResult>
+    public class BAEntryTaskCreationState : AgentState<string, TaskBreakdownResult>
     {
-        public override async Task<TaskBreakdownResult> Invoke(string input)
+        public BAEntryTaskCreationState(StateMachine stateMachine) : base(stateMachine)
         {
-            var currentTask = new QueueTask();
+        }
 
-            string prompt = $@"
-            User Goal: {input}
-
-            Context: This is part of a task management system where tasks will be executed sequentially by automated agents.
-            Each task should be:
-            - Specific and actionable
-            - Self-contained (can be executed independently)
-            - Measurable (clear success criteria)
-            - Appropriately scoped (not too broad or too narrow)
-
-            Current Task Queue Status: {GetTaskQueueStatus()}
-            ";
-
+        public override Agent InitilizeStateAgent()
+        {
             string instructions = $"""
             You are an expert task breakdown specialist for an AI agent system. Your role is to decompose user goals into a well-structured sequence of executable tasks.
 
@@ -69,15 +60,32 @@ namespace BabyAGI.BabyAGIStateMachine.States
             LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Mini,
                                                     [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
 
-            Agent agent = new Agent(
+            return new Agent(
                 client,
                 "Function Executor",
                 instructions,
                 _output_schema: typeof(TaskBreakdownResult));
+        }
 
-            RunResult result = await Runner.RunAsync(agent, prompt);
+        public override async Task<TaskBreakdownResult> Invoke(string input)
+        {
+            var currentTask = GetTaskQueueStatus();
 
-            TaskBreakdownResult taskResults = result.ParseJson<TaskBreakdownResult>();
+            string prompt = $@"
+            User Goal: {input}
+
+            Context: This is part of a task management system where tasks will be executed sequentially by automated agents.
+            Each task should be:
+            - Specific and actionable
+            - Self-contained (can be executed independently)
+            - Measurable (clear success criteria)
+            - Appropriately scoped (not too broad or too narrow)
+
+            Current Task Queue Status: 
+            {currentTask}
+            ";
+
+            TaskBreakdownResult taskResults = await BeginRunnerAsync<TaskBreakdownResult>(prompt);
 
             return taskResults;
         }
@@ -86,9 +94,15 @@ namespace BabyAGI.BabyAGIStateMachine.States
         {
             if (CurrentStateMachine?.RuntimeProperties?.ContainsKey("TaskQueue") == true)
             {
-                var queue = (Queue<QueueTask>)CurrentStateMachine.RuntimeProperties["TaskQueue"];
-                return $"Current queue has {queue.Count} pending tasks";
+                if(CurrentStateMachine.RuntimeProperties.TryGetValue("TaskQueue", out object? Queue))
+                {
+                    if (Queue is Queue<QueueTask> queue)
+                    {
+                        return $"Currently {queue.Count} in the queue"; 
+                    }
+                }
             }
+
             return "Task queue is empty - this will be the first task";
         }
     }

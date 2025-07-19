@@ -46,8 +46,12 @@ namespace BabyAGI.FunctionGenerator.States
                     throw new InvalidOperationException("FunctionsPath is not set in the runtime properties.");
             }
 
-            CSHARP_CodingAgent codeAgent = new CSHARP_CodingAgent(functionsPath);
-            await codeAgent.RunCodingAgent(new FunctionBreakDownInput("", function));
+            if(CurrentStateMachine is IAgentStateMachine agentStateMachine)
+            {
+                var controller =agentStateMachine.ControlAgent;
+                ToolCodingAgent codeAgent = new ToolCodingAgent(controller);
+                await codeAgent.Run(new FunctionBreakDownInput("", function));
+            }
         }
     }
 }

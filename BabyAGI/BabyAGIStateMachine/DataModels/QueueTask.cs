@@ -10,6 +10,7 @@ namespace BabyAGI.BabyAGIStateMachine.DataModels
     {
         public bool IsTaskQueued { get; set; } = false;
         public string Task { get; set; } = "";
+        public string Result { get; set; } = "";
         public QueueTask() { }
         public QueueTask(string task)
         {

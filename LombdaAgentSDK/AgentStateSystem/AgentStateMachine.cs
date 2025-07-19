@@ -8,9 +8,17 @@ using static LombdaAgentSDK.Runner;
 
 namespace LombdaAgentSDK.AgentStateSystem
 {
-    public abstract class AgentStateMachine<TInput, TOutput> : StateMachine<TInput, TOutput>
+    public interface IAgentStateMachine
     {
         public LombdaAgent ControlAgent { get; set; }
+        public List<ModelItem> SharedModelItems { get; set; }
+    }
+
+    public abstract class AgentStateMachine<TInput, TOutput> : StateMachine<TInput, TOutput>, IAgentStateMachine
+    {
+        public LombdaAgent ControlAgent { get; set; }
+        public List<ModelItem> SharedModelItems { get; set; } = new List<ModelItem>();
+
         public AgentStateMachine(LombdaAgent lombdaAgent) {
 
             ControlAgent = lombdaAgent;

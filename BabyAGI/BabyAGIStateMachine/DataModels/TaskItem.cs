@@ -14,6 +14,13 @@ namespace BabyAGI.BabyAGIStateMachine.DataModels
         public string[] Dependencies { get; set; }
         public string Complexity { get; set; } // "Low", "Medium", "High"
         public string SuccessCriteria { get; set; }
+
+        public override string ToString()
+        {
+            return $"TaskId: {TaskId}, Description: {Description}, ExpectedOutcome: {ExpectedOutcome}, " +
+                   $"Dependencies: [{string.Join(", ", Dependencies ?? Array.Empty<string>())}], " +
+                   $"Complexity: {Complexity}, SuccessCriteria: {SuccessCriteria}";
+        }
     }
 
     public struct TaskBreakdownResult

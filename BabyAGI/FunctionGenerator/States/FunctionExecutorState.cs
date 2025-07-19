@@ -22,7 +22,6 @@ namespace BabyAGI.FunctionGenerator.States
 {
     public class FunctionExecutorState : AgentState<FunctionFoundResultOutput, FunctionExecutionResult>
     {
-        string functionsPath = "";
         public FunctionExecutorState(StateMachine stateMachine):base(stateMachine) {  }
         public string PreviousErrors { get; set; } = "";
 
@@ -44,13 +43,6 @@ namespace BabyAGI.FunctionGenerator.States
 
         public override async Task<FunctionExecutionResult> Invoke(FunctionFoundResultOutput input)
         {
-            if (string.IsNullOrEmpty(functionsPath))
-            {
-                functionsPath = CurrentStateMachine.RuntimeProperties.TryGetValue("FunctionsPath", out object? path) ? path?.ToString() : null;
-                if (string.IsNullOrEmpty(functionsPath))
-                    throw new InvalidOperationException("FunctionsPath is not set in the runtime properties.");
-            }
-
             string prompt =
                     $@"User Request:
                         {input.UserInput}
@@ -58,18 +50,18 @@ namespace BabyAGI.FunctionGenerator.States
                        Function To Execute: {input.FoundResult.FunctionName}  
 
                        Function Description:
-                        {FunctionGeneratorUtility.ReadProjectDescription(functionsPath, input.FoundResult.FunctionName)}
+                        {FunctionGeneratorUtility.ReadProjectDescription(BabyAGIConfig.FunctionsPath, input.FoundResult.FunctionName)}
 
                        Errors To Correct From Last run:
                         {PreviousErrors}
 
                        Sample Working Args on file: 
-                        {FunctionGeneratorUtility.ReadProjectArgs(functionsPath, input.FoundResult.FunctionName)}
+                        {FunctionGeneratorUtility.ReadProjectArgs(BabyAGIConfig.FunctionsPath, input.FoundResult.FunctionName)}
                     ";
 
             CommandLineArgs lineArgs = await BeginRunnerAsync<CommandLineArgs>(prompt);
 
-            ExecutableOutputResult outputResult = await FunctionGeneratorUtility.FindAndRunExecutableAndCaptureOutput(functionsPath, input.FoundResult.FunctionName, "net8.0", lineArgs.input_args_array);
+            ExecutableOutputResult outputResult = await FunctionGeneratorUtility.FindAndRunExecutableAndCaptureOutput(BabyAGIConfig.FunctionsPath, input.FoundResult.FunctionName, "net8.0", lineArgs.input_args_array);
 
             PreviousErrors = outputResult.ExecutionCompleted ? "" : outputResult.Error;
 
