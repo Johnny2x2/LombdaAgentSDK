@@ -15,9 +15,12 @@ namespace LombdaAgentSDK.AgentStateSystem
         public RunnerVerboseCallbacks? RunnerVerboseCallbacks { get; set; }
         public StreamingCallbacks? StreamingCallbacks { get; set; }
         public Agent StateAgent { get; set; }
+
         public event Action<string>? RunningVerboseCallback;
 
         public event Action<string>? RunningStreamingCallback;
+
+        public CancellationTokenSource CancelTokenSource { get; set; }  
     }
 
     public abstract class AgentState<TInput, TOutput> : BaseState<TInput, TOutput>, IAgentState
@@ -29,6 +32,7 @@ namespace LombdaAgentSDK.AgentStateSystem
 
         public event Action<string>? RunningStreamingCallback;
 
+        public CancellationTokenSource CancelTokenSource { get; set; } = new CancellationTokenSource();
         /// <summary>
         /// Gets or sets the current state agent responsible for managing state Agent verbose.
         /// </summary>
@@ -53,6 +57,8 @@ namespace LombdaAgentSDK.AgentStateSystem
 
             RunnerVerboseCallbacks += ReceiveVerbose;
             StreamingCallbacks += ReceiveStreaming;
+
+            StateAgent.Client.CancelTokenSource = CancelTokenSource; // Set the cancellation token source for the agent client
         }
 
         public void ReceiveVerbose(string message)
@@ -67,22 +73,22 @@ namespace LombdaAgentSDK.AgentStateSystem
 
         public async Task<string> BeginRunnerAsync(Agent agent, string input, bool streaming = false)
         {
-            return (await Runner.RunAsync(agent, input, verboseCallback: RunnerVerboseCallbacks,streamingCallback:StreamingCallbacks ,streaming: streaming)).Text ?? "";
+            return (await Runner.RunAsync(agent, input, verboseCallback: RunnerVerboseCallbacks,streamingCallback:StreamingCallbacks ,streaming: streaming, cancellationToken: CancelTokenSource)).Text ?? "";
         }
 
         public async Task<T> BeginRunnerAsync<T>(Agent agent, string input, bool streaming = false)
         {
-            return (await Runner.RunAsync(agent, input, verboseCallback: RunnerVerboseCallbacks, streamingCallback: StreamingCallbacks, streaming: streaming)).ParseJson<T>();
+            return (await Runner.RunAsync(agent, input, verboseCallback: RunnerVerboseCallbacks, streamingCallback: StreamingCallbacks, streaming: streaming, cancellationToken: CancelTokenSource)).ParseJson<T>();
         }
 
         public async Task<string> BeginRunnerAsync(string input, bool streaming = false)
         {
-            return (await Runner.RunAsync(StateAgent, input, verboseCallback: RunnerVerboseCallbacks, streamingCallback: StreamingCallbacks, streaming: streaming)).Text ?? "";
+            return (await Runner.RunAsync(StateAgent, input, verboseCallback: RunnerVerboseCallbacks, streamingCallback: StreamingCallbacks, streaming: streaming, cancellationToken: CancelTokenSource)).Text ?? "";
         }
 
         public async Task<T> BeginRunnerAsync<T>(string input, bool streaming = false)
         {
-            return (await Runner.RunAsync(StateAgent, input, verboseCallback: RunnerVerboseCallbacks, streamingCallback: StreamingCallbacks, streaming: streaming)).ParseJson<T>();
+            return (await Runner.RunAsync(StateAgent, input, verboseCallback: RunnerVerboseCallbacks, streamingCallback: StreamingCallbacks, streaming: streaming, cancellationToken: CancelTokenSource)).ParseJson<T>();
         }
     }
 }

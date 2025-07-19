@@ -16,8 +16,6 @@ namespace BabyAGI.Agents
 
         public ComputerControllerAgent(LombdaAgent MainRunner ) => this.MainRunner = MainRunner;
 
-
-
         public async Task<string> RunComputerAgent(string task)
         {
 
@@ -41,7 +39,8 @@ namespace BabyAGI.Agents
                 verboseCallback: MainRunner.VerboseCallback,
                 computerUseCallback: HandleComputerAction,
                 responseID: MainRunner.MainThreadId,
-                maxTurns: 50
+                maxTurns: 50,
+                cancellationToken:MainRunner.CancellationTokenSource
                 );
 
             return result.Text ?? "Task Finished";

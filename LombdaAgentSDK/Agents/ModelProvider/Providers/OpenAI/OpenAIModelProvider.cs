@@ -185,7 +185,7 @@ namespace LombdaAgentSDK
             (List<ResponseItem> responseItems, ResponseCreationOptions responseCreationOptions) = SetupOpenAIClient(messages, options);
 
             return await HandleStreaming(
-                Client.CreateResponseStreamingAsync(responseItems, responseCreationOptions), 
+                Client.CreateResponseStreamingAsync(responseItems, responseCreationOptions, cancellationToken: CancelTokenSource.Token), 
                 options, 
                 streamingCallback);
         }
@@ -196,7 +196,7 @@ namespace LombdaAgentSDK
             (List<ResponseItem> responseItems, ResponseCreationOptions responseCreationOptions) = SetupOpenAIClient(messages, options);
 
             //Create Open Ai response
-            OpenAIResponse response = await Client.CreateResponseAsync(responseItems, responseCreationOptions);
+            OpenAIResponse response = await Client.CreateResponseAsync(responseItems, responseCreationOptions, cancellationToken: CancelTokenSource.Token);
 
             //Convert the response back to Model
             List<ModelItem> ModelItems = ConvertFromProviderItems(response, responseItems).ToList();

@@ -330,7 +330,7 @@ namespace LombdaAgentSDK.StateMachine
         {
             VerboseLog?.Invoke("Resetting StateMachine");
             IsFinished = false;
-            StopTrigger.TryReset();
+            StopTrigger = new CancellationTokenSource(); //Reset the stop trigger
             ActiveProcesses.Clear();
         }
 

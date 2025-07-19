@@ -19,6 +19,8 @@ namespace LombdaAgentSDK.AgentStateSystem
         public RunResult CurrentResult { get; set; } = new RunResult();
         public string MainThreadId { get; set; } = "";
 
+        public event Action? StartingExecution;
+        public event Action? FinishedExecution;
         public event Action<string>? verboseEvent;
         public event Action<string>? streamingEvent;
         public event Action<string>? RootVerboseEvent;
@@ -34,6 +36,8 @@ namespace LombdaAgentSDK.AgentStateSystem
 
         public RunnerVerboseCallbacks? MainVerboseCallback;
 
+        public CancellationTokenSource CancellationTokenSource { get; set; } = new CancellationTokenSource();
+
         public LombdaAgent()
         {
             InitializeAgent();
@@ -41,6 +45,7 @@ namespace LombdaAgentSDK.AgentStateSystem
             VerboseCallback += RecieveVerboseCallbacks;
             MainStreamingCallback += RootStreamingCallback;
             MainVerboseCallback += RootVerboseCallback;
+            ControlAgent.Client.CancelTokenSource = CancellationTokenSource;
         }
 
         private void RootStreamingCallback(string message)
@@ -74,17 +79,43 @@ namespace LombdaAgentSDK.AgentStateSystem
             StateMachineRemoved.Invoke(stateMachine);
         }
 
+        public void CancelExecution()
+        {
+            CancellationTokenSource.Cancel();
+
+            foreach (var stateMachine in CurrentStateMachines)
+            {
+                stateMachine.Stop();
+            }
+        }
+
         public abstract void InitializeAgent();
 
         public async Task<string> AddToConversation(string userInput, bool streaming = true)
         {
+            StartingExecution?.Invoke();
+
+            if (CancellationTokenSource.Token.IsCancellationRequested)
+            {
+                if (!CancellationTokenSource.TryReset())
+                {
+                    CancellationTokenSource = new CancellationTokenSource();
+                }
+            }
+
             if (ControlAgent == null)
             {
                 throw new InvalidOperationException("ControlAgent is not set. Please set ControlAgent before adding to conversation.");
             }
 
-            CurrentResult = await Runner.RunAsync(ControlAgent, userInput, messages: CurrentResult.Messages, verboseCallback: MainVerboseCallback, streaming: streaming, streamingCallback: MainStreamingCallback, responseID: string.IsNullOrEmpty(MainThreadId) ? "" : MainThreadId);
-            MainThreadId = CurrentResult.Response.Id;
+            CurrentResult = await Runner.RunAsync(ControlAgent, userInput, messages: CurrentResult.Messages, verboseCallback: MainVerboseCallback, streaming: streaming, streamingCallback: MainStreamingCallback, cancellationToken:CancellationTokenSource, responseID: string.IsNullOrEmpty(MainThreadId) ? "" : MainThreadId);
+
+            if (!CancellationTokenSource.Token.IsCancellationRequested)
+            {
+                MainThreadId = CurrentResult.Response.Id;
+            }
+
+            FinishedExecution?.Invoke();
 
             return CurrentResult.Text ?? "Error getting Response";
         }

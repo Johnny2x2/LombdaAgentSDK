@@ -20,7 +20,7 @@ namespace BabyAGI
 
             string instructions = $"""You are a person assistant AGI with the ability to generate tools to answer any user question if you cannot do it directly task your tool to create it.""";
 
-            ControlAgent = new Agent(client, "BabyAGI", instructions, _tools: [AttemptToCompleteTask, ControlComputer, DoResearch, BasicWebSearch]);
+            ControlAgent = new Agent(client, "BabyAGI", instructions, _tools: [AttemptToCompleteTask, ControlComputer, DoResearch]);
         }
 
         /// <summary>
@@ -94,7 +94,7 @@ namespace BabyAGI
                 "Web searcher",
                 "Using WebSearch and search for results of the given task.");
 
-            RunResult result = await Runner.RunAsync(agent, search);
+            RunResult result = await Runner.RunAsync(agent, search, cancellationToken:CancellationTokenSource);
 
             return result.Text ?? "Error: Could not search web.";
         }

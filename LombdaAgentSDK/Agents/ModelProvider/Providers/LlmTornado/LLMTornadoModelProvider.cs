@@ -326,7 +326,7 @@ namespace LombdaAgentSDK
             chat = SetupClient(chat, messages, options);
 
             //Create Open response
-            RestDataOrException<ChatRichResponse> response = await chat.GetResponseRichSafe();
+            RestDataOrException<ChatRichResponse> response = await chat.GetResponseRichSafe(CancelTokenSource.Token);
 
             //Convert the response back to Model
             //A bit redundant I can cache the current Model items already converted and only process the new ones
@@ -339,7 +339,7 @@ namespace LombdaAgentSDK
         public async Task<ModelResponse> CreateFromResponseAPIAsync(List<ModelItem> messages, ModelResponseOptions options)
         {
             ResponseRequest request = SetupResponseClient(messages, options);
-
+            request.CancellationToken = CancelTokenSource.Token;
             ResponseResult response = await Client.Responses.CreateResponse(request);
 
             List<ModelItem> ModelItems = ConvertOutputItems(response.Output);

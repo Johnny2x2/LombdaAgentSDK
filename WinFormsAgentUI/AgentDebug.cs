@@ -11,6 +11,8 @@ namespace WinFormsAgentUI
         private delegate void TextUpdateDelegate(string item);
         BabyAGIRunner Agent { get; set; }
         public string LatestResponse{ get; set; } = string.Empty;
+
+
         public AgentDebug()
         {
             InitializeComponent();
@@ -21,6 +23,18 @@ namespace WinFormsAgentUI
             Agent.RootStreamingEvent += StreamChat;
             Agent.StateMachineAdded += AddStateWatcher;
             Agent.StateMachineRemoved += RemoveStateWatcher;
+            Agent.StartingExecution += Agent_StartingExecution;
+            Agent.FinishedExecution += Agent_FinishedExecution;
+        }
+
+        private void Agent_FinishedExecution()
+        {
+            SendButton.Text = "Send";
+        }
+
+        private void Agent_StartingExecution()
+        {
+            SendButton.Text = "Cancel";
         }
 
         void AddState(StateProcess stateProcess)
@@ -83,16 +97,24 @@ namespace WinFormsAgentUI
 
         private async void SendButton_Click(object sender, EventArgs e)
         {
+
+            if (SendButton.Text == "Send") { SendRequest(); } else { Agent.CancelExecution(); }
+        }
+
+        private async Task SendRequest()
+        {
             var text = InputRichTextBox.Text.Trim();
             AddToChat("User", text);
             InputRichTextBox.Clear();
+            SendButton.Text = "Stop";
             ChatRichTextBox.AppendText($"[Assistant]: ");
             await StartAssistantResponse(text);
         }
 
         private async Task<string> StartAssistantResponse(string text)
         {
-            return await Agent.AddToConversation(text, streaming: true); 
+            var result = await Agent.AddToConversation(text, streaming: true);
+            return result;
         }
 
         public void AddToChat(string role, string message)
