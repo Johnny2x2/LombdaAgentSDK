@@ -20,7 +20,8 @@ namespace BabyAGI
 
             string instructions = $"""You are a person assistant AGI with the ability to generate tools to answer any user question if you cannot do it directly task your tool to create it.""";
 
-            ControlAgent = new Agent(client, "BabyAGI", instructions, _tools: [AttemptToCompleteTask, ControlComputer, DoResearch]);
+            
+            ControlAgent = new Agent(new OpenAIModelClient("gpt-4o"), "BabyAGI", instructions, _tools: [AttemptToCompleteTask, ControlComputer, DoResearch]);
         }
 
         /// <summary>

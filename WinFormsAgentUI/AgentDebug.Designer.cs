@@ -38,6 +38,7 @@
             InputTableLayoutPanel = new TableLayoutPanel();
             InputButtonTableLayoutPanel = new TableLayoutPanel();
             SendButton = new Button();
+            AddFileButton = new Button();
             InputRichTextBox = new RichTextBox();
             tableLayoutPanel1 = new TableLayoutPanel();
             SystemRichTextBox = new RichTextBox();
@@ -143,10 +144,11 @@
             // InputButtonTableLayoutPanel
             // 
             InputButtonTableLayoutPanel.ColumnCount = 3;
-            InputButtonTableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 8.333333F));
-            InputButtonTableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 91.6666641F));
+            InputButtonTableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 10.0917435F));
+            InputButtonTableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 89.90826F));
             InputButtonTableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 74F));
             InputButtonTableLayoutPanel.Controls.Add(SendButton, 2, 0);
+            InputButtonTableLayoutPanel.Controls.Add(AddFileButton, 0, 0);
             InputButtonTableLayoutPanel.Dock = DockStyle.Fill;
             InputButtonTableLayoutPanel.Location = new Point(3, 98);
             InputButtonTableLayoutPanel.MaximumSize = new Size(0, 40);
@@ -169,6 +171,16 @@
             SendButton.Text = "Send";
             SendButton.UseVisualStyleBackColor = true;
             SendButton.Click += SendButton_Click;
+            // 
+            // AddFileButton
+            // 
+            AddFileButton.Location = new Point(3, 3);
+            AddFileButton.Name = "AddFileButton";
+            AddFileButton.Size = new Size(27, 23);
+            AddFileButton.TabIndex = 1;
+            AddFileButton.Text = "+";
+            AddFileButton.UseVisualStyleBackColor = true;
+            AddFileButton.Click += AddFileButton_Click;
             // 
             // InputRichTextBox
             // 
@@ -252,5 +264,6 @@
         private TableLayoutPanel tableLayoutPanel1;
         private RichTextBox SystemRichTextBox;
         private ListBox listBox1;
+        private Button AddFileButton;
     }
 }

@@ -116,6 +116,7 @@ namespace LombdaAgentSDK
         }
 
         //ModelItem -> Provider items
+        
         public Conversation ConvertToProviderItems(IEnumerable messages, Conversation conv)
         {
             foreach (ModelItem item in messages)
@@ -178,22 +179,45 @@ namespace LombdaAgentSDK
                 }
                 else if (item is ModelMessageItem message)
                 {
-                    if (message.Role.ToUpper() == "ASSISTANT")
+                    foreach (var content in message.Content)
                     {
-                        conv.AppendAssistantMessage(((ModelMessageTextContent)message.Content[0]).Text);
+                        if (content is ModelMessageTextContent textContent)
+                        {
+                            if (message.Role.ToUpper() == "ASSISTANT")
+                            {
+                                conv.AppendAssistantMessage(textContent.Text);
+                            }
+                            else if (message.Role.ToUpper() == "USER")
+                            {
+                                conv.AppendUserInput(textContent.Text);
+                            }
+                            else if (message.Role.ToUpper() == "SYSTEM")
+                            {
+                                conv.AppendSystemMessage(textContent.Text);
+                            }
+                            else if (message.Role.ToUpper() == "DEVELOPER")
+                            {
+                                conv.AppendMessage(new ChatMessage(ChatMessageRoles.Unknown, (textContent.Text)));
+                            }
+                        }
+                        else if (content is ModelMessageImageFileContent imageContent)
+                        {
+                            // Handle image content if needed
+                            // Currently, we are only handling text content
+                            conv.AddUserMessage(new List<ChatMessagePart>([new ChatMessagePart(new ChatMessagePartFileLinkData (imageContent.ImageURL, imageContent.MediaType))]));
+                        }
+                        else if (content is ModelMessageFileContent fileContent)
+                        {
+                            // Handle file content if needed
+                            // Currently, we are only handling text content
+                            conv.AddUserMessage(new List<ChatMessagePart>([new ChatMessagePart(new ChatMessagePartFileLinkData(fileContent.DataUri.ToString()))]));
+                        }
+                        else
+                        {
+                            throw new ArgumentException($"Unknown ModelMessageContent type: {content.GetType().Name}", nameof(messages));
+                        }
                     }
-                    else if (message.Role.ToUpper() == "USER")
-                    {
-                        conv.AppendUserInput(((ModelMessageTextContent)message.Content[0]).Text);
-                    }
-                    else if (message.Role.ToUpper() == "SYSTEM")
-                    {
-                        conv.AppendSystemMessage(((ModelMessageTextContent)message.Content[0]).Text);
-                    }
-                    else if (message.Role.ToUpper() == "DEVELOPER")
-                    {
-                        conv.AppendMessage(new ChatMessage(ChatMessageRoles.Unknown, ((ModelMessageTextContent)message.Content[0]).Text));
-                    }
+                   
                 }
                 else
                 {

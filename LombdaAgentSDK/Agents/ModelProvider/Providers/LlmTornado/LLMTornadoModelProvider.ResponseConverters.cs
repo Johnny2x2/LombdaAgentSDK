@@ -379,6 +379,35 @@ namespace LombdaAgentSDK
             return computerToolCallOutput;
         }
 
+        public List<ResponseInputContent> ConverModelContentToProviderContent(List<ModelMessageContent> contentParts)
+        {
+            List<ResponseInputContent> responseContents = new List<ResponseInputContent>();
+            foreach (var part in contentParts)
+            {
+                responseContents.Add(ConvertModelContentToProviderContent(part));
+            }
+            return responseContents;
+        }
+
+        private ResponseInputContent ConvertModelContentToProviderContent(ModelMessageContent part)
+        {
+            if(part is ModelMessageResponseTextContent textContent)
+            {
+                return new ResponseInputContentText(textContent.Text);
+            }
+            else if (part is ModelMessageImageFileContent imageContent)
+            {
+                return ResponseInputContentImage.CreateImageUrl(imageContent.ImageURL);
+            }
+            else if (part is ModelMessageFileContent fileContent)
+            {
+                return new ResponseInputContentFile(fileContent.FileId);
+            }
+            else
+            {
+                throw new ArgumentException($"Unknown ModelMessageContent type: {part.GetType().Name}", nameof(part));
+            }
+        }
 
         //ModelItem -> Provider items
         public List<ResponseInputItem> ConvertToProviderResponseItems(IEnumerable messages)
@@ -435,7 +464,7 @@ namespace LombdaAgentSDK
                 }
                 else if (item is ModelMessageItem message)
                 {
-                    ResponseInputMessage inMessage = new ResponseInputMessage(ChatMessageRoles.Assistant, ((ModelMessageTextContent)message.Content[0]).Text);
+                    ResponseInputMessage inMessage = new ResponseInputMessage(ChatMessageRoles.Assistant, ConverModelContentToProviderContent(message.Content));
                     inMessage.Status = ResponseMessageStatuses.Completed;
                     if (message.Role.ToUpper() == "ASSISTANT")
                     {

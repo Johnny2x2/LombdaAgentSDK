@@ -14,6 +14,7 @@ namespace LombdaAgentSDK
         public delegate void ComputerActionCallbacks(ComputerToolAction computerCall);
         public delegate void RunnerVerboseCallbacks(string runnerAction);
         public delegate void StreamingCallbacks(string streamingResult);
+
         /// <summary>
         /// Invoke the agent loop to begin async
         /// </summary>
@@ -66,8 +67,11 @@ namespace LombdaAgentSDK
             }
 
             //Add the latest message to the stream
-            runResult.Messages.Add(new ModelMessageItem("msg_"+Guid.NewGuid().ToString().Replace("-","_"), "USER", [new ModelMessageRequestTextContent(input),], ModelStatus.Completed));
-
+            if (!string.IsNullOrEmpty(input.Trim()))
+            {
+                runResult.Messages.Add(new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", [new ModelMessageRequestTextContent(input),], ModelStatus.Completed));
+            }
+            
             //Check if the input triggers a guardrail to stop the agent from continuing
             if (guard_rail != null)
             {

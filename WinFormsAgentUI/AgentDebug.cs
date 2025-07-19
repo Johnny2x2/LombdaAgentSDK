@@ -10,8 +10,8 @@ namespace WinFormsAgentUI
     {
         private delegate void TextUpdateDelegate(string item);
         BabyAGIRunner Agent { get; set; }
-        public string LatestResponse{ get; set; } = string.Empty;
-
+        public string LatestResponse { get; set; } = string.Empty;
+        public string loadedFilePath { get; set; } = string.Empty;
 
         public AgentDebug()
         {
@@ -60,6 +60,7 @@ namespace WinFormsAgentUI
                 listBox1.Items.Add(item);
             }
         }
+
         private void RemoveListBoxItem(string item)
         {
             if (listBox1.InvokeRequired) // Check if invoking is required
@@ -73,10 +74,11 @@ namespace WinFormsAgentUI
                 listBox1.Items.Remove(item);
             }
         }
+
         void AddStateWatcher(StateMachine stateMachine)
         {
-           stateMachine.OnStateEntered += AddState;
-           stateMachine.OnStateExited += RemoveState;
+            stateMachine.OnStateEntered += AddState;
+            stateMachine.OnStateExited += RemoveState;
         }
 
         void RemoveStateWatcher(StateMachine stateMachine)
@@ -104,22 +106,32 @@ namespace WinFormsAgentUI
         private async Task SendRequest()
         {
             var text = InputRichTextBox.Text.Trim();
-            AddToChat("User", text);
+            AddToChat("\nUser", text);
             InputRichTextBox.Clear();
-            SendButton.Text = "Stop";
             ChatRichTextBox.AppendText($"[Assistant]: ");
             await StartAssistantResponse(text);
         }
 
         private async Task<string> StartAssistantResponse(string text)
         {
-            var result = await Agent.AddToConversation(text, streaming: true);
+            string result = string.Empty;   
+
+            if (!string.IsNullOrEmpty(loadedFilePath))
+            {
+                result = await Agent.AddFileToConversation(text, loadedFilePath, streaming: true);
+                loadedFilePath = string.Empty;
+            }
+            else
+            {
+                result = await Agent.AddToConversation(text, streaming: true);
+            }
+                
             return result;
         }
 
         public void AddToChat(string role, string message)
         {
-            ChatRichTextBox.AppendText($"[{role}]: "+message + Environment.NewLine);
+            ChatRichTextBox.AppendText($"[{role}]: " + message + Environment.NewLine);
         }
 
         public void StreamChat(string message)
@@ -128,5 +140,19 @@ namespace WinFormsAgentUI
             ChatRichTextBox.ScrollToCaret();
         }
 
+        private void AddFileButton_Click(object sender, EventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog
+            {
+                Title = "Select a file to upload",
+            };
+
+            //Filter = "All files" + "|*.*|*.jpg|*.png|*.gif|*.txt|*.md|*.json|*.csv|*.pdf|*.docx|*.pptx|*.html|*.css|.xml|",
+
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                loadedFilePath = openFileDialog.FileName;
+             }
+        }
     }
 }

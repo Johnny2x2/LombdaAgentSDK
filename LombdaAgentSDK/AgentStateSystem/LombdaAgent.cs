@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using static LombdaAgentSDK.Runner;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace LombdaAgentSDK.AgentStateSystem
 {
@@ -91,7 +92,7 @@ namespace LombdaAgentSDK.AgentStateSystem
 
         public abstract void InitializeAgent();
 
-        public async Task<string> AddToConversation(string userInput, bool streaming = true)
+        public async Task<string> AddToConversation(string userInput, ModelItem message = null, bool streaming = true)
         {
             StartingExecution?.Invoke();
 
@@ -108,7 +109,14 @@ namespace LombdaAgentSDK.AgentStateSystem
                 throw new InvalidOperationException("ControlAgent is not set. Please set ControlAgent before adding to conversation.");
             }
 
-            CurrentResult = await Runner.RunAsync(ControlAgent, userInput, messages: CurrentResult.Messages, verboseCallback: MainVerboseCallback, streaming: streaming, streamingCallback: MainStreamingCallback, cancellationToken:CancellationTokenSource, responseID: string.IsNullOrEmpty(MainThreadId) ? "" : MainThreadId);
+            if(message == null)
+            {
+                message = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", new List<ModelMessageContent>([new ModelMessageRequestTextContent(userInput)]), ModelStatus.Completed);
+            }
+
+            CurrentResult.Messages.Add(message);
+
+            CurrentResult = await Runner.RunAsync(ControlAgent, messages: CurrentResult.Messages, verboseCallback: MainVerboseCallback, streaming: streaming, streamingCallback: MainStreamingCallback, cancellationToken:CancellationTokenSource, responseID: string.IsNullOrEmpty(MainThreadId) ? "" : MainThreadId);
 
             if (!CancellationTokenSource.Token.IsCancellationRequested)
             {
@@ -120,11 +128,31 @@ namespace LombdaAgentSDK.AgentStateSystem
             return CurrentResult.Text ?? "Error getting Response";
         }
 
+        public async Task<string> AddToConversation(string userInput, string threadId, bool streaming = true)
+        {
+            MainThreadId = threadId;
+            return await AddToConversation(userInput, streaming: streaming);
+        }
+
+        public async Task<string> AddFileToConversation(string userInput, string fileId, bool streaming = true)
+        {
+            //import image from disk
+            using( var fileStream = new FileStream(fileId, FileMode.Open, FileAccess.Read))
+            {
+                byte[] data = new byte[fileStream.Length];
+                await fileStream.ReadAsync(data, 0, (int)fileStream.Length);
+                var imageContent = new ModelMessageImageFileContent(BinaryData.FromBytes(data), $"image/{Path.GetExtension(fileId).Replace(".","")}");
+                var messageContent = new ModelMessageRequestTextContent(userInput);
+                var fileItem = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", new List<ModelMessageContent>([messageContent, imageContent]),ModelStatus.Completed);
+                return await AddToConversation(userInput, fileItem, streaming: streaming);
+            }
+        }
+
         public async Task<string> StartNewConversation(string userInput, bool streaming = true)
         {
             CurrentResult = new RunResult();
             MainThreadId = "";
-            return await AddToConversation(userInput, streaming);
+            return await AddToConversation(userInput, streaming:streaming);
         }
     }
 }
