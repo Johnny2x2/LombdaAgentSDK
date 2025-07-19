@@ -1,4 +1,5 @@
 ﻿using BabyAGI.BabyAGIStateMachine.DataModels;
+using BabyAGI.BabyAGIStateMachine.Memory;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
 using LombdaAgentSDK;
@@ -56,7 +57,17 @@ namespace BabyAGI.BabyAGIStateMachine.States
 
         public override async Task<EnrichmentResult> Invoke(QueueTask taskResult)
         {
-            string prompt = $"TASK:{taskResult.Task} \n\n  TASK RESULT:{taskResult.Result}";
+            var QueriedResults = BabyAGIMemory.QueryLongTermMemory($"TASK:{taskResult.Task}\n TASK RESULT:{taskResult.Result}");
+
+            string prompt = 
+            $@"TASK:{taskResult.Task} 
+
+            TASK RESULT:{taskResult.Result}
+
+            Queried Results: 
+            {QueriedResults} 
+
+            ";
 
             EnrichmentResult taskEnrichment= await BeginRunnerAsync<EnrichmentResult>(prompt);
 

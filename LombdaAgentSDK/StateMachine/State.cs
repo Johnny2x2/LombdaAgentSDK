@@ -35,7 +35,7 @@ namespace LombdaAgentSDK.StateMachine
         private bool combineInput = false;
         private bool transitioned = false;
         private string id = Guid.NewGuid().ToString();
-
+        private bool isDeadEnd = false;
         /// <summary>
         /// Gets or sets the event that is triggered when a state is entered.
         /// </summary>
@@ -133,13 +133,14 @@ namespace LombdaAgentSDK.StateMachine
         /// property to combine input into a single process to avoid running multiple threads for each input.
         /// </summary>
         public bool CombineInput { get => combineInput; set => combineInput = value; }
+        public bool IsDeadEnd { get => isDeadEnd; set => isDeadEnd = value; }
 
         /// <summary>
         /// Evaluates and returns a list of state processes that meet specific conditions.
         /// </summary>
         /// <returns>A list of <see cref="StateProcess"/> objects that satisfy the defined conditions.  The list will be empty if
         /// no conditions are met.</returns>
-        public abstract List<StateProcess> CheckConditions();
+        public abstract List<StateProcess>? CheckConditions();
     }
 
     /// <summary>
@@ -423,7 +424,7 @@ namespace LombdaAgentSDK.StateMachine
         /// includes it in the list if possible.</remarks>
         /// <returns>A list of <see cref="StateProcess"/> objects representing the first valid state transition for each result.
         /// If a valid transition is not found and the process can be re-attempted, the original process is included.</returns>
-        private List<StateProcess> GetFirstValidStateTransitionForEachResult()
+        private List<StateProcess>? GetFirstValidStateTransitionForEachResult()
         {
             List<StateProcess> newStateProcesses = new();
             //Results Gathered from invoking
@@ -442,12 +443,16 @@ namespace LombdaAgentSDK.StateMachine
                 }
                 else
                 {
-                    //ReRun the process that failed
-                    StateProcess<TInput> failedProcess = InputProcesses.First(process => process.ID == result.ProcessID);
-                    //Cap the amount of times a State can reattempt (Fixed at 3 right now)
-                    if (failedProcess.CanReAttempt())
-                    {
-                        newStateProcesses.Add(failedProcess);
+                    //If the state is a dead end, we do not reattempt the process
+                    if (!this.IsDeadEnd)
+                    {    
+                        //ReRun the process that failed
+                        StateProcess<TInput> failedProcess = InputProcesses.First(process => process.ID == result.ProcessID);
+                        //Cap the amount of times a State can reattempt (Fixed at 3 right now)
+                        if (failedProcess.CanReAttempt())
+                        {
+                            newStateProcesses.Add(failedProcess);
+                        }
                     }
                 }
             });
@@ -462,7 +467,7 @@ namespace LombdaAgentSDK.StateMachine
         /// valid state processes. If no transitions are valid for a given output, the corresponding process may be
         /// re-attempted if allowed.</remarks>
         /// <returns>A list of <see cref="StateProcess"/> objects representing the valid state transitions.</returns>
-        private List<StateProcess> GetAllValidStateTransitions()
+        private List<StateProcess>? GetAllValidStateTransitions()
         {
             List<StateProcess> newStateProcesses = new();
             //Results Gathered from invoking
@@ -482,8 +487,8 @@ namespace LombdaAgentSDK.StateMachine
                     }
                 });
 
-                //If process produces no transitions rerun the process
-                if (newStateProcessesFromOutput.Count == 0)
+                //If process produces no transitions and not at a dead end rerun the process
+                if (newStateProcessesFromOutput.Count == 0 && !this.IsDeadEnd)
                 {
                     StateProcess failedProcess = InputProcesses.First(process => process.ID == output.ProcessID);
                     //rerun the process up to the max attempts
@@ -496,7 +501,7 @@ namespace LombdaAgentSDK.StateMachine
             return newStateProcesses;
         }
 
-        public override List<StateProcess> CheckConditions()
+        public override List<StateProcess>? CheckConditions()
         {
             return AllowsParallelTransitions ? GetAllValidStateTransitions() : GetFirstValidStateTransitionForEachResult();
         }
@@ -570,6 +575,24 @@ namespace LombdaAgentSDK.StateMachine
         public override async Task<object> Invoke(object input)
         {
             CurrentStateMachine.Finish();
+            return input; //Forced to use BaseState<object, object> because of the Task not returning in order
+        }
+    }
+
+    /// <summary>
+    /// Helper State to exit the StateMachine.
+    /// </summary>
+    public class DeadEnd : BaseState<object, object>
+    {
+        public DeadEnd()
+        {
+            IsDeadEnd = true;
+            WasInvoked = true;
+            Transitioned = true;
+        }
+
+        public override async Task<object> Invoke(object input)
+        {
             return input; //Forced to use BaseState<object, object> because of the Task not returning in order
         }
     }

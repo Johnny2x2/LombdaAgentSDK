@@ -32,12 +32,13 @@ namespace LombdaAgentSDK.AgentStateSystem
             //Add new States Event Handlers for Verbose and Streaming Callbacks from State
             OnStateEntered += (state) =>
             {
-                if(state is IAgentState agentState)
+                if(state.State is IAgentState agentState)
                 {
-                    ControlAgent.VerboseCallback +=agentState.RunnerVerboseCallbacks;
+                    ControlAgent.VerboseCallback += agentState.RunnerVerboseCallbacks;
                     ControlAgent.StreamingCallback += agentState.StreamingCallbacks;
                 }
             };
+
             //Remove Verbose and Streaming Callbacks from State when exited
             OnStateExited += (state) =>
             {
@@ -56,7 +57,7 @@ namespace LombdaAgentSDK.AgentStateSystem
 
         private void RemoveFromControl()
         {
-            ControlAgent.CurrentStateMachines.Remove(this);
+            ControlAgent.RemoveStateMachine(this);
         }
 
         private void CancelTriggered()

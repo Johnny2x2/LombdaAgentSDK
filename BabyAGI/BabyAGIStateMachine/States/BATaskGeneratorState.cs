@@ -15,12 +15,11 @@ namespace BabyAGI.BabyAGIStateMachine.States
 {
     public struct TaskGeneratorResult
     {
-        public bool IsTaskComplete { get; set; }
         public string Reasoning { get; set; }
         public List<TaskItem> NewTasks { get; set; }
     }
 
-    internal class BATaskGeneratorState : AgentState<string, TaskGeneratorResult>
+    internal class BATaskGeneratorState : AgentState<string, List<QueueTask>>
     {
         public BATaskGeneratorState(StateMachine stateMachine) : base(stateMachine)
         {
@@ -58,13 +57,28 @@ namespace BabyAGI.BabyAGIStateMachine.States
                 _output_schema: typeof(TaskGeneratorResult));
         }
 
-        public override async Task<TaskGeneratorResult> Invoke(string taskResult)
+        public override async Task<List<QueueTask>> Invoke(string taskResult)
         {
             string prompt = $@"{taskResult}";
 
             TaskGeneratorResult taskStatus = await BeginRunnerAsync<TaskGeneratorResult>(prompt);
 
-            return taskStatus;
+            List<QueueTask> taskQueue = new List<QueueTask>();
+
+            foreach (var newTask in taskStatus.NewTasks)
+            {
+                if (!string.IsNullOrEmpty(newTask.ToString()))
+                {
+                    // Add the new task to the queue
+                    taskQueue.Add(new QueueTask
+                    {
+                        Task = newTask.ToString()
+                    });
+
+                }
+            }
+
+            return taskQueue;
         }
     }
 }

@@ -10,11 +10,12 @@ using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace LombdaAgentSDK.AgentStateSystem
 {
+    public delegate Task<string> InputProcessorDelegate(string input);
     public abstract class LombdaAgent
     {
         public List<ModelItem> SharedModelItems = new List<ModelItem>();
         public Agent ControlAgent { get; set; }
-
+        public InputProcessorDelegate? InputPreprocessor { get; set; } = null!;
         public List<StateMachine.StateMachine> CurrentStateMachines { get; set; } = new();
 
         public RunResult CurrentResult { get; set; } = new RunResult();
@@ -28,6 +29,7 @@ namespace LombdaAgentSDK.AgentStateSystem
         public event Action<string>? RootStreamingEvent;
         public event Action<StateMachine.StateMachine> StateMachineAdded;
         public event Action<StateMachine.StateMachine> StateMachineRemoved;
+
 
         public StreamingCallbacks? StreamingCallback;
 
@@ -76,7 +78,7 @@ namespace LombdaAgentSDK.AgentStateSystem
         }
         public void RemoveStateMachine(StateMachine.StateMachine stateMachine)
         {
-            CurrentStateMachines.Add(stateMachine);
+            CurrentStateMachines.Remove(stateMachine);
             StateMachineRemoved.Invoke(stateMachine);
         }
 
@@ -109,14 +111,31 @@ namespace LombdaAgentSDK.AgentStateSystem
                 throw new InvalidOperationException("ControlAgent is not set. Please set ControlAgent before adding to conversation.");
             }
 
-            if(message == null)
+            
+
+            //Not an image, so we can use the text content
+            if (message == null)
             {
                 message = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", new List<ModelMessageContent>([new ModelMessageRequestTextContent(userInput)]), ModelStatus.Completed);
+                CurrentResult.Messages.Add(message);
+
+                if(InputPreprocessor != null)
+                {
+                    var preprocessedInput = await RunPreprocess(userInput);
+                    //Add the preprocessed input as a system message
+                    preprocessedInput = "The following information has been prepocessed by an Agent tasked to process the input. <PREPOCESSED RESULTS>" + preprocessedInput + "</PREPOCESSED RESULTS>";
+                    CurrentResult.Messages.Add(new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "ASSISTANT", new List<ModelMessageContent>([new ModelMessageAssistantResponseTextContent(preprocessedInput)]), ModelStatus.Completed));
+                }
+                
+            }
+            else
+            {
+                //If the message is not a text message, we assume it is an image or file
+                CurrentResult.Messages.Add(message);
             }
 
-            CurrentResult.Messages.Add(message);
 
-            CurrentResult = await Runner.RunAsync(ControlAgent, messages: CurrentResult.Messages, verboseCallback: MainVerboseCallback, streaming: streaming, streamingCallback: MainStreamingCallback, cancellationToken:CancellationTokenSource, responseID: string.IsNullOrEmpty(MainThreadId) ? "" : MainThreadId);
+            CurrentResult = await Runner.RunAsync(ControlAgent, messages: CurrentResult.Messages, verboseCallback: MainVerboseCallback, streaming: streaming, streamingCallback: MainStreamingCallback, cancellationToken: CancellationTokenSource, responseID: string.IsNullOrEmpty(MainThreadId) ? "" : MainThreadId);
 
             if (!CancellationTokenSource.Token.IsCancellationRequested)
             {
@@ -126,6 +145,28 @@ namespace LombdaAgentSDK.AgentStateSystem
             FinishedExecution?.Invoke();
 
             return CurrentResult.Text ?? "Error getting Response";
+        }
+
+        public async Task<string?> RunPreprocess(string args)
+        {
+            if(InputPreprocessor == null)
+            {
+                return args;
+            }
+            object? result;
+            if (AsyncHelpers.IsGenericTask(InputPreprocessor?.Method.ReturnType!, out Type taskResultType))
+            {
+                // Method is async, invoke and await
+                var task = (Task)InputPreprocessor?.DynamicInvoke(args)!;
+                await task.ConfigureAwait(false);
+                // Get the Result property from the Task
+                result = taskResultType.GetProperty("Result")?.GetValue(task);
+            }
+            else
+            {
+                result = InputPreprocessor?.DynamicInvoke(args);
+            }  
+            return (string?)result;
         }
 
         public async Task<string> AddToConversation(string userInput, string threadId, bool streaming = true)

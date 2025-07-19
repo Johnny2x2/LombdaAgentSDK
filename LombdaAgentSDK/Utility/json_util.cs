@@ -202,6 +202,13 @@ namespace LombdaAgentSDK
             if (prop.PropertyType == typeof(string)) props.Add("type", "string");
             else if (prop.PropertyType == typeof(bool)) props.Add("type", "boolean");
             else if (prop.PropertyType.IsNumeric()) props.Add("type", "number");
+            else if(prop.PropertyType == typeof(DateTime)) props.Add("type", "string"); // DateTime is often represented as a string in JSON
+            else if (prop.PropertyType == typeof(Guid)) props.Add("type", "string"); // Guid is also often represented as a string in JSON
+            else if (prop.PropertyType.IsEnum)
+            {
+                props.Add("type", "string");
+                props.Add("enum", Enum.GetNames(prop.PropertyType));
+            }
             else if (prop.PropertyType.IsArray)
             {
                 props.Add("type", "array");

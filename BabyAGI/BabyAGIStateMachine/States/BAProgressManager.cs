@@ -7,6 +7,7 @@ using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.StateMachine;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,13 +16,16 @@ namespace BabyAGI.BabyAGIStateMachine.States
 {
     public enum ProgressState
     {
+        Completed,
         Progressing,
         Stagnating,
         Regression
     }
 
+    [Description("Progress report on current goal, Status can only be: Completed,\r\n        Progressing,\r\n        Stagnating,\r\n        Regression")]
     public struct ProgressStatus
     {
+        public string UpdatedProgressSummary { get; set; } 
         public ProgressState Status { get; set; }
         public string Evidence { get; set; }
         public string Suggestions { get; set; }
@@ -31,7 +35,6 @@ namespace BabyAGI.BabyAGIStateMachine.States
     {
         public int StallCount { get; set; } = 0;
         public ProgressStatus Status { get; set; }
-
         public ProgressReport( ProgressStatus status, int stallCount)
         {
             Status = status;
@@ -48,7 +51,7 @@ namespace BabyAGI.BabyAGIStateMachine.States
     {
         public string CurrentScratchpad { get; set; } = string.Empty;
         public List<QueueTask> queueTasksForEval { get; set; } = new List<QueueTask>();
-        public List<QueueTask> queueTasks { get; set; } = new List<QueueTask>();
+
         public int StallCount { get; set; } = 0;
         public BAProgressManager(StateMachine stateMachine) : base(stateMachine)
         {
@@ -81,19 +84,34 @@ namespace BabyAGI.BabyAGIStateMachine.States
                 client,
                 "Function Executor",
                 instructions,
-                _output_schema: typeof(TaskBreakdownResult));
+                _output_schema: typeof(ProgressStatus));
         }
 
         public override async Task<ProgressReport> Invoke(QueueTask input)
         {
+            var goal = CurrentStateMachine.RuntimeProperties.TryGetValue("UserGoal", out object goalObj) ? goalObj as string : input.Task;
+            queueTasksForEval = CurrentStateMachine.RuntimeProperties.TryGetValue("queueTasksForEval", out object evalQueue) 
+                ? (List<QueueTask>)evalQueue 
+                : new List<QueueTask>();
             string prompt = $@"
-            User Goal: {input}
+            User Goal: {goal}
+    
+            Last Task: {input.Task}
 
-            Context: {CurrentScratchpad}
+           Last Result: {input.Result}
+
+            Current Tasks for Evaluation: {string.Join("\n", queueTasksForEval.Select(t => $"{t.Task} - Result: {t.Result}"))}
+
+            Current Summary: {CurrentScratchpad}
+
+            Completed Tasks: {string.Join("\n", queueTasksForEval.Select(t => $"{t.Task} - Result: {t.Result}"))}
             ";
 
             var status = await BeginRunnerAsync<ProgressStatus>(prompt);
-            if(status.Status == ProgressState.Stagnating || status.Status == ProgressState.Regression)
+
+            CurrentScratchpad = status.UpdatedProgressSummary;
+
+            if (status.Status == ProgressState.Stagnating || status.Status == ProgressState.Regression)
             {
                 StallCount++;
             }
@@ -101,6 +119,15 @@ namespace BabyAGI.BabyAGIStateMachine.States
             {
                 StallCount = 0;
             }
+
+            if(status.Status == ProgressState.Completed)
+            {
+                // Reset the scratchpad and task queue if the task is completed
+                CurrentScratchpad = string.Empty;
+                queueTasksForEval.Clear();
+            }
+
+
             return new ProgressReport(status, StallCount);
         }
 

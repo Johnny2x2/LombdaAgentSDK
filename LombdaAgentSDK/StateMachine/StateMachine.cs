@@ -242,7 +242,7 @@ namespace LombdaAgentSDK.StateMachine
             activeProcesses.Clear();
             VerboseLog?.Invoke($"Initializing {newStateProcesses.Count} new state processes...");
             //If there are no new processes, return
-            if (newStateProcesses.Count == 0) return;
+            if (newStateProcesses.Count == 0) { IsFinished = true; return; }
 
             //Initialize each new state process concurrently
             List<Task> Tasks = new List<Task>();
@@ -266,7 +266,7 @@ namespace LombdaAgentSDK.StateMachine
         /// specific conditions. The returned list may be empty if no new state processes are identified.</remarks>
         /// <returns>A list of <see cref="StateProcess"/> objects representing the new state processes that meet the specified
         /// conditions. The list will be empty if no new processes are found.</returns>
-        private async Task<List<StateProcess>> GetNewProcesses()
+        private async Task<List<StateProcess>>? GetNewProcesses()
         {
             VerboseLog?.Invoke("Validating State conditions for transitions");
             List<StateProcess> newStateProcesses = new();
@@ -274,8 +274,12 @@ namespace LombdaAgentSDK.StateMachine
             activeProcesses.ForEach(process => {
                 var newStates = process.State.CheckConditions();
                 VerboseLog?.Invoke($"State {process.State.GetType().Name} : produced new states:\n {string.Join("\n",newStates.Select(nproces=> nproces.State.GetType().Name))}");
-                newStateProcesses.AddRange(process.State.CheckConditions());
-            });
+                var newProcesses = process.State.CheckConditions();
+                if (newProcesses is not null)
+                {
+                    newStateProcesses.AddRange(newProcesses);
+                }
+        });
             VerboseLog?.Invoke("Finished Validations");
             return newStateProcesses;
         }

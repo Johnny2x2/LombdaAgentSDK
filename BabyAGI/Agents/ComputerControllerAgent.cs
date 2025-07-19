@@ -5,16 +5,41 @@ using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
 using LombdaAgentSDK.AgentStateSystem;
+using LombdaAgentSDK.StateMachine;
 using System.Threading.Tasks;
+using static LombdaAgentSDK.Runner;
 using static System.Runtime.CompilerServices.RuntimeHelpers;
 
 namespace BabyAGI.Agents
 {
     public class ComputerControllerAgent
     {
-        LombdaAgent MainRunner { get; set; }
+        public string ResponseID { get; set; } = string.Empty;  
+        public CancellationTokenSource CancellationTokenSource { get; set; } = new CancellationTokenSource();
+        public RunnerVerboseCallbacks runnerVerboseCallbacks { get; set; }
 
-        public ComputerControllerAgent(LombdaAgent MainRunner ) => this.MainRunner = MainRunner;
+        public ComputerControllerAgent(LombdaAgent MainRunner ) 
+        {
+            if(MainRunner.VerboseCallback is not null)
+            {
+                this.runnerVerboseCallbacks = MainRunner?.VerboseCallback;
+            }
+            this.CancellationTokenSource = MainRunner.CancellationTokenSource;
+        } 
+
+        public ComputerControllerAgent(string responseId = "", CancellationTokenSource? cancellationTokenSource = null, RunnerVerboseCallbacks? verboseCallback = null)
+        {
+            this.CancellationTokenSource = cancellationTokenSource ?? new CancellationTokenSource();
+            if(verboseCallback is not null)
+            {
+                this.runnerVerboseCallbacks = verboseCallback;
+            }
+
+            if(!string.IsNullOrEmpty(responseId))
+            {
+                this.ResponseID = responseId;
+            }
+        }
 
         public async Task<string> RunComputerAgent(string task)
         {
@@ -36,11 +61,11 @@ namespace BabyAGI.Agents
             RunResult result = await Runner.RunAsync(
                 agent,
                 input: task,
-                verboseCallback: MainRunner.VerboseCallback,
+                verboseCallback: runnerVerboseCallbacks,
                 computerUseCallback: HandleComputerAction,
-                responseID: MainRunner.MainThreadId,
+                responseID: ResponseID,
                 maxTurns: 50,
-                cancellationToken:MainRunner.CancellationTokenSource
+                cancellationToken: CancellationTokenSource
                 );
 
             return result.Text ?? "Task Finished";

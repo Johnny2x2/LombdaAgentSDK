@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace BabyAGI.BabyAGIStateMachine.States
 {
-    public class BATaskPrioritizationState : AgentState<string, QueueTask>
+    public class BATaskPrioritizationState : AgentState<QueueTask, QueueTask>
     {
         public BATaskPrioritizationState(StateMachine stateMachine) : base(stateMachine)
         {
@@ -50,9 +50,9 @@ namespace BabyAGI.BabyAGIStateMachine.States
         } 
 
 
-        public override async Task<QueueTask> Invoke(string input)
+        public override async Task<QueueTask> Invoke(QueueTask input)
         {
-            return new QueueTask(input);
+            return input;
         }
     }
 }

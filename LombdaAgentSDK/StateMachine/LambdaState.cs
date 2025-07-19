@@ -33,7 +33,6 @@ namespace LombdaAgentSDK.StateMachine
 
         public override async Task<TOutput> Invoke(TInput args)
         {
-            
             object? result;
             if (AsyncHelpers.IsGenericTask(Function.Method.ReturnType, out Type taskResultType))
             {

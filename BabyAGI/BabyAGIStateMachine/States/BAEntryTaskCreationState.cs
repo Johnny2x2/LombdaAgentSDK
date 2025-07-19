@@ -18,7 +18,7 @@ using System.Threading.Tasks;
 namespace BabyAGI.BabyAGIStateMachine.States
 {
    
-    public class BAEntryTaskCreationState : AgentState<string, TaskBreakdownResult>
+    public class BAEntryTaskCreationState : AgentState<string, List<QueueTask>>
     {
         public BAEntryTaskCreationState(StateMachine stateMachine) : base(stateMachine)
         {
@@ -62,14 +62,17 @@ namespace BabyAGI.BabyAGIStateMachine.States
 
             return new Agent(
                 client,
-                "Function Executor",
+                "task maker",
                 instructions,
                 _output_schema: typeof(TaskBreakdownResult));
         }
 
-        public override async Task<TaskBreakdownResult> Invoke(string input)
+        public override async Task<List<QueueTask>> Invoke(string input)
         {
-            var currentTask = GetTaskQueueStatus();
+            if (CurrentStateMachine?.RuntimeProperties?.ContainsKey("CurrentGoal") == true)
+            {
+                CurrentStateMachine.RuntimeProperties.AddOrUpdate("CurrentGoal", input, (key, oldValue) => input);
+            }
 
             string prompt = $@"
             User Goal: {input}
@@ -80,30 +83,17 @@ namespace BabyAGI.BabyAGIStateMachine.States
             - Self-contained (can be executed independently)
             - Measurable (clear success criteria)
             - Appropriately scoped (not too broad or too narrow)
-
-            Current Task Queue Status: 
-            {currentTask}
             ";
 
             TaskBreakdownResult taskResults = await BeginRunnerAsync<TaskBreakdownResult>(prompt);
-
-            return taskResults;
-        }
-
-        private string GetTaskQueueStatus()
-        {
-            if (CurrentStateMachine?.RuntimeProperties?.ContainsKey("TaskQueue") == true)
+            var newTasks = new List<QueueTask>();
+            foreach (var task in taskResults.Tasks)
             {
-                if(CurrentStateMachine.RuntimeProperties.TryGetValue("TaskQueue", out object? Queue))
-                {
-                    if (Queue is Queue<QueueTask> queue)
-                    {
-                        return $"Currently {queue.Count} in the queue"; 
-                    }
-                }
+                // Create a QueueTask for each task in the breakdown result
+                newTasks.Add(new QueueTask(task.ToString()));
             }
 
-            return "Task queue is empty - this will be the first task";
+            return newTasks;
         }
     }
 }

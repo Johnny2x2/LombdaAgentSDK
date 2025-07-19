@@ -1,5 +1,6 @@
 using BabyAGI;
 using Examples.Demos.FunctionGenerator;
+using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.StateMachine;
 using System.Data;
 using static System.Net.Mime.MediaTypeNames;
@@ -40,11 +41,21 @@ namespace WinFormsAgentUI
         void AddState(StateProcess stateProcess)
         {
             AddListBoxItem(stateProcess.State.GetType().Name);
+            if(stateProcess.State is IAgentState agentState)
+            {
+                agentState.RunningVerboseCallback += Agent_VerboseLog;
+                agentState.RunningStreamingCallback += StreamChat;
+            }
         }
 
         void RemoveState(BaseState state)
         {
             RemoveListBoxItem(state.GetType().Name);
+            if (state is IAgentState agentState)
+            {
+                agentState.RunningVerboseCallback -= Agent_VerboseLog;
+                agentState.RunningStreamingCallback -= StreamChat;
+            }
         }
 
         private void AddListBoxItem(string item)
@@ -89,12 +100,30 @@ namespace WinFormsAgentUI
 
         void Agent_VerboseLog(string e)
         {
-            SystemRichTextBox.AppendText(e + Environment.NewLine);
+            if (SystemRichTextBox.InvokeRequired) // Check if invoking is required
+            {
+                // If on a different thread, use Invoke to call this method on the UI thread
+                SystemRichTextBox.Invoke(new TextUpdateDelegate(Agent_VerboseLog), e);
+                return;
+            }
+            else
+            {
+                SystemRichTextBox.AppendText(e + Environment.NewLine);
+            }  
         }
 
         void Root_VerboseLog(string e)
         {
-            SystemRichTextBox.AppendText("[Control Agent]: " + e + Environment.NewLine);
+            if (SystemRichTextBox.InvokeRequired) // Check if invoking is required
+            {
+                // If on a different thread, use Invoke to call this method on the UI thread
+                SystemRichTextBox.Invoke(new TextUpdateDelegate(Root_VerboseLog), e);
+                return;
+            }
+            else
+            {
+                SystemRichTextBox.AppendText("[Control Agent]: " + e + Environment.NewLine);
+            }
         }
 
         private async void SendButton_Click(object sender, EventArgs e)
