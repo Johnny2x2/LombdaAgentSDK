@@ -106,9 +106,9 @@ namespace WinFormsAgentUI
         private async Task SendRequest()
         {
             var text = InputRichTextBox.Text.Trim();
-            AddToChat("\nUser", text);
+            AddToChat("User", text);
             InputRichTextBox.Clear();
-            ChatRichTextBox.AppendText($"[Assistant]: ");
+            ChatRichTextBox.AppendText($"\n[Assistant]: ");
             await StartAssistantResponse(text);
         }
 
@@ -131,10 +131,23 @@ namespace WinFormsAgentUI
 
         public void AddToChat(string role, string message)
         {
-            ChatRichTextBox.AppendText($"[{role}]: " + message + Environment.NewLine);
+            ChatRichTextBox.AppendText($"\n[{role}]: " + message + Environment.NewLine);
         }
 
         public void StreamChat(string message)
+        {
+            if(ChatRichTextBox.InvokeRequired)
+            {
+                ChatRichTextBox.Invoke(new Action(() => AppendToChat(message)));
+            }
+            else
+            {
+                AppendToChat(message);
+            }
+            
+        }
+
+        private void AppendToChat(string message)
         {
             ChatRichTextBox.AppendText(message);
             ChatRichTextBox.ScrollToCaret();

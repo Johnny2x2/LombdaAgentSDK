@@ -395,9 +395,13 @@ namespace LombdaAgentSDK
             {
                 return new ResponseInputContentText(textContent.Text);
             }
+            if(part is ModelMessageRequestTextContent textRequestContent)
+            {
+                return new ResponseInputContentText(textRequestContent.Text);
+            }
             else if (part is ModelMessageImageFileContent imageContent)
             {
-                return ResponseInputContentImage.CreateImageUrl(imageContent.ImageURL);
+                return ResponseInputContentImage.CreateImageUrl(imageContent.DataUri);
             }
             else if (part is ModelMessageFileContent fileContent)
             {

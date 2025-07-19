@@ -122,7 +122,7 @@ namespace LombdaAgentSDK.Agents.DataClasses
         /// <summary>
         /// Complete dataUri
         /// </summary>
-        public string ImageURL { get=> DataUri.ToString(); set=> DataUri = new Uri(value); }
+        public string ImageURL { get=> DataUri; set=> DataUri = value; }
 
         public ModelMessageImageFileContent() { ContentType = ModelContentType.InputImage; }
 
@@ -155,7 +155,7 @@ namespace LombdaAgentSDK.Agents.DataClasses
     /// </summary>
     public class ModelMessageImageUrlContent : ModelMessageFileContent
     {
-        public Uri ImageUrl { get => DataUri; set => DataUri = value; }
+        public Uri ImageUrl { get; set; }
         public ModelMessageImageUrlContent(Uri imageData)
         {
             ContentType = ModelContentType.InputImage;
@@ -171,7 +171,7 @@ namespace LombdaAgentSDK.Agents.DataClasses
         /// <summary>
         /// Gets or sets the Uri of the file.
         /// </summary>
-        public Uri DataUri { get; set; }
+        public string DataUri { get; set; }
         /// <summary>
         /// Name of the file
         /// </summary>
@@ -192,12 +192,16 @@ namespace LombdaAgentSDK.Agents.DataClasses
 
         public ModelMessageFileContent(string fileName = "", BinaryData data = null, string mediaType = "")
         {
-            ContentType = ModelContentType.InputFile;
+            if(ContentType == ModelContentType.Unknown)
+            {
+                ContentType = ModelContentType.InputFile;
+            }
+
             DataBytes = data;
             FileName = fileName;
             MediaType = mediaType;
             string base64EncodedData = Convert.ToBase64String(data.ToArray());
-            DataUri = new Uri($"data:{MediaType};base64,{base64EncodedData}");
+            DataUri = $"data:{MediaType};base64,{base64EncodedData}";
         }
 
         /// <summary>

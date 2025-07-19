@@ -16,12 +16,12 @@ namespace BabyAGI
     {
         public override void InitializeAgent()
         {
-            LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
+            LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),], useResponseAPI:true);
 
             string instructions = $"""You are a person assistant AGI with the ability to generate tools to answer any user question if you cannot do it directly task your tool to create it.""";
 
             
-            ControlAgent = new Agent(new OpenAIModelClient("gpt-4o"), "BabyAGI", instructions, _tools: [AttemptToCompleteTask, ControlComputer, DoResearch]);
+            ControlAgent = new Agent(client, "BabyAGI", instructions, _tools: [AttemptToCompleteTask, ControlComputer, DoResearch]);
         }
 
         /// <summary>

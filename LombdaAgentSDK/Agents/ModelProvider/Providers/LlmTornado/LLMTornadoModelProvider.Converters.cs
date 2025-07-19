@@ -1,8 +1,11 @@
-﻿using LombdaAgentSDK.Agents.DataClasses;
-using LlmTornado.Chat;
+﻿using LlmTornado.Chat;
 using LlmTornado.ChatFunctions;
 using LlmTornado.Code;
+using LlmTornado.Images;
+using LombdaAgentSDK.Agents.DataClasses;
+using Microsoft.VisualBasic;
 using System.Collections;
+using System.Collections.Generic;
 
 namespace LombdaAgentSDK
 {
@@ -116,7 +119,36 @@ namespace LombdaAgentSDK
         }
 
         //ModelItem -> Provider items
-        
+        public List<ChatMessagePart> ConvertModelContentToProviderPart(List<ModelMessageContent> contents)
+        {
+            List<ChatMessagePart> parts = new List<ChatMessagePart>();
+            foreach(var content in contents)
+            {
+                parts.Add(ConvertModelContentToProviderPart(content));
+            }
+            return parts;
+        }
+
+        public ChatMessagePart ConvertModelContentToProviderPart(ModelMessageContent content)
+        {
+            if (content is ModelMessageTextContent textContent)
+            {
+                return new ChatMessagePart(textContent.Text);
+            }
+            else if (content is ModelMessageImageFileContent imageContent)
+            {
+                return new ChatMessagePart(imageContent.DataUri, ImageDetail.Auto);
+            }
+            else if (content is ModelMessageFileContent fileContent)
+            {
+                return new ChatMessagePart(fileContent.DataUri, ImageDetail.Auto);
+            }
+            else
+            {
+                throw new ArgumentException($"Unknown ModelMessageContent type: {content.GetType().Name}", nameof(content));
+            }
+        }
+
         public Conversation ConvertToProviderItems(IEnumerable messages, Conversation conv)
         {
             foreach (ModelItem item in messages)
@@ -179,45 +211,22 @@ namespace LombdaAgentSDK
                 }
                 else if (item is ModelMessageItem message)
                 {
-                    foreach (var content in message.Content)
+                    if (message.Role.ToUpper() == "ASSISTANT")
                     {
-                        if (content is ModelMessageTextContent textContent)
-                        {
-                            if (message.Role.ToUpper() == "ASSISTANT")
-                            {
-                                conv.AppendAssistantMessage(textContent.Text);
-                            }
-                            else if (message.Role.ToUpper() == "USER")
-                            {
-                                conv.AppendUserInput(textContent.Text);
-                            }
-                            else if (message.Role.ToUpper() == "SYSTEM")
-                            {
-                                conv.AppendSystemMessage(textContent.Text);
-                            }
-                            else if (message.Role.ToUpper() == "DEVELOPER")
-                            {
-                                conv.AppendMessage(new ChatMessage(ChatMessageRoles.Unknown, (textContent.Text)));
-                            }
-                        }
-                        else if (content is ModelMessageImageFileContent imageContent)
-                        {
-                            // Handle image content if needed
-                            // Currently, we are only handling text content
-                            conv.AddUserMessage(new List<ChatMessagePart>([new ChatMessagePart(new ChatMessagePartFileLinkData (imageContent.ImageURL, imageContent.MediaType))]));
-                        }
-                        else if (content is ModelMessageFileContent fileContent)
-                        {
-                            // Handle file content if needed
-                            // Currently, we are only handling text content
-                            conv.AddUserMessage(new List<ChatMessagePart>([new ChatMessagePart(new ChatMessagePartFileLinkData(fileContent.DataUri.ToString()))]));
-                        }
-                        else
-                        {
-                            throw new ArgumentException($"Unknown ModelMessageContent type: {content.GetType().Name}", nameof(messages));
-                        }
+                        conv.AppendMessage(new ChatMessage(ChatMessageRoles.Assistant, ConvertModelContentToProviderPart(message.Content)));
                     }
-                   
+                    else if (message.Role.ToUpper() == "USER")
+                    {
+                        conv.AppendMessage(new ChatMessage(ChatMessageRoles.User, ConvertModelContentToProviderPart(message.Content)));
+                    }
+                    else if (message.Role.ToUpper() == "SYSTEM")
+                    {
+                        conv.AppendMessage(new ChatMessage(ChatMessageRoles.System, ConvertModelContentToProviderPart(message.Content)));
+                    }
+                    else if (message.Role.ToUpper() == "DEVELOPER")
+                    {
+                        conv.AppendMessage(new ChatMessage(ChatMessageRoles.Unknown, ConvertModelContentToProviderPart(message.Content)));
+                    }
                 }
                 else
                 {
