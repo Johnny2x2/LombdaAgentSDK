@@ -1,80 +1,39 @@
-# LombdaAgentSDK Architecture Guide
+# Architecture Guide
 
-## Overview
+This document outlines the architecture and design principles of the LombdaAgentSDK.
 
-LombdaAgentSDK is built around three core architectural concepts:
+## High-Level Architecture
+User → Agent → Model Provider → Response → Tool Execution → Output
+LombdaAgentSDK follows a modular architecture with several key components:
 
-1. **Agents** - AI-powered entities that can process tasks, use tools, and interact with users
-2. **State Machines** - Workflow orchestration system for complex multi-step processes  
-3. **Model Providers** - Abstracted interfaces to different AI model services
-
-## Core Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│     Agents      │    │  State Machine  │    │ Model Providers │
-│                 │    │                 │    │                 │
-│ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │
-│ │   Runner    │ │    │ │    State    │ │    │ │   OpenAI    │ │
-│ │             │ │    │ │             │ │    │ │             │ │
-│ │ ┌─────────┐ │ │    │ │ ┌─────────┐ │ │    │ │             │ │
-│ │ │  Agent  │ │ │    │ │ │  Input  │ │ │    │ │             │ │
-│ │ │         │ │ │    │ │ │         │ │ │    │ │             │ │
-│ │ │ ┌─────┐ │ │ │    │ │ │ ┌─────┐ │ │ │    │ │             │ │
-│ │ │ │Tools│ │ │ │    │ │ │ │Invoke│ │ │ │    │ │             │ │
-│ │ │ └─────┘ │ │ │    │ │ │ └─────┘ │ │ │    │ │             │ │
-│ │ └─────────┘ │ │    │ │ │         │ │ │    │ │             │ │
-│ └─────────────┘ │    │ │ │ ┌─────┐ │ │ │    │ │             │ │
-│                 │    │ │ │ │Output│ │ │ │    │ │             │ │
-└─────────────────┘    │ │ │ └─────┘ │ │ │    │ │             │ │
-                       │ │ └─────────┘ │ │    │ │             │ │
-                       │ └─────────────┘ │    │ └─────────────┘ │
-                       │                 │    │                 │
-                       │ ┌─────────────┐ │    │ ┌─────────────┐ │
-                       │ │ Transitions │ │    │ │ LLMTornado  │ │
-                       │ └─────────────┘ │    │ └─────────────┘ │
-                       └─────────────────┘    └─────────────────┘
-```
+1. **Agent**: Encapsulates LLM interactions and tool execution
+2. **State Machine**: Manages workflow transitions between states
+3. **LombdaAgent**: Orchestrator connecting agents and state machines
+4. **Model Providers**: Abstract interfaces to various LLM services
+5. **Tools**: Extensible functions that agents can call
+6. **Event System**: Communication channel between components
 
 ## Agent Architecture
 
-### Agent Composition
+### Agent Design
 
-An **Agent** consists of:
+An agent consists of:
 
-- **ModelClient**: Interface to AI model provider (OpenAI, LLMTornado, etc.)
-- **Instructions**: System prompt defining agent behavior
-- **Tools**: Available functions the agent can call
-- **OutputSchema**: Optional structured output format
-- **Options**: Configuration for model parameters, guardrails, etc.
+- **ModelClient**: Connection to LLM service
+- **Instructions**: System prompt for the agent
+- **Tools**: Functions the agent can call
+- **Output Schema**: Structure for response parsing
+- **Conversation History**: Maintained message log
 
-### Agent Execution Flow
-
-```
-User Input → Runner → Agent → Model Provider → Response Processing → Tool Calls → Final Output
-```
-
-1. **Input Processing**: User input is validated and added to conversation history
-2. **Model Invocation**: Agent sends messages to model provider with tools and instructions
-3. **Response Processing**: Model response is parsed for tool calls, content, and structured data
-4. **Tool Execution**: Any tool calls are executed and results added back to conversation
-5. **Loop Continuation**: Process repeats until no more tool calls or max turns reached
-
+### Execution Flow
+Input → Agent → Model → Tool Calls? → Execute Tools → Collect Responses → Final Output
 ### Tool System
 
-Tools are C# methods decorated with the `[Tool]` attribute:
+Tools follow a standardized pattern:
 
-```csharp
-[Tool(Description = "Get weather data", In_parameters_description = ["Location", "Unit"])]
-public string GetWeather(string location, Unit unit = Unit.celsius)
-{
-    // Implementation
-}
-```
-
-Tools are automatically:
-- Converted to OpenAI function call format
-- Registered with the agent
+- Decorated with `[Tool]` attributes
+- Metadata for descriptions and parameters
+- Auto-converted to tool specifications
 - Executed when called by the model
 - Results fed back into conversation
 
@@ -90,11 +49,7 @@ States follow a generic pattern `BaseState<TInput, TOutput>` where:
 - **Transitions**: Conditions for moving to next states
 
 ### State Machine Flow
-
-```
 Entry State → Process → Transition Check → Next State → ... → Exit State
-```
-
 1. **Initialization**: Entry state receives initial input
 2. **Processing**: State executes its `Invoke()` method
 3. **Transition Evaluation**: Conditions are checked against output
@@ -110,20 +65,72 @@ State machines handle concurrency through:
 - **Process isolation** between state instances
 - **Safe transition** mechanisms
 
+## AgentStateMachine Architecture
+
+AgentStateMachine extends the basic state machine architecture with agent-specific capabilities:
+LombdaAgent → AgentStateMachine → AgentStates → Agent Execution → Events
+### AgentState Design
+
+AgentState adds agent-specific features to BaseState:
+
+- **StateAgent**: Agent instance owned by the state
+- **Event Handling**: Built-in event integration
+- **Lifecycle Management**: Initialization and disposal
+- **BeginRunnerAsync**: Helper for agent execution
+
+### Flow in AgentStateMachine
+Initialize → Setup States → Configure Transitions → Connect Events → Run → Monitor → Complete
+1. **Initialization**: LombdaAgent creates AgentStateMachine
+2. **State Setup**: AgentStates are created and configured
+3. **Event Binding**: Events are connected to LombdaAgent
+4. **Execution**: States process input and generate outputs
+5. **Monitoring**: Events flow back to LombdaAgent for logging/debugging
+6. **Completion**: Results are collected and returned
+
+## LombdaAgent Architecture
+
+LombdaAgent serves as the central coordination point:
+Application → LombdaAgent → State Machines → States → Agents → Events → UI/Logging
+### Responsibilities:
+
+- **State Machine Management**: Tracks active state machines
+- **Event Coordination**: Routes events between components
+- **Logging**: Centralizes verbose logging
+- **Streaming**: Manages streaming callbacks
+- **Debugging**: Connects to UI components
+
+### Communication Flow
+Agent Action → Event → LombdaAgent → Event Handlers → UI/Logging
+## Event System Architecture
+
+The event system provides real-time communication between components:
+Source → Event → Subscribers → Actions
+### Event Types:
+
+- **VerboseCallback**: Detailed operation logs
+- **StreamingCallback**: Real-time model responses
+- **RunningVerboseCallback**: High-level verbose messages
+- **RunningStreamingCallback**: High-level streaming updates
+- **OnStateEntered/OnStateExited**: State transition events
+- **OnBegin/FinishedTriggered/CancellationTriggered**: Lifecycle events
+
+### Event Flow:
+
+1. **Source Generation**: Component raises event
+2. **LombdaAgent Routing**: Central handler processes event
+3. **Subscription Delivery**: Subscribers receive notifications
+4. **UI/Logging Update**: Visual or text representation
+
 ## Model Provider Architecture
 
 ### Provider Abstraction
 
 The `ModelClient` abstract class provides a uniform interface regardless of the underlying model provider:
-
-```csharp
 public abstract class ModelClient
 {
     public abstract Task<ModelResponse> _CreateResponseAsync(List<ModelItem> messages, ModelResponseOptions options);
     public abstract Task<ModelResponse> _CreateStreamingResponseAsync(List<ModelItem> messages, ModelResponseOptions options, StreamingCallbacks callback);
 }
-```
-
 ### Supported Providers
 
 - **OpenAIModelClient**: Direct integration with OpenAI API
@@ -133,17 +140,31 @@ public abstract class ModelClient
 ## Data Flow Architecture
 
 ### Message Flow
-
-```
 User Input → ModelMessageItem → Conversation History → Model Provider → ModelResponse → Tool Calls → Output
-```
-
 ### Type Safety
 
 The SDK maintains strong typing throughout:
 - **Generic States**: `BaseState<TInput, TOutput>` ensures type safety
 - **Structured Output**: Automatic JSON schema generation from C# types
 - **Tool Parameters**: Automatic parameter extraction and validation
+
+## Debugging UI Architecture
+
+The Windows debugging UI provides visualization of agent operations:
+LombdaAgent → Events → UI → User
+### UI Components:
+
+- **Left Panel**: Streaming chat display
+- **Right Panel**: Verbose logging display
+- **Controls**: Operations like cancellation
+- **State Visualization**: Visual representation of state machine
+
+### Data Flow:
+
+1. **Event Generation**: LombdaAgent raises events
+2. **UI Update**: UI components receive and display events
+3. **User Interaction**: Debugging controls affect execution
+4. **Visualization**: State machine status is displayed
 
 ## Design Principles
 
@@ -172,6 +193,7 @@ The SDK maintains strong typing throughout:
 - Graceful failure recovery
 - Retry mechanisms
 - Guard rail system for input validation
+- IsDeadEnd state detection to prevent failed state rerunning
 
 ## Memory and State Management
 
@@ -179,16 +201,19 @@ The SDK maintains strong typing throughout:
 - Messages stored in `List<ModelItem>`
 - Persistent across agent turns
 - Includes tool calls and responses
+- SharedModelItems for cross-state conversation history
 
 ### State Machine Memory
 - `RuntimeProperties` for cross-state data
 - State-specific input/output storage
 - Process isolation for parallel execution
+- Event history for debugging and monitoring
 
 ### Resource Management
 - Automatic cleanup of completed states
 - Configurable thread limits
 - Memory-efficient message handling
+- Cancellation support via CancellationTokenSource
 
 ## Security Considerations
 

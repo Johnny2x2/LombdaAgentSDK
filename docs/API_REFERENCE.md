@@ -1,127 +1,90 @@
-# LombdaAgentSDK API Reference
+# API Reference
+
+This document provides a comprehensive reference for the LombdaAgentSDK API.
 
 ## Core Classes
 
-### Agent Class
+### Agent
 
-The `Agent` class is the core component for creating AI agents with tool capabilities and instructions.
-
-#### Constructor
-
-```csharp
-public Agent(ModelClient client, string name, string instructions = "", Type? outputSchema = null, List<Delegate>? tools = null)
-```
-
-**Parameters:**
-- `client`: Model provider client (OpenAI, LlmTornado, etc.)
-- `name`: Agent name identifier
-- `instructions`: System instructions for the agent behavior
-- `outputSchema`: Optional type for structured JSON output
-- `tools`: List of available tools/functions
-
-#### Properties
-
-- `ModelClient Client` - The model provider client
-- `string AgentName` - Name of the agent
-- `string Instructions` - Instructions for processing prompts
-- `Type? OutputSchema` - Data type for formatted response output
-- `List<Delegate>? Tools` - Available tools for the agent
-- `ModelResponseOptions Options` - Response configuration options
-
-#### Example
-
-```csharp
-Agent agent = new Agent(
-    new OpenAIModelClient("gpt-4o-mini"), 
-    "Assistant", 
-    "You are a helpful research assistant",
-    typeof(ResearchResult),
-    [GetWeatherTool, SearchWebTool]
-);
-```
-
-### Runner Class
-
-Static class for executing agent workflows with various configuration options.
-
-#### RunAsync Method
-
-```csharp
-public static async Task<RunResult> RunAsync(
-    Agent agent,
-    string input = "",
-    GuardRailFunction? guardRail = null,
-    bool singleTurn = false,
-    int maxTurns = 10,
-    List<ModelItem>? messages = null,
-    ComputerActionCallbacks? computerUseCallback = null,
-    RunnerVerboseCallbacks? verboseCallback = null,
-    bool streaming = false,
-    StreamingCallbacks? streamingCallback = null,
-    string responseID = ""
+The primary class for creating AI agents.
+public Agent(
+    IModelClient client,
+    string _name,
+    string _instructions,
+    Tool[]? _tools = null,
+    Type? _output_schema = null,
+    string? _output_schema_json = null
 )
-```
+#### Parameters
 
-**Parameters:**
-- `agent`: The agent to execute
-- `input`: User input message
-- `guardRail`: Optional input validation function
-- `singleTurn`: Set to true for single interaction
-- `maxTurns`: Maximum conversation turns (default: 10)
-- `messages`: Previous conversation history
-- `computerUseCallback`: Callback for computer use actions
-- `verboseCallback`: Callback for verbose logging
-- `streaming`: Enable streaming responses
-- `streamingCallback`: Callback for streaming content
-- `responseID`: Previous response ID for continuation
+- `client`: Model provider client
+- `_name`: Name for the agent (used in conversation)
+- `_instructions`: System prompt/instructions
+- `_tools`: Array of tools available to the agent
+- `_output_schema`: Type for structured output
+- `_output_schema_json`: JSON schema for structured output
 
 #### Example
-
-```csharp
-RunResult result = await Runner.RunAsync(
-    agent, 
-    "What is the weather in Boston?",
-    maxTurns: 5,
-    streaming: true,
-    streamingCallback: Console.Write
+Agent plannerAgent = new Agent(
+    new OpenAIModelClient("gpt-4o-mini"),
+    "Planner",
+    "Create a research plan for the given query",
+    typeof(ResearchPlan)
 );
-```
 
-### BaseState Class
+var result = await Runner.RunAsync(plannerAgent, query);
+return result.ParseJson<ResearchPlan>();
+### LombdaAgent
 
-Abstract base class for creating state machine states with typed input/output.
+The orchestrator class that unifies Agent and StateMachine operations, providing event management, debugging, and monitoring capabilities.
+public class LombdaAgent
+{
+    public LombdaAgent();
+    public void AddStateMachine(IAgentStateMachine stateMachine);
+    public void RemoveStateMachine(IAgentStateMachine stateMachine);
+}
+#### Events
 
-#### BaseState<TInput, TOutput>
+- `VerboseCallback`: Triggered for verbose log messages
+- `StreamingCallback`: Triggered for streaming updates
+- `RunningVerboseCallback`: Event for receiving verbose log messages
+- `RunningStreamingCallback`: Event for receiving streaming updates
 
-Generic state class with strongly typed input and output.
+#### Example
+// Create a LombdaAgent
+LombdaAgent agent = new LombdaAgent();
 
-```csharp
-public abstract class BaseState<TInput, TOutput> : BaseState
-```
+// Subscribe to events
+agent.RunningVerboseCallback += (message) => Console.WriteLine($"[LOG] {message}");
+agent.RunningStreamingCallback += (update) => Console.WriteLine($"[STREAM] {update}");
 
-#### Key Methods
+// Use with a state machine
+ResearchAgent researchAgent = new ResearchAgent(agent);
+var result = await researchAgent.RunAsync("Research quantum computing");
+### BaseState
 
-```csharp
-public abstract Task<TOutput> Invoke(TInput input);
-public virtual Task EnterState(TInput? input);
-public virtual Task ExitState();
-public void AddTransition(TransitionEvent<TOutput> condition, BaseState nextState);
-```
-
+Base class for creating state machine states.
+public abstract class BaseState<TInput, TOutput>
+{
+    public virtual async Task<TOutput> Invoke(TInput input);
+    public void AddTransition(TransitionEvent<TOutput> transitionCheck, BaseState nextState);
+    public void AddTransition(BaseState nextState);
+    public void AddTransition<TNextInput>(TransitionEvent<TOutput> transitionCheck, 
+                                         Func<TOutput, TNextInput> converter, BaseState nextState);
+}
 #### Properties
 
-- `List<TInput> Input` - Input data for the state
-- `List<TOutput> Output` - Output results from the state
-- `bool AllowsParallelTransitions` - Enable parallel state transitions
-- `bool CombineInput` - Process all inputs as single batch
-- `StateMachine? CurrentStateMachine` - Reference to parent state machine
+- `StateMachine? CurrentStateMachine` - Reference to containing state machine
+- `TInput Input` - Input data for the state
+- `TOutput? Output` - Output data from state execution
+- `bool IsDeadEnd` - Indicates if state is a dead end (no valid transitions)
+- `bool AllowsParallelTransitions` - Enable multiple transition paths
+- `bool CombineInput` - Combine multiple inputs into single execution
 
 #### Example
-
-```csharp
 class PlanningState : BaseState<string, ResearchPlan>
 {
-    public override async Task<ResearchPlan> Invoke(string query)
+    public override async Task<ResearchPlan> Invoke(string input)
     {
         Agent plannerAgent = new Agent(
             new OpenAIModelClient("gpt-4o-mini"),
@@ -134,37 +97,105 @@ class PlanningState : BaseState<string, ResearchPlan>
         return result.ParseJson<ResearchPlan>();
     }
 }
-```
+### AgentState
 
+Specialized state for agent execution with built-in event handling and agent lifecycle management.
+public abstract class AgentState<TInput, TOutput> : BaseState<TInput, TOutput>, IAgentState
+{
+    public AgentState(StateMachine stateMachine);
+    public abstract Agent InitilizeStateAgent();
+    protected async Task<TResult> BeginRunnerAsync<TResult>(string input);
+}
+#### Properties and Events
+
+- `Agent StateAgent`: The agent controlled by this state
+- `RunnerVerboseCallbacks? RunnerVerboseCallbacks`: Callbacks for verbose logs
+- `StreamingCallbacks? StreamingCallbacks`: Callbacks for streaming updates
+- `event Action<string>? RunningVerboseCallback`: Event for verbose messages
+- `event Action<string>? RunningStreamingCallback`: Event for streaming updates
+- `CancellationTokenSource CancelTokenSource`: Cancellation token source
+
+#### Example
+class ResearchState : AgentState<string, ResearchData>
+{
+    public ResearchState(StateMachine stateMachine) : base(stateMachine) {}
+
+    public override Agent InitilizeStateAgent()
+    {
+        return new Agent(
+            client: new OpenAIModelClient("gpt-4o-mini"),
+            _name: "Research Agent",
+            _instructions: "You are a researcher tasked with finding information.",
+            _output_schema: typeof(ResearchData)
+        );
+    }
+
+    public override async Task<ResearchData> Invoke(string input)
+    {
+        return await BeginRunnerAsync<ResearchData>(input);
+    }
+}
+### AgentStateMachine
+
+State machine specifically designed for agent-based workflows.
+public abstract class AgentStateMachine<TInput, TOutput> : StateMachine<TInput, TOutput>, IAgentStateMachine
+{
+    public AgentStateMachine(LombdaAgent lombdaAgent);
+    public abstract void InitilizeStates();
+    public async Task<TOutput> RunAsync(TInput input);
+}
+#### Properties
+
+- `LombdaAgent ControlAgent`: The controller agent for this state machine
+- `List<ModelItem> SharedModelItems`: Shared conversation history
+
+#### Example
+public class ResearchAgent : AgentStateMachine<string, ReportData>
+{
+    public ResearchAgent(LombdaAgent lombdaAgent) : base(lombdaAgent) {}
+
+    public override void InitilizeStates()
+    {
+        // Setup states
+        PlanningState plannerState = new PlanningState(this);
+        ResearchState researchState = new ResearchState(this);
+        ReportingState reportingState = new ReportingState(this);
+
+        // Setup transitions
+        plannerState.AddTransition((plan) => plan.items.Length > 0, researchState);
+        researchState.AddTransition(reportingState);
+        reportingState.AddTransition(new ExitState());
+
+        // Set entry and output states
+        SetEntryState(plannerState);
+        SetOutputState(reportingState);
+    }
+}
+
+// Usage
+LombdaAgent agent = new LombdaAgent();
+ResearchAgent researchAgent = new ResearchAgent(agent);
+ReportData report = await researchAgent.RunAsync("Research quantum computing");
 ### StateMachine Class
 
 Orchestrates execution of connected states with transition logic.
 
 #### Generic StateMachine<TInput, TOutput>
-
-```csharp
 public class StateMachine<TInput, TOutput> : StateMachine
-```
-
 #### Key Methods
-
-```csharp
 public async Task<List<TOutput?>> Run(TInput input);
 public async Task<List<List<TOutput?>>> Run(TInput[] inputs);
 public void SetEntryState(BaseState startState);
 public void SetOutputState(BaseState resultState);
-```
-
 #### Properties
 
 - `List<TOutput>? Results` - Final results from execution
 - `int MaxThreads` - Maximum concurrent threads (default: 20)
 - `CancellationToken CancelToken` - Cancellation token for stopping execution
 - `Dictionary<string, object> RuntimeProperties` - Runtime state storage
+- `List<IAgentState> States` - Collection of agent states
 
 #### Example
-
-```csharp
 // Create states
 PlanningState planningState = new PlanningState();
 ResearchState researchState = new ResearchState();
@@ -181,8 +212,6 @@ stateMachine.SetEntryState(planningState);
 stateMachine.SetOutputState(reportState);
 
 List<string?> results = await stateMachine.Run("Research electric bikes under $1500");
-```
-
 ### RunResult Class
 
 Contains the results and conversation history from agent execution.
@@ -194,16 +223,10 @@ Contains the results and conversation history from agent execution.
 - `ModelResponse Response` - Raw model response data
 
 #### Methods
-
-```csharp
 public T ParseJson<T>() // Parse structured output to specified type
-```
-
 ### Tool Attribute
 
 Attribute for marking methods as agent tools with metadata.
-
-```csharp
 [Tool(
     Description = "Get current weather for a location",
     In_parameters_description = [
@@ -214,42 +237,55 @@ Attribute for marking methods as agent tools with metadata.
 public string GetWeather(string location, Unit unit = Unit.celsius)
 {
     // Tool implementation
-    return "75°F, sunny";
+    return "75Â°F, sunny";
 }
-```
-
 ## Model Providers
 
 ### OpenAIModelClient
 
 Client for OpenAI models with built-in tool calling and structured output support.
-
-```csharp
 public OpenAIModelClient(string model, ApiKeyCredential? apiKey = null)
-```
-
 ### LLMTornadoModelProvider
 
 Client for LLMTornado with support for multiple model providers.
-
-```csharp
 LLMTornadoModelProvider client = new(
     ChatModel.OpenAi.Gpt41.V41Mini,
     [new ProviderAuthentication(LLmProviders.OpenAi, apiKey)]
 );
-```
+## Event System
 
+### Event Delegates
+// Callbacks for runner operations
+public delegate void RunnerVerboseCallbacks(string runnerAction);
+
+// Callbacks for streaming results
+public delegate void StreamingCallbacks(string streamingResult);
+
+// Events for state transitions
+public event Action? OnBegin;
+public event Action<StateTransition>? OnStateEntered;
+public event Action<IState>? OnStateExited;
+public event Action? FinishedTriggered;
+public event Action? CancellationTriggered;
+## UI Debugging
+
+The Windows debugging UI provides visualization of agent operations:
+// Initialize the debug UI
+var debugUI = new AgentDebuggerForm();
+
+// Connect LombdaAgent to UI
+lombdaAgent.RunningVerboseCallback += debugUI.AddVerboseLog;
+lombdaAgent.RunningStreamingCallback += debugUI.AddStreamingMessage;
+
+// Show the UI
+debugUI.Show();
 ## Utility Classes
 
 ### json_util
 
 Helper methods for JSON parsing and schema generation.
-
-```csharp
 public static T ParseJson<T>(RunResult result);
 public static ModelOutputFormat CreateJsonSchemaFormatFromType(this Type type, bool strict = false);
-```
-
 ### ImageUtility
 
 Helper methods for image processing and encoding.
@@ -265,11 +301,8 @@ Utilities for computer use functionality including screenshot capture and UI aut
 Thrown when input guard rails are triggered to prevent agent execution.
 
 ## Delegates and Callbacks
-
-```csharp
 public delegate void ComputerActionCallbacks(ComputerToolAction computerCall);
 public delegate void RunnerVerboseCallbacks(string runnerAction);
 public delegate void StreamingCallbacks(string streamingResult);
 public delegate Task<GuardRailFunctionOutput> GuardRailFunction(string input = "");
 public delegate bool TransitionEvent<T>(T output);
-```

@@ -1,258 +1,261 @@
-# Getting Started with LombdaAgentSDK
+# Getting Started
 
-This guide will help you get up and running with LombdaAgentSDK, from basic agent creation to advanced state machine workflows.
-
-## Prerequisites
-
-- .NET 8.0 or later
-- An OpenAI API key (for OpenAI provider) or LLMTornado setup
-- Visual Studio, VS Code, or any C# development environment
+This guide will help you quickly get up and running with LombdaAgentSDK.
 
 ## Installation
 
-### NuGet Package
-
-```bash
+Install the SDK using NuGet:
 dotnet add package LombdaAiAgents
-```
+Or clone the repository and reference the project:
+git clone https://github.com/johnny2x2/LombdaAgentSDK.git
+## Basic Usage
 
-### From Source
-
-1. Clone the repository:
-```bash
-git clone https://github.com/Johnny2x2/LombdaAgentSDK.git
-```
-
-2. Add project reference:
-```bash
-dotnet add reference path/to/LombdaAgentSDK/LombdaAgentSDK.csproj
-```
-
-## Quick Start: Your First Agent
-
-### Step 1: Create a Simple Agent
-
-```csharp
+### Creating a Simple Agent
 using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
-using LombdaAgentSDK.Agents.DataClasses;
 
-// Create an agent with OpenAI
+// Create a simple agent
 Agent agent = new Agent(
-    new OpenAIModelClient("gpt-4o-mini"), 
-    "Assistant", 
-    "You are a helpful assistant"
+    new OpenAIModelClient("gpt-4o-mini"),
+    "Assistant",
+    "You are a helpful assistant."
 );
 
 // Run the agent
-RunResult result = await Runner.RunAsync(agent, "Hello, world!");
-Console.WriteLine($"Agent: {result.Text}");
-```
-
-### Step 2: Set Your API Key
-
-Make sure to set your OpenAI API key as an environment variable:
-
-```bash
-export OPENAI_API_KEY="your-api-key-here"
-```
-
-Or in your code:
-```csharp
-Environment.SetEnvironmentVariable("OPENAI_API_KEY", "your-api-key-here");
-```
-
-## Adding Tools to Your Agent
-
-Tools allow agents to perform actions and access external data.
-
-### Step 1: Create Tool Methods
-
-```csharp
-using LombdaAgentSDK.Agents.Tools;
-
-public class WeatherTools
-{
-    [Tool(Description = "Get current weather for a location")]
-    public string GetWeather(string location)
-    {
-        // Simulate weather API call
-        return $"The weather in {location} is 72°F and sunny";
-    }
-
-    [Tool(Description = "Get weather forecast for multiple days")]
-    public string GetForecast(string location, int days = 3)
-    {
-        return $"{days}-day forecast for {location}: Sunny with highs in the 70s";
-    }
-}
-```
-
-### Step 2: Add Tools to Agent
-
-```csharp
-var weatherTools = new WeatherTools();
-
-Agent agent = new Agent(
-    new OpenAIModelClient("gpt-4o-mini"),
-    "Weather Assistant",
-    "You help users with weather information",
-    _tools: [weatherTools.GetWeather, weatherTools.GetForecast]
-);
-
-RunResult result = await Runner.RunAsync(agent, "What's the weather like in Boston?");
+RunResult result = await Runner.RunAsync(agent, "Tell me a joke");
 Console.WriteLine(result.Text);
-```
-
-## Structured Output
-
-Get structured data from your agents using C# types.
-
-### Step 1: Define Your Data Structure
-
-```csharp
-public struct WeatherReport
+### Using Structured Output
+// Define a structured output type
+public class WeatherReport
 {
-    public string location { get; set; }
-    public int temperature { get; set; }
-    public string conditions { get; set; }
-    public string recommendation { get; set; }
+    public string Location { get; set; }
+    public double Temperature { get; set; }
+    public string Conditions { get; set; }
+    public string[] ForecastDays { get; set; }
 }
-```
 
-### Step 2: Use Structured Output
-
-```csharp
+// Create an agent with structured output
 Agent agent = new Agent(
     new OpenAIModelClient("gpt-4o-mini"),
-    "Weather Analyzer", 
-    "Analyze weather and provide structured recommendations",
+    "Weather Reporter",
+    "You are a weather reporting assistant.",
     _output_schema: typeof(WeatherReport)
 );
 
-RunResult result = await Runner.RunAsync(agent, "Analyze the weather in Miami");
-
-// Parse the structured output
+// Run the agent
+RunResult result = await Runner.RunAsync(agent, "What's the weather in New York?");
 WeatherReport report = result.ParseJson<WeatherReport>();
-Console.WriteLine($"Temperature: {report.temperature}°F");
-Console.WriteLine($"Conditions: {report.conditions}");
-```
 
-## Building Your First State Machine
+Console.WriteLine($"Temperature: {report.Temperature}°C");
+Console.WriteLine($"Conditions: {report.Conditions}");
+### Adding Tools
+// Define a tool
+[Tool(
+    Description = "Get current weather in a location",
+    In_parameters_description = [
+        "The city and state, e.g. San Francisco, CA",
+        "The temperature unit to use: 'celsius' or 'fahrenheit'"
+    ]
+)]
+public string GetWeather(string location, string unit = "celsius")
+{
+    // In a real app, you would call a weather API here
+    return $"72°F, partly cloudy in {location}";
+}
 
-State machines allow you to create complex workflows with multiple steps.
+// Create an agent with tools
+Agent agent = new Agent(
+    new OpenAIModelClient("gpt-4o-mini"),
+    "Weather Assistant",
+    "You are a weather assistant.",
+    _tools: [GetWeather] // Pass method group as tool
+);
 
-### Step 1: Create State Classes
+// Run the agent
+RunResult result = await Runner.RunAsync(agent, "What's the weather in Boston?");
+Console.WriteLine(result.Text);
+## State Machine Basics
 
-```csharp
+### Creating a Simple State
 using LombdaAgentSDK.StateMachine;
 
-// Planning state: Takes user query, outputs research plan
-public class PlanningState : BaseState<string, ResearchPlan>
+// Define a state that processes string input and produces integer output
+public class StringToIntState : BaseState<string, int>
 {
-    public override async Task<ResearchPlan> Invoke(string query)
+    public override async Task<int> Invoke(string input)
     {
-        Agent planner = new Agent(
-            new OpenAIModelClient("gpt-4o-mini"),
-            "Research Planner",
-            "Create a detailed research plan with search terms and steps",
-            typeof(ResearchPlan)
-        );
-        
-        var result = await Runner.RunAsync(planner, query);
-        return result.ParseJson<ResearchPlan>();
+        return int.Parse(input);
     }
 }
 
-// Research state: Takes plan, outputs research data
-public class ResearchState : BaseState<ResearchPlan, ResearchData>
+// Define another state that formats integers
+public class IntToResultState : BaseState<int, string>
 {
-    public override async Task<ResearchData> Invoke(ResearchPlan plan)
+    public override async Task<string> Invoke(int input)
     {
-        // Implement research logic
-        return new ResearchData { Summary = "Research completed", Sources = plan.SearchTerms };
+        return $"The result is {input * 2}";
     }
 }
-
-// Report state: Takes data, outputs final report
-public class ReportState : BaseState<ResearchData, string>
-{
-    public override async Task<string> Invoke(ResearchData data)
-    {
-        Agent reporter = new Agent(
-            new OpenAIModelClient("gpt-4o-mini"),
-            "Report Writer",
-            "Write a comprehensive report based on research data"
-        );
-        
-        var result = await Runner.RunAsync(reporter, $"Write a report based on: {data.Summary}");
-        return result.Text;
-    }
-}
-```
-
-### Step 2: Define Data Structures
-
-```csharp
-public struct ResearchPlan
-{
-    public List<string> SearchTerms { get; set; }
-    public List<string> Steps { get; set; }
-}
-
-public struct ResearchData
-{
-    public string Summary { get; set; }
-    public List<string> Sources { get; set; }
-}
-```
-
-### Step 3: Connect States with Transitions
-
-```csharp
+### Connecting States
 // Create state instances
-var planningState = new PlanningState();
-var researchState = new ResearchState();
-var reportState = new ReportState();
+StringToIntState inputState = new();
+IntToResultState resultState = new();
 
-// Setup transitions between states
-planningState.AddTransition(plan => plan.SearchTerms?.Count > 0, researchState);
-researchState.AddTransition(_ => true, reportState);
-reportState.AddTransition(_ => true, new ExitState());
-```
+// Connect states: When inputState completes, transition to resultState
+inputState.AddTransition(_ => true, resultState);
 
-### Step 4: Run the State Machine
+// Mark the end of the workflow
+resultState.AddTransition(_ => true, new ExitState());
 
-```csharp
 // Create and configure state machine
 StateMachine<string, string> stateMachine = new();
-stateMachine.SetEntryState(planningState);
-stateMachine.SetOutputState(reportState);
+stateMachine.SetEntryState(inputState);
+stateMachine.SetOutputState(resultState);
 
 // Execute the workflow
-List<string?> results = await stateMachine.Run("Research the best electric bikes under $1500");
+List<string?> results = await stateMachine.Run("42");
+Console.WriteLine(results.First()); // "The result is 84"
+## Agent State Machine
 
-// Get the final report
-string finalReport = results.First();
-Console.WriteLine($"Final Report: {finalReport}");
-```
+### Creating Agent States
+using LombdaAgentSDK.AgentStateSystem;
 
+// Define a research plan structure
+public class ResearchPlan
+{
+    public string[] items { get; set; }
+}
+
+// Define an agent state for planning
+class PlanningState : AgentState<string, ResearchPlan>
+{
+    public PlanningState(StateMachine stateMachine) : base(stateMachine) { }
+
+    public override Agent InitilizeStateAgent()
+    {
+        return new Agent(
+            new OpenAIModelClient("gpt-4o-mini"),
+            "Planner",
+            "Create a research plan for the given query.",
+            _output_schema: typeof(ResearchPlan)
+        );
+    }
+
+    public override async Task<ResearchPlan> Invoke(string input)
+    {
+        return await BeginRunnerAsync<ResearchPlan>(input);
+    }
+}
+
+// Define an agent state for generating reports
+class ReportState : AgentState<ResearchPlan, string>
+{
+    public ReportState(StateMachine stateMachine) : base(stateMachine) { }
+
+    public override Agent InitilizeStateAgent()
+    {
+        return new Agent(
+            new OpenAIModelClient("gpt-4o-mini"),
+            "Report Generator",
+            "Generate a comprehensive report based on the research plan.",
+            _output_schema: typeof(string)
+        );
+    }
+
+    public override async Task<string> Invoke(ResearchPlan plan)
+    {
+        return await BeginRunnerAsync<string>($"Research plan: {string.Join(", ", plan.items)}");
+    }
+}
+### Creating an Agent State Machine
+using LombdaAgentSDK.AgentStateSystem;
+
+public class ResearchAgent : AgentStateMachine<string, string>
+{
+    public ResearchAgent(LombdaAgent lombdaAgent) : base(lombdaAgent) { }
+
+    public override void InitilizeStates()
+    {
+        // Create states
+        PlanningState planningState = new PlanningState(this);
+        ReportState reportState = new ReportState(this);
+
+        // Setup transitions
+        planningState.AddTransition((plan) => plan.items.Length > 0, reportState);
+        reportState.AddTransition(new ExitState());
+
+        // Set entry and output states
+        SetEntryState(planningState);
+        SetOutputState(reportState);
+    }
+}
+
+// Use the agent state machine
+LombdaAgent lombdaAgent = new LombdaAgent();
+ResearchAgent researchAgent = new ResearchAgent(lombdaAgent);
+string report = await researchAgent.RunAsync("Research the best electric bikes under $1500");
+Console.WriteLine(report);
+### Using the LombdaAgent for Monitoring and Debugging
+// Create a LombdaAgent with event handling
+LombdaAgent lombdaAgent = new LombdaAgent();
+
+// Subscribe to verbose logs
+lombdaAgent.RunningVerboseCallback += (message) => {
+    Console.WriteLine($"[LOG] {message}");
+};
+
+// Subscribe to streaming updates
+lombdaAgent.RunningStreamingCallback += (update) => {
+    Console.WriteLine($"[STREAM] {update}");
+};
+
+// Create and run an agent state machine
+ResearchAgent researchAgent = new ResearchAgent(lombdaAgent);
+string report = await researchAgent.RunAsync("Research quantum computing applications");
+
+// Output will include all the verbose logs and streaming updates
+### Using the Windows Debugging UI
+
+If you're developing on Windows, you can use the included debugging UI:
+using WinFormsAgentUI;
+
+// Create the debug form
+var debugForm = new AgentDebuggerForm();
+
+// Connect the LombdaAgent to the UI
+lombdaAgent.RunningVerboseCallback += debugForm.AddVerboseLog;
+lombdaAgent.RunningStreamingCallback += debugForm.AddStreamingMessage;
+
+// Show the form
+debugForm.Show();
+
+// Run your agent workflows
+ResearchAgent researchAgent = new ResearchAgent(lombdaAgent);
+await researchAgent.RunAsync("Research topic");
+
+// The UI will display logs and streaming chat in real-time
+## Using LLMTornado Provider
+
+LLMTornado provides access to multiple model providers:
+using LlmTornado.Models;
+using LlmTornado.Providers;
+
+LLMTornadoModelProvider client = new(
+    ChatModel.OpenAi.Gpt41.V41Mini,
+    [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!)]
+);
+
+Agent agent = new Agent(client, "Assistant", "You are helpful");
 ## Advanced Features
 
 ### Streaming Responses
-
-```csharp
 RunResult result = await Runner.RunAsync(
     agent, 
     "Tell me a story",
     streaming: true,
     streamingCallback: (text) => Console.Write(text)
 );
-```
-
 ### Guard Rails
-
-```csharp
 public static async Task<GuardRailFunctionOutput> ContentFilter(string input)
 {
     // Check for inappropriate content
@@ -270,11 +273,7 @@ RunResult result = await Runner.RunAsync(
     "User input here",
     guard_rail: ContentFilter
 );
-```
-
 ### Parallel State Processing
-
-```csharp
 public class ParallelProcessingState : BaseState<string, ProcessedData>
 {
     public ParallelProcessingState()
@@ -288,11 +287,7 @@ public class ParallelProcessingState : BaseState<string, ProcessedData>
         return new ProcessedData { Result = $"Processed: {input}" };
     }
 }
-```
-
 ### Computer Use (Experimental)
-
-```csharp
 RunResult result = await Runner.RunAsync(
     agent, 
     "Take a screenshot",
@@ -300,29 +295,28 @@ RunResult result = await Runner.RunAsync(
         Console.WriteLine($"Computer action: {action.TypeText}");
     }
 );
-```
+### Sharing Data Between States
 
-## Using LLMTornado Provider
+You can share data between states in an AgentStateMachine using SharedModelItems:
+// In your state's Invoke method
+var newModelItem = new ModelItem
+{
+    Role = ModelItemRoles.Assistant,
+    Content = "Important information to share"
+};
 
-LLMTornado provides access to multiple model providers:
+// Add to shared items
+CurrentStateMachine.RuntimeProperties["SharedKey"] = "Shared value";
 
-```csharp
-using LlmTornado.Models;
-using LlmTornado.Providers;
-
-LLMTornadoModelProvider client = new(
-    ChatModel.OpenAi.Gpt41.V41Mini,
-    [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!)]
-);
-
-Agent agent = new Agent(client, "Assistant", "You are helpful");
-```
-
+// Access in another state
+if (CurrentStateMachine.RuntimeProperties.TryGetValue("SharedKey", out object value))
+{
+    string sharedValue = value.ToString();
+    // Use the shared value
+}
 ## Best Practices
 
 ### 1. Error Handling
-
-```csharp
 try
 {
     RunResult result = await Runner.RunAsync(agent, "User input");
@@ -336,30 +330,44 @@ catch (Exception ex)
 {
     Console.WriteLine($"Error: {ex.Message}");
 }
-```
-
 ### 2. Resource Management
-
-```csharp
 // Set appropriate limits for state machines
 StateMachine stateMachine = new()
 {
     MaxThreads = 5 // Limit concurrent states
 };
-```
 
+// Remember to dispose state resources
+public override void Dispose()
+{
+    CancelTokenSource.Dispose();
+    base.Dispose();
+}
 ### 3. Type Safety
 
 Always use strongly typed states and structured output for better reliability:
-
-```csharp
 // Good: Strongly typed
 public class TypedState : BaseState<UserQuery, ProcessedResult>
 
 // Avoid: Generic object types
 public class GenericState : BaseState<object, object>
-```
+### 4. Using IsDeadEnd for Failed States
 
+When a state fails and should not be re-run:
+public override async Task<TOutput> Invoke(TInput input)
+{
+    try
+    {
+        // Attempt to process
+        return result;
+    }
+    catch (Exception)
+    {
+        // Mark as dead end to prevent re-running
+        IsDeadEnd = true;
+        throw;
+    }
+}
 ## Next Steps
 
 - Explore the [API Reference](API_REFERENCE.md) for detailed class documentation
@@ -369,20 +377,8 @@ public class GenericState : BaseState<object, object>
 
 ## Common Issues
 
-### API Key Not Set
-```
-Error: Value cannot be null. (Parameter 'key')
-```
-Solution: Set your `OPENAI_API_KEY` environment variable.
+### API Key Not SetError: Value cannot be null. (Parameter 'key')Solution: Set your `OPENAI_API_KEY` environment variable.
 
-### State Transition Failures
-```
-State transitions fail silently
-```
-Solution: Check that your transition conditions return `true` and that input/output types match between connected states.
+### State Transition FailuresState transitions fail silentlySolution: Check that your transition conditions return `true` and that input/output types match between connected states.
 
-### Tool Not Found
-```
-Tool method not being called
-```
-Solution: Ensure methods are public, have the `[Tool]` attribute, and are included in the agent's tools list.
+### Tool Not FoundTool method not being calledSolution: Ensure methods are public, have the `[Tool]` attribute, and are included in the agent's tools list.

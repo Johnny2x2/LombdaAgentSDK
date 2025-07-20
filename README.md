@@ -15,17 +15,19 @@
 * 🔍 Plug-and-play: easily inject your own function handlers.
 * 📦 .NET Standard compatible – works across .NET Framework and .NET Core.
 * ✅ StateMachine Code is completely decoupled from Agent pipelines
+* 🧠 `AgentStateMachine` for creating stateful multi-agent workflows
+* 🌐 `LombdaAgent` to unify Agent and StateMachine operations
+* 🪟 Debugging UI for Windows with streaming chat and verbose logging
+* 📢 Event system for monitoring agent operations and debugging
 * 📦 BabyAGI
 ---
 
 ## 📂 Installation
 
 Install with NuGet
-
-```bash
+```
 dotnet add package LombdaAiAgents
 ```
-
 Or include the library in your solution by adding the project reference.
 
 ---
@@ -33,16 +35,7 @@ Or include the library in your solution by adding the project reference.
 ## 🔧 Usage
 
 ### Run an Agent
-
-```csharp
-Agent agent = new Agent(new OpenAIModelClient("gpt-4o-mini"), "Assistant", "Have fun");
-
-RunResult result = await Runner.RunAsync(agent, "Hello World!");
 ```
-
-### Setup With LLMTornado
-
-```csharp
 LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Mini,
                         [new ProviderAuthentication(LLmProviders.OpenAi, 
                         Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
@@ -50,36 +43,29 @@ LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Mini,
 Agent agent = new Agent(client, "Assistant", "Have fun");
 
 RunResult result = await Runner.RunAsync(agent, "Hello World!");
-```
-
+````
 ### Automatic Structured Output from Type
-```csharp
+```
+[Description("Steps to complete problem")]
 public struct math_step
 {
     public string explanation { get; set; }
     public string output { get; set; }
 }
 
-Agent agent = new Agent(
-    new OpenAIModelClient("gpt-4o-mini"),
-    "Assistant", 
-    "Have fun",
-    _output_schema: typeof(math_step));
+Agent agent = new Agent(client,  _output_schema:typeof(math_step));
 
 RunResult result = await Runner.RunAsync(agent, "How can I solve 8x + 7 = -23?");
 
 //Helper function to extract json from last message
 math_step mathResult = result.ParseJson<math_step>();
 ```
-
 ### Simple Tool Use
-```csharp
+```
 void async Task Run()
 {
     Agent agent = new Agent(
-        new OpenAIModelClient("gpt-4o-mini"), 
-        "Assistant", 
-        "Have fun",  
+        client
         _tools : [GetCurrentWeather]);
 
     RunResult result = await Runner.RunAsync(agent, "What is the weather in boston?");
@@ -98,11 +84,9 @@ public string GetCurrentWeather(string location, Unit unit = Unit.celsius)
     return $"31 C";
 } 
 ```
-
 ## Create Complex Agent Workflows
 
 ### Create a States
-
 ```csharp
 class PlanningState : BaseState<string, WebSearchPlan>
 {
@@ -115,7 +99,7 @@ class PlanningState : BaseState<string, WebSearchPlan>
             """;
 
         Agent agent = new Agent(
-            new OpenAIModelClient("gpt-4o-mini"), 
+            client, 
             "Assistant", 
             instructions, 
             _output_schema: typeof(WebSearchPlan));
@@ -125,7 +109,6 @@ class PlanningState : BaseState<string, WebSearchPlan>
 }
 ```
 ### Connect States Together
-
 ```csharp
 PlanningState plannerState = new PlanningState(); 
 ResearchState ResearchState = new ResearchState();
@@ -134,13 +117,9 @@ ReportingState reportingState = new ReportingState();
 //Setup Transitions between states
 plannerState.AddTransition(IfPlanCreated, ResearchState); //Check if a plan was generated or Rerun
 
-ResearchState.AddTransition(_ => true, reportingState); //Use Lambda expression For passthrough to reporting state
+ResearchState.AddTransition(reportingState); //Use Lambda expression For passthrough to reporting state
 
-reportingState.AddTransition(_ => true, new ExitState()); //Use Lambda expression For passthrough to Exit
-```
-### Run the StateMachine
-```csharp
-//Create State Machine Runner
+reportingState.AddTransition(new ExitState()); //Use Lambda expression For passthrough to Exit### Run the StateMachine//Create State Machine Runner
 StateMachine stateMachine = new StateMachine();
 
 //Run the state machine
@@ -159,20 +138,18 @@ Where `FooState : BaseState<InputType, OutputType>`
 Invoke(InputType input) Must Return the Output Type (Strongly Typed)
 
 You can only Transition to a state where the Output of the current state is the Input to the next state
-
-```csharp
+```
 class ConvertStringToIntState : BaseState<string, int>
 {
     public override async Task<int> Invoke(string input)
     {
         return int.Parse(this.Input)
     }
-}
-```
+}```
+
 You can build pipelines of states and let the agent transition between them based on the results.
 
 ### Creating State Machines With Input & Output Types
-
 ```csharp
 //Where string is Input and int is Output
 StateMachine<string, int> stateMachine = new();
@@ -185,12 +162,8 @@ stateMachine.SetOutputState(resultState);
 
 //Return list of Output objects from State 
 //List because machine might generate more than 1 output depending on flow
-List<int> stateResults = await stateMachine.Run("3");
-```
----
+List<int> stateResults = await stateMachine.Run("3");---
 ### Allow states to transition to other states in a parallel workflow 
-
-```csharp
 //AllowsParallelTransitions = true Allows state Outputs to transition to all states that meet the criteria
 ConvertStringToIntState inputState = new() { AllowsParallelTransitions = true };
 
@@ -203,18 +176,18 @@ SummingState summingState = new() { CombineInput = true };
 ConvertIntToStringState resultState = new();
 
 //should happen in parallel and get result
-inputState.AddTransition(_=> true, state3);
-inputState.AddTransition(_ => true, state4);
+inputState.AddTransition(state3);
+inputState.AddTransition(state4);
 
 //summing State will get both results next tick
-state3.AddTransition(_ => true, summingState);
-state4.AddTransition(_ => true, summingState);
+state3.AddTransition(summingState);
+state4.AddTransition(summingState);
 
 //Will sum all inputs 
-summingState.AddTransition(_ => true, resultState);
+summingState.AddTransition(resultState);
 
 //Convert result and End the State Machine 
-resultState.AddTransition(_ => true, new ExitState());
+resultState.AddTransition(new ExitState());
 
 //Create Input & Output State Machine
 StateMachine<string, string> stateMachine = new();
@@ -224,19 +197,16 @@ stateMachine.SetEntryState(inputState);
 stateMachine.SetOutputState(resultState);
 
 //Run the StateMachine
-List<string?> stateResults = await stateMachine.Run("3");
+List<string?> stateResults = await stateMachine.Run("3");---
 ```
----
-
-### Simple Conversion from different Input to Output types
+### Simple Conversion from different Input to Output typesConvertStringToIntState inputState = new();
 ```csharp
-ConvertStringToIntState inputState = new();
 ConvertStringToIntState resultState = new();
 
 //Input State will convert string to int
-inputState.AddTransition(_ => true, (result) => result.ToString(), resultState);
+inputState.AddTransition((result) => result.ToString(), resultState);
 
-resultState.AddTransition(_ => true,  new ExitState());
+resultState.AddTransition(new ExitState());
 
 StateMachine<string, int?> stateMachine = new();
 
@@ -249,6 +219,108 @@ Console.WriteLine($"State Results: {string.Join(", ", stateResults.Select(r => s
 
 Assert.IsTrue(stateResults[0].Contains(3));
 ```
+## New Features
+
+### AgentState and AgentStateMachine
+
+The `AgentState` system enhances the basic state machine by creating states specifically designed for agent execution. Unlike the `BaseState`, which is a generic state container, `AgentState` is tailored for AI agent operations.
+
+```csharp
+class ReportingState : AgentState<string, ReportData>
+{
+    public ReportingState(StateMachine stateMachine) : base(stateMachine){}
+
+    public override Agent InitilizeStateAgent()
+    {
+        return new Agent(
+            client: new OpenAIModelClient("gpt-4o-mini"), 
+            _name: "Reporting agent",
+            _instructions: """
+                You are a senior researcher tasked with writing a cohesive report for a research query.
+                You will be provided with the original query, and some initial research done by a research assistant.
+                Generate a detailed report in markdown format.
+                """, 
+            _output_schema: typeof(ReportData)
+        );
+    }
+
+    public override async Task<ReportData> Invoke(string input)
+    {
+        return await BeginRunnerAsync<ReportData>(input);
+    }
+}
+```
+
+### Using the LombdaAgent for Orchestration
+
+The `LombdaAgent` acts as a unifier between individual agents and the state machine. It provides centralized management, event handling, and debugging capabilities.
+```
+// Create a LombdaAgent instance
+LombdaAgent lombdaAgent = new LombdaAgent();
+
+// Create and run a stateful agent workflow
+ResearchAgent researchAgent = new ResearchAgent(lombdaAgent);
+ReportData result = await researchAgent.RunAsync("Research quantum computing applications in medicine");
+
+// Monitor events and get logs
+lombdaAgent.VerboseCallback += (message) => Console.WriteLine($"[VERBOSE] {message}");
+lombdaAgent.StreamingCallback += (update) => Console.WriteLine($"[STREAM] {update}");
+```
+### Creating Multi-Agent Workflows with AgentStateMachine
+
+The `AgentStateMachine` provides a framework for creating complex multi-agent workflows:
+```
+public class ResearchAgent : AgentStateMachine<string, ReportData>
+{
+    public ResearchAgent(LombdaAgent lombdaAgent) : base(lombdaAgent) { }
+
+    public override void InitilizeStates()
+    {
+        // Setup states
+        PlanningState plannerState = new PlanningState(this);
+        ResearchState researchState = new ResearchState(this);
+        ReportingState reportingState = new ReportingState(this);
+
+        // Setup transitions between states
+        plannerState.AddTransition((result) => result.items.Length > 0, researchState);
+        researchState.AddTransition(reportingState);
+        reportingState.AddTransition(new ExitState());
+
+        // Set entry and output states
+        SetEntryState(plannerState);
+        SetOutputState(reportingState);
+    }
+}
+```
+```csharp
+// Use the state machine
+var agent = new ResearchAgent(new LombdaAgent());
+var result = await agent.RunAsync("Research quantum computing");
+```
+### Event System for Logging and Debugging
+
+The new event system provides comprehensive monitoring and debugging capabilities:
+```csharp
+// Subscribe to verbose logs
+lombdaAgent.RunningVerboseCallback += (message) => {
+    Debug.WriteLine($"[VERBOSE]: {message}");
+};
+
+// Subscribe to streaming updates
+lombdaAgent.RunningStreamingCallback += (update) => {
+    UI.UpdateStreamingPanel(update);
+};
+```
+
+### Debugging UI for Windows
+
+LombdaAgentSDK now includes a basic debugging UI for Windows applications:
+
+- Left panel: Streaming chat updates in real-time
+- Right panel: Verbose logging with detailed operation information
+- Allows monitoring the state transitions and agent communications
+
+To use the debugging UI, reference the WinFormsAgentUI project in your solution.
 
 ## 📚 Documentation
 
@@ -263,12 +335,15 @@ For comprehensive documentation, please visit the [docs folder](docs/):
 ## 🚦 Roadmap
 * [ ] Add non async support for agent execution.
 * [ ] Improve logging and diagnostics.
+* [ ] Enhance the debugging UI for better visualization of agent states
+* [ ] Add support for serializing agent state machines for persistence
+* [ ] Fix structured outputs deserialization with field descriptions
 
 ---
 
 ## 🤝 Contributing
 
-Pull requests are welcome! For major changes, please open an issue first to discuss what you’d like to change.
+Pull requests are welcome! For major changes, please open an issue first to discuss what you'd like to change.
 
 ---
 
