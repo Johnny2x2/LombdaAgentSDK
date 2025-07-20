@@ -292,12 +292,16 @@ namespace LombdaAgentSDK
             {
                 OnEvent = (data) =>
                 {
-                    if (data is ResponseEventOutputTextDelta delta)
+                    if(data is ResponseEventCreated ResponseEvent)
+                    {
+                        ResponseOutput.Id = ResponseEvent.Response.PreviousResponseId ?? ResponseEvent.Response.Id;
+                    }
+                    else if (data is ResponseEventOutputTextDelta delta)
                     {
                         streamingCallback?.Invoke(delta.Delta);
                     }
 
-                    if (data is ResponseEventOutputItemDone itemDone)
+                    else if (data is ResponseEventOutputItemDone itemDone)
                     {
                         ResponseOutput.OutputItems.Add(ConvertFromProviderOutputItem(itemDone.Item));
 
@@ -305,10 +309,12 @@ namespace LombdaAgentSDK
                         {
                             streamingCallback?.Invoke($"INVOKING -> [{call.Name}]");
                         }
+                        
                     }
 
                     return ValueTask.CompletedTask;
                 }
+
             });
 
             return ResponseOutput;

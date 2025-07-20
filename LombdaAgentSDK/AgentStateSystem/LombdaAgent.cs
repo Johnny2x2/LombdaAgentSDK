@@ -296,7 +296,7 @@ namespace LombdaAgentSDK.AgentStateSystem
             // If the cancellation token has not been requested, update the MainThreadId with the response ID or keep last used thread ID
             if (!CancellationTokenSource.Token.IsCancellationRequested)
             {
-                MainThreadId = CurrentResult.Response.Id;
+                MainThreadId = CurrentResult.Response.Id ?? MainThreadId;
             }
 
             //Trigger the FinishedExecution event to signal the end of the execution process

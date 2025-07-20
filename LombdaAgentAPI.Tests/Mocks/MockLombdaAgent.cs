@@ -1,6 +1,7 @@
 using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
+using LombdaAgentSDK;
 
 namespace LombdaAgentAPI.Tests.Mocks
 {
@@ -11,9 +12,11 @@ namespace LombdaAgentAPI.Tests.Mocks
     {
         private readonly string _agentId;
         private readonly string _agentName;
-        
+
         public string AgentId => _agentId;
         public string AgentName => _agentName;
+
+
 
         public MockLombdaAgent(string agentId, string agentName)
         {
@@ -21,11 +24,13 @@ namespace LombdaAgentAPI.Tests.Mocks
             _agentName = agentName;
         }
 
+        public bool IsTrue() { return true; }
+
         public override void InitializeAgent()
         {
             // Create a mock agent for testing
             ControlAgent = new Agent(
-                new MockModelClient(),
+                new OpenAIModelClient("gpt-4o"),
                 _agentName,
                 $"You are a mock agent named {_agentName} for testing purposes."
             );
@@ -34,49 +39,46 @@ namespace LombdaAgentAPI.Tests.Mocks
         /// <summary>
         /// Override AddToConversation to avoid making real API calls
         /// </summary>
-        public override Task<string> AddToConversation(string userInput, ModelItem message = null, bool streaming = true)
+        public new Task<string> AddToConversation(string userInput, ModelItem message = null, bool streaming = true)
         {
-            // Fire events to simulate the agent processing
-            StartingExecution?.Invoke();
-
             // If streaming is enabled, simulate streamed response
             if (streaming)
             {
                 // Simulate a streamed response with a few parts
                 var words = $"Hello! I'm {_agentName}, a mock agent. You said: {userInput}".Split(' ');
-                
-                Task.Run(async () => 
+
+                Task.Run(async () =>
                 {
                     foreach (var word in words)
                     {
                         // Emit each word as a separate streaming event
-                        RootStreamingEvent?.Invoke(word + " ");
+                        MainStreamingCallback?.Invoke(word + " ");
                         await Task.Delay(100);
                     }
                 });
             }
-            
+
             // Set thread ID if not already set
             if (string.IsNullOrEmpty(MainThreadId))
             {
                 MainThreadId = Guid.NewGuid().ToString();
             }
-            
-            // Simulate completion of the execution
-            Task.Delay(500).ContinueWith(_ => FinishedExecution?.Invoke());
-            
+
             return Task.FromResult($"Hello! I'm {_agentName}, a mock agent. You said: {userInput}");
         }
+
     }
+
+    
 
     /// <summary>
     /// Mock implementation of IModelClient for testing
     /// </summary>
-    public class MockModelClient : IModelClient
+    public class MockModelClient : ModelClient
     {
         public CancellationTokenSource CancelTokenSource { get; set; } = new();
 
-        public Task<ModelResponse> _CreateResponseAsync(List<ModelItem> messages, ModelOptions options = null)
+        public Task<ModelResponse> _CreateResponseAsync(List<ModelItem> messages, ModelResponseOptions options = null)
         {
             // Create a mock response
             return Task.FromResult(new ModelResponse
@@ -97,7 +99,7 @@ namespace LombdaAgentAPI.Tests.Mocks
             });
         }
 
-        public Task<ModelResponse> _CreateStreamingResponseAsync(List<ModelItem> messages, ModelOptions options = null, Runner.StreamingCallbacks streamingCallback = null)
+        public Task<ModelResponse> _CreateStreamingResponseAsync(List<ModelItem> messages, ModelResponseOptions options = null, Runner.StreamingCallbacks streamingCallback = null)
         {
             // Simulate streaming by invoking the callback a few times
             if (streamingCallback != null)

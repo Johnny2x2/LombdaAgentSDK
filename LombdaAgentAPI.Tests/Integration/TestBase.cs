@@ -19,7 +19,7 @@ namespace LombdaAgentAPI.Tests.Integration
             builder.ConfigureServices(services => 
             {
                 // Replace the real agent service with our mock implementation
-                services.AddSingleton<ILombdaAgentService, MockLombdaAgentService>();
+                services.AddSingleton<ILombdaAgentService, LombdaAgentService>();
             });
 
             return base.CreateHost(builder);
