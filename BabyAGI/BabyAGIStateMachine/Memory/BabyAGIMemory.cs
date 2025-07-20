@@ -27,7 +27,17 @@ namespace BabyAGI.BabyAGIStateMachine.Memory
             var chromaClient = new ChromaClient(configOptions, httpClient);
             await chromaClient.DeleteCollection("ShortTerm");
         }
-
+        public static async Task ClearLongTermMemory()
+        {
+            var handler = new ApiV1ToV2DelegatingHandler
+            {
+                InnerHandler = new HttpClientHandler()
+            };
+            var configOptions = new ChromaConfigurationOptions(uri: BabyAGIConfig.ChromaDbURI);
+            using var httpClient = new HttpClient(handler);
+            var chromaClient = new ChromaClient(configOptions, httpClient);
+            await chromaClient.DeleteCollection("LongTerm");
+        }
         private static async Task AddTaskResultToMemory(string task, string result, string collection, MetadataKeyValuePair[] metadata = null)
         {
             var handler = new ApiV1ToV2DelegatingHandler

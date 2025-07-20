@@ -51,7 +51,7 @@ namespace BabyAGI.BabyAGIStateMachine
             //Progress manager deamed the task completed and will exit the state machine
             progressManager.AddTransition((result) => result.Status.Status == ProgressState.Completed, new ExitState()); //Only Exit
             //Progress manager not satisfied with the task result and will generate new tasks
-            progressManager.AddTransition((result) => result.Status.Status == ProgressState.Progressing && IsTaskQueueEmpty(), (toConvert) =>toConvert.ToString(), taskGeneratorState);
+            progressManager.AddTransition((result) => result.Status.Status == ProgressState.Progressing && IsTaskQueueEmpty(), (toConvert) => toConvert.ToString(), taskGeneratorState);
             //Moving forward to the next task
             progressManager.AddTransition((result) => result.Status.Status == ProgressState.Progressing && !IsTaskQueueEmpty(), (toConvert)=>new List<QueueTask>(), taskQueueState);
             //Stagnating or regression, will try to generate new tasks

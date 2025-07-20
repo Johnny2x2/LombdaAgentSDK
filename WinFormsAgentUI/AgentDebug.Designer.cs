@@ -215,6 +215,7 @@
             SystemRichTextBox.Size = new Size(408, 326);
             SystemRichTextBox.TabIndex = 0;
             SystemRichTextBox.Text = "";
+            SystemRichTextBox.TextChanged += SystemRichTextBox_TextChanged;
             // 
             // listBox1
             // 

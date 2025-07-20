@@ -16,7 +16,7 @@ namespace BabyAGI.BabyAGIStateMachine.States
     public struct TaskGeneratorResult
     {
         public string Reasoning { get; set; }
-        public List<TaskItem> NewTasks { get; set; }
+        public bTaskItem[] NewTasks { get; set; }
     }
 
     internal class BATaskGeneratorState : AgentState<string, List<QueueTask>>

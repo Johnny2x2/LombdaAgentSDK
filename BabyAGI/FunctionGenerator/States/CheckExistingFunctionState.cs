@@ -40,7 +40,7 @@ namespace Examples.Demos.FunctionGenerator.States
 
             if (string.IsNullOrEmpty(OriginalTask))
             {
-                OriginalTask = CurrentStateMachine.RuntimeProperties.TryGetValue("OrginalTask",out object orginalTask) ? orginalTask.ToString() : string.Empty;
+                OriginalTask = CurrentStateMachine.RuntimeProperties.TryGetValue("OriginalTask", out object orginalTask) ? orginalTask.ToString() : string.Empty;
                 if(string.IsNullOrEmpty(OriginalTask))
                 {
                     throw new InvalidOperationException("Original task is not set in the runtime properties.");

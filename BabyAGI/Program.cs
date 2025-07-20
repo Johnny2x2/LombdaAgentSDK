@@ -1,6 +1,7 @@
 using BabyAGI;
 using BabyAGI.Agents;
 using BabyAGI.Agents.ResearchAgent;
+using BabyAGI.BabyAGIStateMachine.Memory;
 using Examples.Demos.FunctionGenerator;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
@@ -10,6 +11,3 @@ using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
 
 Console.WriteLine("hello world");
-
-
-

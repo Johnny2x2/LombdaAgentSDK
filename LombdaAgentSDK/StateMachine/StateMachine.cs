@@ -172,6 +172,9 @@ namespace LombdaAgentSDK.StateMachine
         /// <returns></returns>
         private async Task ProcessTick()
         {
+            //If there are no processes, return
+            if (activeProcesses.Count == 0) { IsFinished = true; return; }
+
             OnTick?.Invoke(); //Invoke the tick event  
             List<Task> Tasks = new List<Task>();
 
@@ -372,7 +375,7 @@ namespace LombdaAgentSDK.StateMachine
             await InitilizeProcess(new StateProcess(runStartState, input));
 
             //Run the state machine until it is finished or cancelled
-            while (!StopTrigger.IsCancellationRequested || IsFinished)
+            while (true)
             {
                 //Collect each state Result
                 await ProcessTick();

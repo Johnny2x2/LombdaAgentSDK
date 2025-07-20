@@ -23,9 +23,22 @@ namespace BabyAGI.BabyAGIStateMachine.DataModels
         }
     }
 
+    public struct bTaskItem
+    {
+        public int TaskId { get; set; }
+        public string Description { get; set; }
+        public string SuccessCriteria { get; set; }
+
+        public override string ToString()
+        {
+            return $"TaskId: {TaskId}, Description: {Description}, ExpectedOutcome: {SuccessCriteria}";
+        }
+
+    }
+
     public struct TaskBreakdownResult
     {
-        public TaskItem[] Tasks { get; set; }
+        public bTaskItem[] Tasks { get; set; }
         public string OverallStrategy { get; set; }
     }
 }

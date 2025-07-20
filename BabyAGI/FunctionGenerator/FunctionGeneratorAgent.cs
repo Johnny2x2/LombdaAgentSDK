@@ -9,13 +9,11 @@ namespace Examples.Demos.FunctionGenerator
 {
     public class FunctionGeneratorAgent : AgentStateMachine<string, FinalResult>
     {
-        public string FunctionsPath = "C:\\Users\\johnl\\source\\repos\\FunctionApplications";
         public string OriginalTask = "";
         public List<string> SavedResults = new List<string>();
 
         public FunctionGeneratorAgent(LombdaAgent lombdaAgent, string functionsPath) : base(lombdaAgent)
         {
-            FunctionsPath = functionsPath;
             RuntimeProperties.TryAdd("FunctionsPath", functionsPath);
             RuntimeProperties.TryAdd("OriginalTask", OriginalTask);
             RuntimeProperties.TryAdd("SavedResults", SavedResults);

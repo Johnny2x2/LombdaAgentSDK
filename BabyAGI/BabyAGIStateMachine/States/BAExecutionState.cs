@@ -24,30 +24,28 @@ namespace BabyAGI.BabyAGIStateMachine.States
 
     public class BAExecutionState : AgentState<QueueTask, QueueTask>
     {
+        public UserInputRequestDelegate userInputRequest { get; set; }
+
         public BAExecutionState(StateMachine stateMachine) : base(stateMachine)
         {
-
+            if (stateMachine is IAgentStateMachine agentStateMachine)
+            {
+                agentStateMachine.ControlAgent.UserInputRequested += userInputRequest;
+            }
         }
 
         public override Agent InitilizeStateAgent()
         {
-            LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),], enableWebSearch:true, useResponseAPI: true);
+            LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),], enableWebSearch: true, useResponseAPI: true);
 
             string instructions = $"""You are a person assistant AGI with the ability to generate tools to answer any user question if you cannot do it directly task your tool to create it.""";
 
-            return new Agent(client, "BabyAGI", instructions, _tools: [AttemptToCompleteTask, ControlComputer, DoResearch]);
+            return new Agent(client, "BabyAGI", instructions, _tools: [AttemptToCompleteTask, ControlComputer, DoResearch, QueryLongTermMemory, QueryShortTermMemory, RequestUserInput]);
         }
 
         public override async Task<QueueTask> Invoke(QueueTask input)
         {
-            string prompt = 
-                $@"
-<TASK>: {input.Task}</TASK> 
-
-<SHORT_TERM_MEMORY_CONTEXT>: {string.Join("\n\n",BabyAGIMemory.QueryShortTermMemory(input.Task))}</SHORT_TERM_MEMORY_CONTEXT>
-
-<LONG_TERM_MEMORY_CONTEXT>{string.Join("\n\n", BabyAGIMemory.QueryLongTermMemory(input.Task))}</LONG_TERM_MEMORY_CONTEXT>
-";
+            string prompt =$@"<TASK>: {input.Task}</TASK> ";
 
             input.Result = await BeginRunnerAsync(prompt);
 
@@ -98,7 +96,7 @@ namespace BabyAGI.BabyAGIStateMachine.States
         {
             try
             {
-                ComputerControllerAgent computerTool = new ComputerControllerAgent();
+                ComputerControllerAgent computerTool = new ComputerControllerAgent(cancellationTokenSource:CancelTokenSource, verboseCallback:RunnerVerboseCallbacks);
                 return await computerTool.RunComputerAgent(task);
             }
             catch
@@ -107,28 +105,24 @@ namespace BabyAGI.BabyAGIStateMachine.States
             }
         }
 
-        /// <summary>
-        /// Performs a basic web search for the specified topic.
-        /// </summary>
-        /// <remarks>This method utilizes an external web search tool to retrieve information about the
-        /// specified topic. Ensure that the necessary API key is set in the environment variables for successful
-        /// execution.</remarks>
-        /// <param name="search">The topic to research. This parameter cannot be null or empty.</param>
-        /// <returns>A <see cref="string"/> containing the search results. Returns "Error: Could not search web." if the search
-        /// fails.</returns>
-        [Tool(Description = "Use this tool for doing basic web search", In_parameters_description = ["The topic you wish to research."])]
-        public async Task<string> BasicWebSearch(string search)
+
+        [Tool(Description = "Use this to query long term memory for context [CAUTION MAY OR MAY NOT BE RELEVANT]", In_parameters_description = ["Query you wish to search"])]
+        public async Task<string> QueryLongTermMemory(string search)
         {
-            LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),], enableWebSearch: true);
-            Agent agent = new Agent(
-                client,
-                "Web searcher",
-                "Using WebSearch and search for results of the given task.");
-
-            RunResult result = await Runner.RunAsync(agent, search, cancellationToken: StateAgent.Client.CancelTokenSource);
-
-            return result.Text ?? "Error: Could not search web.";
+            return string.Join("\n\n", await BabyAGIMemory.QueryLongTermMemory(search));
         }
 
+        [Tool(Description = "Use this to query short term memory for context [CAUTION MAY OR MAY NOT BE RELEVANT]", In_parameters_description = ["Query you wish to search"])]
+        public async Task<string> QueryShortTermMemory(string search)
+        {
+            return string.Join("\n\n", await BabyAGIMemory.QueryShortTermMemory(search));
+        }
+
+        [Tool(Description = "Use this to ask user for input", In_parameters_description = ["question you want to ask"])]
+        public string RequestUserInput(string prompt)
+        {
+            // Get the Result property from the Task
+            return (string?)userInputRequest?.DynamicInvoke(prompt)!;
+        }
     }
 }

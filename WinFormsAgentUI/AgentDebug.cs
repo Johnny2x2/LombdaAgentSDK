@@ -3,6 +3,7 @@ using Examples.Demos.FunctionGenerator;
 using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.StateMachine;
 using System.Data;
+using System.Windows.Forms;
 using static System.Net.Mime.MediaTypeNames;
 
 namespace WinFormsAgentUI
@@ -37,6 +38,31 @@ namespace WinFormsAgentUI
             Agent.StateMachineRemoved += RemoveStateWatcher;
             Agent.StartingExecution += Agent_StartingExecution;
             Agent.FinishedExecution += Agent_FinishedExecution;
+            Agent.UserInputRequested += UserInputRequest;
+        }
+
+
+        private string UserInputRequest(string prompt)
+        {
+            // Replace 'this' with your main form instance, e.g. 'MainForm'
+            if (this.InvokeRequired)
+            {
+                // We're on a background thread; marshal to UI thread and return result
+                return (string)this.Invoke(new Func<string>(() => UserInputRequest(prompt)));
+            }
+            else
+            {
+                var input = Microsoft.VisualBasic.Interaction.InputBox(
+                    string.IsNullOrEmpty(prompt) ? "Please enter your input:" : prompt,
+                    "User Input Request",
+                    string.Empty);
+
+                if (string.IsNullOrEmpty(input))
+                {
+                    throw new ArgumentException("User input cannot be empty.");
+                }
+                return input;
+            }
         }
 
         /// <summary>
@@ -66,7 +92,7 @@ namespace WinFormsAgentUI
         void AddState(StateProcess stateProcess)
         {
             AddListBoxItem(stateProcess.State.GetType().Name);
-            if(stateProcess.State is IAgentState agentState)
+            if (stateProcess.State is IAgentState agentState)
             {
                 agentState.RunningVerboseCallback += Agent_VerboseLog;
                 agentState.RunningStreamingCallback += Agent_VerboseLog;
@@ -159,7 +185,7 @@ namespace WinFormsAgentUI
             else
             {
                 SystemRichTextBox.AppendText(e + Environment.NewLine);
-            }  
+            }
         }
 
         /// <summary>
@@ -234,7 +260,7 @@ namespace WinFormsAgentUI
             {
                 result = await Agent.AddToConversation(text, streaming: true);
             }
-                
+
             return result;
         }
 
@@ -259,7 +285,7 @@ namespace WinFormsAgentUI
         /// <param name="message">The message to be displayed in the chat. Cannot be null or empty.</param>
         public void StreamChat(string message)
         {
-            if(ChatRichTextBox.InvokeRequired)
+            if (ChatRichTextBox.InvokeRequired)
             {
                 ChatRichTextBox.Invoke(new Action(() => AppendToChat(message)));
             }
@@ -301,6 +327,12 @@ namespace WinFormsAgentUI
             {
                 loadedFilePath = openFileDialog.FileName;
             }
+        }
+
+        private void SystemRichTextBox_TextChanged(object sender, EventArgs e)
+        {
+            SystemRichTextBox.SelectionStart = SystemRichTextBox.Text.Length; // Scroll to the end of the text
+            SystemRichTextBox.ScrollToCaret();
         }
     }
 }

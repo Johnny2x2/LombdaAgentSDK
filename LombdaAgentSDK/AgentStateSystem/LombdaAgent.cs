@@ -17,6 +17,8 @@ namespace LombdaAgentSDK.AgentStateSystem
     /// <returns>A task that represents the asynchronous operation. The task result contains the processed string.</returns>
     public delegate Task<string> InputProcessorDelegate(string input);
 
+    public delegate string UserInputRequestDelegate(string prompt);
+
     public abstract class LombdaAgent
     {
         public List<ModelItem> SharedModelItems = new List<ModelItem>();
@@ -40,6 +42,8 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// Thread ID of the main conversation thread for the response API
         /// </summary>
         public string MainThreadId { get; set; } = "";
+
+        public event UserInputRequestDelegate UserInputRequested;
         /// <summary>
         /// Occurs when Agent gets a new message to process.
         /// </summary>
@@ -182,8 +186,8 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// <param name="stateMachine">The state machine to be removed. Cannot be null.</param>
         public void RemoveStateMachine(StateMachine.StateMachine stateMachine)
         {
-            CurrentStateMachines.Remove(stateMachine); // Remove the state machine from the collection
             StateMachineRemoved.Invoke(stateMachine); // Trigger the StateMachineRemoved event
+            CurrentStateMachines.Remove(stateMachine); // Remove the state machine from the collection
         }
 
         /// <summary>
@@ -252,18 +256,18 @@ namespace LombdaAgentSDK.AgentStateSystem
             //If userInput is not empty, create a new message item and add it to the conversation
             if (!string.IsNullOrEmpty(userInput))
             {
-                // Create a new message item with the user input
-                var userMessage = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", new List<ModelMessageContent>([new ModelMessageRequestTextContent(userInput)]), ModelStatus.Completed);
-                CurrentResult.Messages.Add(userMessage);
                 // If an input preprocessor is set, run it on the user input
-                if ( InputPreprocessor != null)
+                if (InputPreprocessor != null)
                 {
                     var preprocessedInput = await RunPreprocess(userInput);
-                    preprocessedInput = "The following information has been prepocessed by an Agent tasked to process the input. <PREPOCESSED RESULTS>" + preprocessedInput + "</PREPOCESSED RESULTS>";
+                    preprocessedInput = "The following CONTEXT has been prepocessed by an Agent tasked to process the input[may or may not be relevent]. <PREPOCESSED RESULTS>" + preprocessedInput + "</PREPOCESSED RESULTS>";
                     // Create a system message with the preprocessed input
                     var systemMessage = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "SYSTEM", new List<ModelMessageContent>([new ModelMessageSystemResponseTextContent(preprocessedInput)]), ModelStatus.Completed);
                     CurrentResult.Messages.Add(systemMessage);
                 }
+                // Create a new message item with the user input
+                var userMessage = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", new List<ModelMessageContent>([new ModelMessageRequestTextContent(userInput)]), ModelStatus.Completed);
+                CurrentResult.Messages.Add(userMessage);
             }
 
             //Run the ControlAgent with the current messages

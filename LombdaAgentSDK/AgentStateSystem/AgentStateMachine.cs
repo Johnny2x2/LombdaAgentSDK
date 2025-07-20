@@ -31,7 +31,7 @@ namespace LombdaAgentSDK.AgentStateSystem
             InitilizeStates();
             OnBegin += AddToControl; //Add active state machine to the control agent when it begins execution
             //Add OnFinish and CancellationTriggered events to remove from control
-            OnFinish += (output) => RemoveFromControl(); // Remove active state machine from the control agent when it finishes execution
+            FinishedTriggered += RemoveFromControl; // Remove active state machine from the control agent when it finishes execution
             CancellationTriggered += RemoveFromControl; // Remove active state machine from the control agent when cancellation is triggered
             CancellationTriggered += CancelTriggered; // Cancel all active states when cancellation is triggered
 

@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using static LombdaAgentSDK.Runner;
 
@@ -124,10 +126,10 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// <param name="input">The input data to be processed by the agent.</param>
         /// <param name="streaming">A value indicating whether the operation should use streaming. Defaults to <see langword="false"/>.</param>
         /// <returns>A task representing the asynchronous operation. The task result contains the processed text output.</returns>
-        public async Task<T> BeginRunnerAsync<T>(Agent agent, string input, bool streaming = false)
-        {
-            return (await Runner.RunAsync(agent, input, verboseCallback: RunnerVerboseCallbacks, streamingCallback: StreamingCallbacks, streaming: streaming, cancellationToken: CancelTokenSource)).ParseJson<T>();
-        }
+        //public async Task<T> BeginRunnerAsync<T>(Agent agent, string input, bool streaming = false)
+        //{
+        //    return (await Runner.RunAsync(agent, input, verboseCallback: RunnerVerboseCallbacks, streamingCallback: StreamingCallbacks, streaming: streaming, cancellationToken: CancelTokenSource)).ParseJson<T>();
+        //}
 
         /// <summary>
         /// Initiates an asynchronous operation to process the specified input and returns the result as a string.
@@ -152,15 +154,107 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// langword="true"/> to enable streaming; otherwise, <see langword="false"/>.</param>
         /// <returns>A task that represents the asynchronous operation. The task result contains the processed output as a
         /// string. If the operation does not produce any output, an empty string is returned.</returns>
-        public async Task<T> BeginRunnerAsync<T>(string input, bool streaming = false)
+        public async Task<T> BeginRunnerAsync<T>(string input, bool streaming = false, int maxRetries = 2)
         {
-            var result = (await Runner.RunAsync(StateAgent, input, verboseCallback: RunnerVerboseCallbacks, streamingCallback: StreamingCallbacks, streaming: streaming, cancellationToken: CancelTokenSource));
-            if(result.TryParseJson<T>(out var parsedResult))
+            for (int attempt = 0; attempt <= maxRetries; attempt++)
             {
-                return parsedResult;
+                var result = await Runner.RunAsync(StateAgent, input,
+                    verboseCallback: RunnerVerboseCallbacks,
+                    streamingCallback: StreamingCallbacks,
+                    streaming: streaming,
+                    cancellationToken: CancelTokenSource);
+
+                // First try standard parsing
+                if (result.TryParseJson<T>(out var parsedResult))
+                {
+                    return parsedResult;
+                }
+
+                // Attempt JSON repair if standard parsing fails
+                var repairedJson = await RepairJsonAsync(result.Text, typeof(T));
+                if (repairedJson != null && TryParseJson(repairedJson, out parsedResult))
+                {
+                    RunningVerboseCallback?.Invoke($"JSON repaired and parsed successfully on attempt {attempt + 1}");
+                    return parsedResult;
+                }
+
+                // If not the last attempt, try again with improved prompt
+                if (attempt < maxRetries)
+                {
+                    var retryPrompt = $"The previous response couldn't be parsed as valid JSON for type {typeof(T).Name}. " +
+                                      "Please provide a properly formatted JSON response that matches this C# class structure. " +
+                                      "Previous response: {result.Text}";
+
+                    RunningVerboseCallback?.Invoke($"Retry attempt {attempt + 1}: Requesting properly formatted JSON");
+                    input = retryPrompt;
+                }
             }
-            //retry?
-            throw new InvalidOperationException($"Failed to parse the result {result.Text} into the specified type.");
+
+            throw new InvalidOperationException($"Failed to parse the result into {typeof(T).Name} after {maxRetries + 1} attempts.");
+        }
+
+        private async Task<string> RepairJsonAsync(string possibleJson, Type targetType)
+        {
+            try
+            {
+                // Basic cleanup - remove markdown code fences and leading/trailing whitespace
+                string cleaned = possibleJson.Trim();
+                cleaned = Regex.Replace(cleaned, @"^```json\s*|```$", "", RegexOptions.Multiline);
+
+                // Check if it's valid JSON already
+                try
+                {
+                    JsonDocument.Parse(cleaned);
+                    return cleaned; // It's valid, return as is
+                }
+                catch (JsonException) { /* Continue with repair attempts */ }
+
+                // If basic cleaning didn't work, we can use the LLM itself to repair the JSON
+                var repairPrompt = $"Fix this invalid JSON to match the C# type {targetType.Name}. " +
+                                   $"Return ONLY the fixed JSON with no explanations or markdown:\n{cleaned}";
+
+                var repairResult = await Runner.RunAsync(StateAgent, repairPrompt,
+                    cancellationToken: CancelTokenSource);
+
+                // Clean the repair result
+                string repairedJson = repairResult.Text?.Trim() ?? "";
+                repairedJson = Regex.Replace(repairedJson, @"^```json\s*|```$", "", RegexOptions.Multiline);
+
+                // Validate the repaired JSON
+                try
+                {
+                    JsonDocument.Parse(repairedJson);
+                    return repairedJson;
+                }
+                catch (JsonException)
+                {
+                    RunningVerboseCallback?.Invoke("JSON repair attempt failed");
+                    return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                RunningVerboseCallback?.Invoke($"Error during JSON repair: {ex.Message}");
+                return null;
+            }
+        }
+
+        private bool TryParseJson<T>(string json, out T result)
+        {
+            try
+            {
+                result = JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    AllowTrailingCommas = true
+                });
+                return result != null;
+            }
+            catch
+            {
+                result = default;
+                return false;
+            }
         }
     }
 }

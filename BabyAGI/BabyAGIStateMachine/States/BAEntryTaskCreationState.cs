@@ -1,5 +1,6 @@
 ﻿using BabyAGI.Agents.CSharpCodingAgent.states;
 using BabyAGI.BabyAGIStateMachine.DataModels;
+using BabyAGI.BabyAGIStateMachine.Memory;
 using BabyAGI.Utility;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
@@ -76,13 +77,16 @@ namespace BabyAGI.BabyAGIStateMachine.States
 
             string prompt = $@"
             User Goal: {input}
-
+            
             Context: This is part of a task management system where tasks will be executed sequentially by automated agents.
             Each task should be:
             - Specific and actionable
             - Self-contained (can be executed independently)
             - Measurable (clear success criteria)
             - Appropriately scoped (not too broad or too narrow)
+
+            Additions Queried Context[CAUTION MAY OR MAY NOT BE RELEVANT]:
+            {string.Join("\n\n", await BabyAGIMemory.QueryLongTermMemory(input))} 
             ";
 
             TaskBreakdownResult taskResults = await BeginRunnerAsync<TaskBreakdownResult>(prompt);
