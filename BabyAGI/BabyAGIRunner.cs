@@ -16,7 +16,11 @@ namespace BabyAGI
 {
     public class BabyAGIRunner : LombdaAgent
     {
+        /// <summary>
+        /// Setup the input preprocessor to run the state machine
+        /// </summary>
         public BabyAgiStateMachine _stateMachine { get; set; } 
+
         public BabyAGIRunner() : base() 
         {             //Initialize the agent
             _stateMachine = new BabyAgiStateMachine(this);

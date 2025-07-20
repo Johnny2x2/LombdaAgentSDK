@@ -48,14 +48,15 @@ namespace BabyAGI.BabyAGIStateMachine.States
                     {
                         ((Queue<QueueTask>)queue).Enqueue(task);
                     }
-                    
-                    currentTask = ((Queue<QueueTask>)queue).Dequeue();
-                    tasksForEval.Add(currentTask);
-                }
-                
-            }
 
-            CurrentStateMachine.RuntimeProperties.AddOrUpdate("queueTasksForEval", tasksForEval, (key,val)=>tasksForEval);
+                    if(((Queue<QueueTask>)queue).Count > 0)
+                    {
+                        currentTask = ((Queue<QueueTask>)queue).Dequeue();
+                        tasksForEval.Add(currentTask);
+                        CurrentStateMachine.RuntimeProperties.AddOrUpdate("queueTasksForEval", tasksForEval, (key, val) => tasksForEval);
+                    } 
+                }   
+            }
 
             return currentTask;
         }

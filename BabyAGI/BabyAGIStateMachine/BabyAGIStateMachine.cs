@@ -1,13 +1,7 @@
 ﻿using BabyAGI.BabyAGIStateMachine.DataModels;
 using BabyAGI.BabyAGIStateMachine.States;
-using LombdaAgentSDK;
 using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.StateMachine;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BabyAGI.BabyAGIStateMachine
 {
@@ -56,18 +50,31 @@ namespace BabyAGI.BabyAGIStateMachine
 
             //Progress manager deamed the task completed and will exit the state machine
             progressManager.AddTransition((result) => result.Status.Status == ProgressState.Completed, new ExitState()); //Only Exit
+            //Progress manager not satisfied with the task result and will generate new tasks
+            progressManager.AddTransition((result) => result.Status.Status == ProgressState.Progressing && IsTaskQueueEmpty(), (toConvert) =>toConvert.ToString(), taskGeneratorState);
             //Moving forward to the next task
-            progressManager.AddTransition((result) => result.Status.Status == ProgressState.Progressing, (toConvert)=>new List<QueueTask>(), taskQueueState);
+            progressManager.AddTransition((result) => result.Status.Status == ProgressState.Progressing && !IsTaskQueueEmpty(), (toConvert)=>new List<QueueTask>(), taskQueueState);
             //Stagnating or regression, will try to generate new tasks
-            progressManager.AddTransition((result) => result.Status.Status == ProgressState.Stagnating && result.StallCount > 2, (toConvert) => toConvert.Status.Evidence, taskGeneratorState);
+            progressManager.AddTransition((result) => result.StallCount > 2,(toConvert) => toConvert.ToString(), taskGeneratorState);
+            //Progress manager not satisfied with the task result and will generate new tasks
+            progressManager.AddTransition(_ => IsTaskQueueEmpty(), (toConvert) => toConvert.ToString(), taskGeneratorState);
             //Default transition for stagnating or regression before stalling
             progressManager.AddTransition((toConvert) => new List<QueueTask>(), taskQueueState);
-
+            
             //Task generate will send new tasks to the task queue state
             taskGeneratorState.AddTransition(taskQueueState);
 
             SetEntryState(entryTaskCreationState);
             SetOutputState(progressManager);
+        }
+
+        public bool IsTaskQueueEmpty()
+        {
+            if (RuntimeProperties.TryGetValue("TaskQueue", out object queue))
+            {
+                return ((Queue<QueueTask>)queue).Count == 0;
+            }
+            return true; // If the TaskQueue is not initialized, consider it empty
         }
     }
 }

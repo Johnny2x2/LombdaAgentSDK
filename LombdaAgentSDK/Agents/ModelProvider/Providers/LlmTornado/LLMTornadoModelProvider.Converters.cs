@@ -143,6 +143,18 @@ namespace LombdaAgentSDK
             {
                 return new ChatMessagePart(fileContent.DataUri, ImageDetail.Auto);
             }
+            else if(content is ModelMessageSystemResponseTextContent systemContent)
+            {
+                return new ChatMessagePart(systemContent.Text);
+            }
+            else if (content is ModelMessageUserResponseTextContent userContent)
+            {
+                return new ChatMessagePart(userContent.Text);
+            }
+            else if (content is ModelMessageAssistantResponseTextContent assistantContent)
+            {
+                return new ChatMessagePart(assistantContent.Text);
+            }
             else
             {
                 throw new ArgumentException($"Unknown ModelMessageContent type: {content.GetType().Name}", nameof(content));

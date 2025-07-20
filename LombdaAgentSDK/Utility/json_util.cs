@@ -1,4 +1,5 @@
-﻿using LombdaAgentSDK.Agents;
+﻿using LlmTornado.Moderation;
+using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
 using System.ComponentModel;
 using System.Reflection;
@@ -67,6 +68,65 @@ namespace LombdaAgentSDK
             return JsonSerializer.Deserialize<T>(json)!;
         }
 
+
+        /// <summary>
+        /// Attempts to parse the specified JSON string into an object of type <typeparamref name="T"/>.
+        /// </summary>
+        /// <remarks>This method does not throw exceptions for invalid JSON strings. Instead, it returns
+        /// <see langword="false"/> and sets  <paramref name="result"/> to the default value of <typeparamref
+        /// name="T"/>.</remarks>
+        /// <typeparam name="T">The type of the object to deserialize the JSON string into.</typeparam>
+        /// <param name="json">The JSON string to parse. Cannot be null or whitespace.</param>
+        /// <param name="result">When this method returns, contains the object of type <typeparamref name="T"/> that is deserialized from the
+        /// JSON string, if the parsing is successful; otherwise, the default value for type <typeparamref name="T"/>.</param>
+        /// <returns><see langword="true"/> if the JSON string was successfully parsed into an object of type <typeparamref
+        /// name="T"/>;  otherwise, <see langword="false"/>.</returns>
+        /// <exception cref="ArgumentException">Thrown if <paramref name="json"/> is null or whitespace.</exception>
+        public static bool TryParseJson<T>(this string? json, out T? result)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(json))
+                    throw new ArgumentException("JSON is null or empty");
+                result = JsonSerializer.Deserialize<T>(json);
+                return true;
+            }
+            catch (Exception)
+            {
+                result = default;
+                return false;
+            }
+        }
+
+
+        /// <summary>
+        /// Attempts to parse the JSON text from the specified <see cref="RunResult"/> into an object of type
+        /// <typeparamref name="T"/>.
+        /// </summary>
+        /// <remarks>This method catches any exceptions that occur during deserialization and returns <see
+        /// langword="false"/> if an error occurs.</remarks>
+        /// <typeparam name="T">The type of the object to deserialize the JSON text into.</typeparam>
+        /// <param name="Result">The <see cref="RunResult"/> containing the JSON text to parse.</param>
+        /// <param name="result">When this method returns, contains the deserialized object of type <typeparamref name="T"/> if the parsing
+        /// is successful; otherwise, the default value for type <typeparamref name="T"/>.</param>
+        /// <returns><see langword="true"/> if the JSON text is successfully parsed; otherwise, <see langword="false"/>.</returns>
+        /// <exception cref="ArgumentException">Thrown if the JSON text in <paramref name="Result"/> is null or empty.</exception>
+        public static bool TryParseJson<T>(this RunResult Result, out T? result)
+        {
+            try
+            {
+                string json = Result.Text;
+                if (string.IsNullOrWhiteSpace(json))
+                    throw new ArgumentException("JSON is null or empty");
+                result = JsonSerializer.Deserialize<T>(json);
+                return true;
+            }
+            catch (Exception)
+            {
+                result = default;
+                return false;
+            }
+        }
         /// <summary>
         /// Maps a CLR type to its corresponding JSON type representation.
         /// </summary>

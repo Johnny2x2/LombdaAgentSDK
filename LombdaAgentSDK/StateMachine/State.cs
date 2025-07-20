@@ -133,6 +133,9 @@ namespace LombdaAgentSDK.StateMachine
         /// property to combine input into a single process to avoid running multiple threads for each input.
         /// </summary>
         public bool CombineInput { get => combineInput; set => combineInput = value; }
+        /// <summary>
+        /// Used to set if this state is okay not to have transitions.
+        /// </summary>
         public bool IsDeadEnd { get => isDeadEnd; set => isDeadEnd = value; }
 
         /// <summary>

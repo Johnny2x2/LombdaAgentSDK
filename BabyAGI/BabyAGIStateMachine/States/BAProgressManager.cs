@@ -5,11 +5,13 @@ using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.StateMachine;
+using Newtonsoft.Json.Converters;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace BabyAGI.BabyAGIStateMachine.States
@@ -25,10 +27,18 @@ namespace BabyAGI.BabyAGIStateMachine.States
     [Description("Progress report on current goal, Status can only be: Completed,\r\n        Progressing,\r\n        Stagnating,\r\n        Regression")]
     public struct ProgressStatus
     {
-        public string UpdatedProgressSummary { get; set; } 
+        public string UpdatedProgressSummary { get; set; }
+
+        [JsonConverter(typeof(JsonStringEnumConverter))]
         public ProgressState Status { get; set; }
+
         public string Evidence { get; set; }
         public string Suggestions { get; set; }
+
+        public override string ToString()
+        {
+            return $"Status: {Status}, Evidence: {Evidence}, Suggestions: {Suggestions}, UpdatedProgressSummary: {UpdatedProgressSummary}";
+        }
     }
 
     public class ProgressReport

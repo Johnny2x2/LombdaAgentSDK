@@ -407,8 +407,21 @@ namespace LombdaAgentSDK
             {
                 return new ResponseInputContentFile(fileContent.FileId);
             }
+            else if (part is ModelMessageSystemResponseTextContent systemTextContent)
+            {
+                return new ResponseInputContentText(systemTextContent.Text);
+            }
+            else if (part is ModelMessageResponseTextContent utextContent)
+            {
+                return  new ResponseInputContentText(utextContent.Text);
+            }
             else
             {
+                if(part.ContentType == ModelContentType.InputText || part.ContentType == ModelContentType.OutputText)
+                {
+                    var partText = part as ModelMessageResponseTextContent;
+                    return new ResponseInputContentText(partText.Text);
+                }
                 throw new ArgumentException($"Unknown ModelMessageContent type: {part.GetType().Name}", nameof(part));
             }
         }
