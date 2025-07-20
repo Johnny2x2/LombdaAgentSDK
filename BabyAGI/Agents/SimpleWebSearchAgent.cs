@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace BabyAGI.Agents
 {
-    internal class SimpleWebSearchAgent
+    public class SimpleWebSearchAgent
     {
         [Tool(Description = "Use this tool for doing basic web search", In_parameters_description = ["The topic you wish to research."])]
         public async Task<string> BasicWebSearch(string search)

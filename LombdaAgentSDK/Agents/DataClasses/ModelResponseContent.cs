@@ -1,4 +1,6 @@
-﻿namespace LombdaAgentSDK.Agents.DataClasses
+﻿using LlmTornado.Common;
+
+namespace LombdaAgentSDK.Agents.DataClasses
 {
     /// <summary>
     /// Current supported model message content type
@@ -118,30 +120,20 @@
     public class ModelMessageImageFileContent : ModelMessageFileContent
     {
         /// <summary>
-        /// type of media e.g: png, jpg
-        /// </summary>
-        public string MediaType { get; set; }
-        /// <summary>
         /// Complete dataUri
         /// </summary>
-        public string ImageURL { get; set; }
+        public string ImageURL { get=> DataUri; set=> DataUri = value; }
 
         public ModelMessageImageFileContent() { ContentType = ModelContentType.InputImage; }
 
-        public ModelMessageImageFileContent(BinaryData imageData, string mediaType)
+        public ModelMessageImageFileContent(BinaryData imageData, string mediaType) : base(data:imageData, mediaType: mediaType)
         {
-            DataBytes = imageData;
             ContentType = ModelContentType.InputImage;
-            MediaType = mediaType;
-            string base64EncodedData = Convert.ToBase64String(imageData.ToArray());
-            string dataUri = $"data:{MediaType};base64,{base64EncodedData}";
-            ImageURL = dataUri;
         }
 
         public ModelMessageImageFileContent(string imageUrl)
         {
             ContentType = ModelContentType.InputImage;
-
             ImageURL = imageUrl;
         }
 
@@ -177,6 +169,10 @@
     public class ModelMessageFileContent : ModelMessageContent
     {
         /// <summary>
+        /// Gets or sets the Uri of the file.
+        /// </summary>
+        public string DataUri { get; set; }
+        /// <summary>
         /// Name of the file
         /// </summary>
         public string? FileName { get; set; }
@@ -189,12 +185,25 @@
         /// </summary>
         public string FileId { get; set; }
 
+        /// <summary>
+        /// type of media e.g: png, jpg
+        /// </summary>
+        public string MediaType { get; set; }
+
         public ModelMessageFileContent(string fileName = "", BinaryData data = null, string mediaType = "")
         {
-            ContentType = ModelContentType.InputFile;
+            if(ContentType == ModelContentType.Unknown)
+            {
+                ContentType = ModelContentType.InputFile;
+            }
+
             DataBytes = data;
             FileName = fileName;
+            MediaType = mediaType;
+            string base64EncodedData = Convert.ToBase64String(data.ToArray());
+            DataUri = $"data:{MediaType};base64,{base64EncodedData}";
         }
+
         /// <summary>
         /// Create a file message content by using the fileId
         /// </summary>

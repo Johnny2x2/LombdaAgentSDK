@@ -10,6 +10,9 @@ using System.Threading.Tasks;
 
 namespace LombdaAgentSDK.StateMachine
 {
+    public delegate void StateEnteredEvent<T>(StateProcess<T> input);
+    public delegate void StateExitEvent(BaseState input);
+    public delegate void StateInvokeEvent<T>(StateProcess<T> input);
     /// <summary>
     /// Represents the base class for defining a state within a state machine.
     /// </summary>
@@ -20,8 +23,8 @@ namespace LombdaAgentSDK.StateMachine
     public abstract class BaseState
     {
         private SemaphoreSlim threadLimitor;
-        private int maxThreads = 20;
         internal readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
+        private int maxThreads = 20;
         public bool BeingReran = false;
         private List<StateTransition<object>> transitions = new();
         private List<object> input = new();
@@ -32,6 +35,21 @@ namespace LombdaAgentSDK.StateMachine
         private bool combineInput = false;
         private bool transitioned = false;
         private string id = Guid.NewGuid().ToString();
+        private bool isDeadEnd = false;
+        /// <summary>
+        /// Gets or sets the event that is triggered when a state is entered.
+        /// </summary>
+        public event StateEnteredEvent<object>? OnStateEntered;
+
+        /// <summary>
+        /// Gets or sets the event that is triggered when a state is exited.
+        /// </summary>
+        public event StateExitEvent? OnStateExited;
+
+        /// <summary>
+        /// Gets or sets the event that is triggered when a state is invoked.
+        /// </summary>
+        public event StateInvokeEvent<object>? OnStateInvoked;
 
         /// <summary>
         /// State identifier.
@@ -70,6 +88,7 @@ namespace LombdaAgentSDK.StateMachine
         /// Internal invoke to abstract BaseState from Type specifics.
         /// </summary>
         /// <returns></returns>
+        /// 
         public abstract Task _Invoke();
 
         /// <summary>
@@ -114,13 +133,17 @@ namespace LombdaAgentSDK.StateMachine
         /// property to combine input into a single process to avoid running multiple threads for each input.
         /// </summary>
         public bool CombineInput { get => combineInput; set => combineInput = value; }
+        /// <summary>
+        /// Used to set if this state is okay not to have transitions.
+        /// </summary>
+        public bool IsDeadEnd { get => isDeadEnd; set => isDeadEnd = value; }
 
         /// <summary>
         /// Evaluates and returns a list of state processes that meet specific conditions.
         /// </summary>
         /// <returns>A list of <see cref="StateProcess"/> objects that satisfy the defined conditions.  The list will be empty if
         /// no conditions are met.</returns>
-        public abstract List<StateProcess> CheckConditions();
+        public abstract List<StateProcess>? CheckConditions();
     }
 
     /// <summary>
@@ -135,6 +158,29 @@ namespace LombdaAgentSDK.StateMachine
     /// <typeparam name="TOutput">The type of output data produced by the state.</typeparam>
     public abstract class BaseState<TInput, TOutput> : BaseState
     {
+        /// <summary>
+        /// Occurs when a state is entered in the state process.
+        /// </summary>
+        /// <remarks>This event is triggered whenever a new state is entered within the <see
+        /// cref="StateProcess{TInput}"/>. Subscribers can use this event to perform actions or handle logic specific to
+        /// the entry of a state.</remarks>
+        public new StateEnteredEvent<TInput>? OnStateEntered { get; set; }
+
+        /// <summary>
+        /// Occurs when a state has been exited.
+        /// </summary>
+        /// <remarks>This event is triggered whenever a state transition results in exiting a state. 
+        /// Subscribers can use this event to perform cleanup or other actions when a state is exited.</remarks>
+        public new StateExitEvent? OnStateExited { get; set; }
+
+        /// <summary>
+        /// Occurs when a state is invoked within the state process.
+        /// </summary>
+        /// <remarks>This event is triggered each time a state is invoked, allowing subscribers to handle
+        /// or respond to the invocation.</remarks>
+        public new StateInvokeEvent<TInput>? OnStateInvoked { get; set; }
+
+
         private List<StateProcess<TInput>> inputProcesses = new();
         private List<StateResult<TOutput>> outputResults = new();
 
@@ -237,6 +283,7 @@ namespace LombdaAgentSDK.StateMachine
             {
                 AddInputProcess(input);
                 await this.EnterState(input!.Input);
+                OnStateEntered?.Invoke(input);
             }
             finally
             {
@@ -257,6 +304,7 @@ namespace LombdaAgentSDK.StateMachine
             {
                 AddInputProcess(input);
                 await this.EnterState((TInput)input!._Input!);
+                OnStateEntered?.Invoke(new StateProcess<TInput>(input.State, (TInput)input._Input, input.ID));
             }
             finally
             {
@@ -275,6 +323,7 @@ namespace LombdaAgentSDK.StateMachine
             {
                 InputProcesses.Clear();
                 await ExitState();
+                OnStateExited?.Invoke(this);
             }
             finally
             {
@@ -348,6 +397,7 @@ namespace LombdaAgentSDK.StateMachine
         /// <returns></returns>
         private async Task<StateResult<TOutput>> InternalInvoke(StateProcess<TInput> input)
         {
+            OnStateInvoked?.Invoke(input);
             return new StateResult<TOutput>(input.ID, await Invoke(input.Input));
         }
 
@@ -377,7 +427,7 @@ namespace LombdaAgentSDK.StateMachine
         /// includes it in the list if possible.</remarks>
         /// <returns>A list of <see cref="StateProcess"/> objects representing the first valid state transition for each result.
         /// If a valid transition is not found and the process can be re-attempted, the original process is included.</returns>
-        private List<StateProcess> GetFirstValidStateTransitionForEachResult()
+        private List<StateProcess>? GetFirstValidStateTransitionForEachResult()
         {
             List<StateProcess> newStateProcesses = new();
             //Results Gathered from invoking
@@ -396,12 +446,16 @@ namespace LombdaAgentSDK.StateMachine
                 }
                 else
                 {
-                    //ReRun the process that failed
-                    StateProcess<TInput> failedProcess = InputProcesses.First(process => process.ID == result.ProcessID);
-                    //Cap the amount of times a State can reattempt (Fixed at 3 right now)
-                    if (failedProcess.CanReAttempt())
-                    {
-                        newStateProcesses.Add(failedProcess);
+                    //If the state is a dead end, we do not reattempt the process
+                    if (!this.IsDeadEnd)
+                    {    
+                        //ReRun the process that failed
+                        StateProcess<TInput> failedProcess = InputProcesses.First(process => process.ID == result.ProcessID);
+                        //Cap the amount of times a State can reattempt (Fixed at 3 right now)
+                        if (failedProcess.CanReAttempt())
+                        {
+                            newStateProcesses.Add(failedProcess);
+                        }
                     }
                 }
             });
@@ -416,7 +470,7 @@ namespace LombdaAgentSDK.StateMachine
         /// valid state processes. If no transitions are valid for a given output, the corresponding process may be
         /// re-attempted if allowed.</remarks>
         /// <returns>A list of <see cref="StateProcess"/> objects representing the valid state transitions.</returns>
-        private List<StateProcess> GetAllValidStateTransitions()
+        private List<StateProcess>? GetAllValidStateTransitions()
         {
             List<StateProcess> newStateProcesses = new();
             //Results Gathered from invoking
@@ -436,8 +490,8 @@ namespace LombdaAgentSDK.StateMachine
                     }
                 });
 
-                //If process produces no transitions rerun the process
-                if (newStateProcessesFromOutput.Count == 0)
+                //If process produces no transitions and not at a dead end rerun the process
+                if (newStateProcessesFromOutput.Count == 0 && !this.IsDeadEnd)
                 {
                     StateProcess failedProcess = InputProcesses.First(process => process.ID == output.ProcessID);
                     //rerun the process up to the max attempts
@@ -450,9 +504,20 @@ namespace LombdaAgentSDK.StateMachine
             return newStateProcesses;
         }
 
-        public override List<StateProcess> CheckConditions()
+        public override List<StateProcess>? CheckConditions()
         {
             return AllowsParallelTransitions ? GetAllValidStateTransitions() : GetFirstValidStateTransitionForEachResult();
+        }
+
+        /// <summary>
+        /// Adds a transition to the specified next state.
+        /// </summary>
+        /// <remarks>This method creates a transition that is always valid, allowing the state machine to
+        /// move to the specified <paramref name="nextState"/>.</remarks>
+        /// <param name="nextState">The state to transition to. Cannot be null.</param>
+        public void AddTransition(BaseState nextState)
+        {
+            Transitions.Add(new StateTransition<TOutput>(_ => true, nextState));
         }
 
         /// <summary>
@@ -465,6 +530,7 @@ namespace LombdaAgentSDK.StateMachine
         {
             Transitions.Add(new StateTransition<TOutput>(methodToInvoke, nextState));
         }
+
         /// <summary>
         /// Adds a state transition to the current state.
         /// </summary>
@@ -479,6 +545,29 @@ namespace LombdaAgentSDK.StateMachine
             var transition = new StateTransition<TOutput, T>(methodToInvoke, conversionMethod, nextState);
             Transitions.Add(transition);
         }
+
+        /// <summary>
+        /// Adds a state transition to the current state with an optional event handler and conver the result.
+        /// </summary>
+        /// <typeparam name="T">The type of the input parameter for the conversion method.</typeparam>
+        /// <param name="conversionMethod">The method used to convert the current state's output to the next state's input.</param>
+        /// <param name="nextState">The state to transition to after the conversion.</param>
+        /// <param name="methodToInvoke">An optional event handler that determines whether the transition should occur.  If <see langword="null"/>,
+        /// the transition will always occur.</param>
+        public void AddTransition<T>(ConversionMethod<TOutput, T> conversionMethod, BaseState nextState, TransitionEvent<TOutput>? methodToInvoke = null)
+        {
+            if (methodToInvoke != null)
+            {
+                var transition = new StateTransition<TOutput, T>(methodToInvoke, conversionMethod, nextState);
+                Transitions.Add(transition);
+            }
+            else
+            {
+                var transition = new StateTransition<TOutput, T>(_ => true, conversionMethod, nextState);
+                Transitions.Add(transition);
+            }
+        }
+
     }
 
     /// <summary>
@@ -489,6 +578,24 @@ namespace LombdaAgentSDK.StateMachine
         public override async Task<object> Invoke(object input)
         {
             CurrentStateMachine.Finish();
+            return input; //Forced to use BaseState<object, object> because of the Task not returning in order
+        }
+    }
+
+    /// <summary>
+    /// Helper State to exit the StateMachine.
+    /// </summary>
+    public class DeadEnd : BaseState<object, object>
+    {
+        public DeadEnd()
+        {
+            IsDeadEnd = true;
+            WasInvoked = true;
+            Transitioned = true;
+        }
+
+        public override async Task<object> Invoke(object input)
+        {
             return input; //Forced to use BaseState<object, object> because of the Task not returning in order
         }
     }

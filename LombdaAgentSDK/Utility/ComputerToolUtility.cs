@@ -515,7 +515,7 @@ namespace LombdaAgentSDK
                     g.ReleaseHdc(hdcDest);
                 }
 
-                bmp.Save("screenshot.png");
+                //bmp.Save("screenshot.png");
 
                 bmp.Save(ms, format);
 
