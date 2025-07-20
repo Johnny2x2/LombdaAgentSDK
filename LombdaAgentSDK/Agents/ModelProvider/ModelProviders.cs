@@ -9,6 +9,10 @@ namespace LombdaAgentSDK
     public abstract class ModelClient
     {
         /// <summary>
+        /// Gets or sets the <see cref="CancellationTokenSource"/> used to signal cancellation requests.
+        /// </summary>
+        public CancellationTokenSource CancelTokenSource { get; set; } = new CancellationTokenSource();
+        /// <summary>
         /// Model being ran
         /// </summary>
         public string Model { get; set; }

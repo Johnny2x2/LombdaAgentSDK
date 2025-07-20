@@ -1,8 +1,11 @@
-﻿using LombdaAgentSDK.Agents.DataClasses;
-using LlmTornado.Chat;
+﻿using LlmTornado.Chat;
 using LlmTornado.ChatFunctions;
 using LlmTornado.Code;
+using LlmTornado.Images;
+using LombdaAgentSDK.Agents.DataClasses;
+using Microsoft.VisualBasic;
 using System.Collections;
+using System.Collections.Generic;
 
 namespace LombdaAgentSDK
 {
@@ -116,6 +119,48 @@ namespace LombdaAgentSDK
         }
 
         //ModelItem -> Provider items
+        public List<ChatMessagePart> ConvertModelContentToProviderPart(List<ModelMessageContent> contents)
+        {
+            List<ChatMessagePart> parts = new List<ChatMessagePart>();
+            foreach(var content in contents)
+            {
+                parts.Add(ConvertModelContentToProviderPart(content));
+            }
+            return parts;
+        }
+
+        public ChatMessagePart ConvertModelContentToProviderPart(ModelMessageContent content)
+        {
+            if (content is ModelMessageTextContent textContent)
+            {
+                return new ChatMessagePart(textContent.Text);
+            }
+            else if (content is ModelMessageImageFileContent imageContent)
+            {
+                return new ChatMessagePart(imageContent.DataUri, ImageDetail.Auto);
+            }
+            else if (content is ModelMessageFileContent fileContent)
+            {
+                return new ChatMessagePart(fileContent.DataUri, ImageDetail.Auto);
+            }
+            else if(content is ModelMessageSystemResponseTextContent systemContent)
+            {
+                return new ChatMessagePart(systemContent.Text);
+            }
+            else if (content is ModelMessageUserResponseTextContent userContent)
+            {
+                return new ChatMessagePart(userContent.Text);
+            }
+            else if (content is ModelMessageAssistantResponseTextContent assistantContent)
+            {
+                return new ChatMessagePart(assistantContent.Text);
+            }
+            else
+            {
+                throw new ArgumentException($"Unknown ModelMessageContent type: {content.GetType().Name}", nameof(content));
+            }
+        }
+
         public Conversation ConvertToProviderItems(IEnumerable messages, Conversation conv)
         {
             foreach (ModelItem item in messages)
@@ -180,19 +225,19 @@ namespace LombdaAgentSDK
                 {
                     if (message.Role.ToUpper() == "ASSISTANT")
                     {
-                        conv.AppendAssistantMessage(((ModelMessageTextContent)message.Content[0]).Text);
+                        conv.AppendMessage(new ChatMessage(ChatMessageRoles.Assistant, ConvertModelContentToProviderPart(message.Content)));
                     }
                     else if (message.Role.ToUpper() == "USER")
                     {
-                        conv.AppendUserInput(((ModelMessageTextContent)message.Content[0]).Text);
+                        conv.AppendMessage(new ChatMessage(ChatMessageRoles.User, ConvertModelContentToProviderPart(message.Content)));
                     }
                     else if (message.Role.ToUpper() == "SYSTEM")
                     {
-                        conv.AppendSystemMessage(((ModelMessageTextContent)message.Content[0]).Text);
+                        conv.AppendMessage(new ChatMessage(ChatMessageRoles.System, ConvertModelContentToProviderPart(message.Content)));
                     }
                     else if (message.Role.ToUpper() == "DEVELOPER")
                     {
-                        conv.AppendMessage(new ChatMessage(ChatMessageRoles.Unknown, ((ModelMessageTextContent)message.Content[0]).Text));
+                        conv.AppendMessage(new ChatMessage(ChatMessageRoles.Unknown, ConvertModelContentToProviderPart(message.Content)));
                     }
                 }
                 else

@@ -1,4 +1,6 @@
-﻿using LombdaAgentSDK.Agents.DataClasses;
+﻿using LlmTornado.Chat.Models;
+using LlmTornado.Code;
+using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
 
 namespace LombdaAgentSDK.Agents
@@ -53,8 +55,13 @@ namespace LombdaAgentSDK.Agents
         /// </summary>
         public Dictionary<string, AgentTool> agent_tools = new Dictionary<string, AgentTool>();
 
-
-        public Agent(ModelClient client, string _name, string _instructions = "", Type? _output_schema = null, List<Delegate>? _tools = null)
+        public static Agent DummyAgent()
+        {
+            LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Nano,
+                                                   [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
+            return new Agent(client, "");
+        }
+        public Agent(ModelClient client, string _name = "Assistant", string _instructions = "", Type? _output_schema = null, List<Delegate>? _tools = null)
         {
             Client = client;
             AgentName = _name;

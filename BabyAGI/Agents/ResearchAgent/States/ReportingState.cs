@@ -7,12 +7,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using LombdaAgentSDK.AgentStateSystem;
 
 namespace BabyAGI.Agents.ResearchAgent.States
 {
-    class ReportingState : BaseState<string, ReportData>
+    class ReportingState : AgentState<string, ReportData>
     {
-        public override async Task<ReportData> Invoke(string input)
+        public ReportingState(StateMachine stateMachine) : base(stateMachine){}
+
+        public override Agent InitilizeStateAgent()
         {
             string instructions = """
                     You are a senior researcher tasked with writing a cohesive report for a research query.
@@ -24,9 +27,12 @@ namespace BabyAGI.Agents.ResearchAgent.States
                     The final output should be in markdown format, and it should be lengthy and detailed. Aim for 5-10 pages of content, at least 1000 words.
                     """;
 
-            Agent agent = new Agent(new OpenAIModelClient("gpt-4o-mini"), "Reporting agent", instructions, _output_schema: typeof(ReportData));
+            return new Agent(new OpenAIModelClient("gpt-4o-mini"), "Reporting agent", instructions, _output_schema: typeof(ReportData));
+        }
 
-            return (await Runner.RunAsync(agent, input)).ParseJson<ReportData>(); ;
+        public override async Task<ReportData> Invoke(string input)
+        {
+            return await BeginRunnerAsync<ReportData>(input);
         }
     }
 }

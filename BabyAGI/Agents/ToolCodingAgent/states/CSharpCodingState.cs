@@ -4,6 +4,7 @@ using LlmTornado.Code;
 using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
+using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.StateMachine;
 using System;
 using System.Collections.Generic;
@@ -14,13 +15,11 @@ using System.Threading.Tasks;
 namespace Examples.Demos.CodingAgent.states
 {
     //Design the states
-    class CSharpCodingState : BaseState<string, ProgramResultOutput>
+    class CSharpCodingState : AgentState<string, ProgramResultOutput>
     {
-        public CSHARP_CodingAgent StateAgent { get; set; }
+        public CSharpCodingState(StateMachine stateMachine) : base(stateMachine)
+        {
 
-        public CSharpCodingState(CSHARP_CodingAgent stateAgent) 
-        { 
-            StateAgent = stateAgent;
         }
 
         public override async Task<ProgramResultOutput> Invoke(string input)
@@ -32,20 +31,21 @@ namespace Examples.Demos.CodingAgent.states
                     Overall context:
                     {0}";
 
-            LLMTornadoModelProvider client = new(
-           ChatModel.OpenAi.Gpt41.V41Mini,
-           [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
-
-            Agent agent = new Agent(client, 
-                "Code Assistant",
-                "You are an expert C# programmer. Your task is to write detailed and working code for the following function based on the context provided.",
-                _output_schema: typeof(ProgramResult));
-
-            RunResult result = await Runner.RunAsync(agent, string.Format(prompt, input));
-
-            ProgramResult program = result.ParseJson<ProgramResult>();
+            ProgramResult program = await BeginRunnerAsync<ProgramResult>(string.Format(prompt, input));
 
             return new ProgramResultOutput(program, input);
+        }
+
+        public override Agent InitilizeStateAgent()
+        {
+            LLMTornadoModelProvider client = new(
+            ChatModel.OpenAi.Gpt41.V41Mini,
+            [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
+
+            return new Agent(client,
+                    "Code Assistant",
+                    "You are an expert C# programmer. Your task is to write detailed and working code for the following function based on the context provided.",
+                    _output_schema: typeof(ProgramResult));
         }
     }
 }

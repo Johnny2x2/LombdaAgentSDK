@@ -24,7 +24,20 @@
             }
         }
 
-        
+        public static T ParseEnum<T>(this string input)
+        {
+            try
+            {
+                Enum.TryParse(typeof(T), input, true, out object? result);
+                var output = (T?)result;
+                return output;
+            }
+            catch (Exception)
+            {
+               throw new ArgumentException($"Failed to parse '{input}' into enum of type {typeof(T).Name}");
+
+            }
+        }
     }
 
 

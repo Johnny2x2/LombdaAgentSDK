@@ -4,20 +4,46 @@ using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
+using LombdaAgentSDK.AgentStateSystem;
+using LombdaAgentSDK.StateMachine;
+using System.Threading.Tasks;
+using static LombdaAgentSDK.Runner;
 using static System.Runtime.CompilerServices.RuntimeHelpers;
 
 namespace BabyAGI.Agents
 {
     public class ComputerControllerAgent
     {
-        BabyAGIRunner MainRunner { get; set; }
+        public string ResponseID { get; set; } = string.Empty;  
+        public CancellationTokenSource CancellationTokenSource { get; set; } = new CancellationTokenSource();
+        public RunnerVerboseCallbacks runnerVerboseCallbacks { get; set; }
 
-        public ComputerControllerAgent( BabyAGIRunner MainRunner ) => this.MainRunner = MainRunner;
-
-        //requires Teir 3 account & access to use computer-use-preview currently
-        [Tool(Description = "Use this agent to accomplish task that require computer input or output like mouse movement, clicking, screen shots", In_parameters_description = ["The task you wish to accomplish."])]
-        public async Task<string> ControlComputer(string task)
+        public ComputerControllerAgent(LombdaAgent MainRunner ) 
         {
+            if(MainRunner.VerboseCallback is not null)
+            {
+                this.runnerVerboseCallbacks = MainRunner?.VerboseCallback;
+            }
+            this.CancellationTokenSource = MainRunner.CancellationTokenSource;
+        } 
+
+        public ComputerControllerAgent(string responseId = "", CancellationTokenSource? cancellationTokenSource = null, RunnerVerboseCallbacks? verboseCallback = null)
+        {
+            this.CancellationTokenSource = cancellationTokenSource ?? new CancellationTokenSource();
+            if(verboseCallback is not null)
+            {
+                this.runnerVerboseCallbacks = verboseCallback;
+            }
+
+            if(!string.IsNullOrEmpty(responseId))
+            {
+                this.ResponseID = responseId;
+            }
+        }
+
+        public async Task<string> RunComputerAgent(string task)
+        {
+
             LLMTornadoModelProvider client =
                 new(ChatModel.OpenAi.Codex.ComputerUsePreview,
                 [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),],
@@ -26,21 +52,22 @@ namespace BabyAGI.Agents
 
 
             Agent agent = new Agent(
-                client, 
+                client,
                 "Assistant",
                 "You are a useful assistant that controls a computer to complete the users task. After the task is complete please report what you did and the state of the PC."
                 );
-            
+
             //Runner needs to return callbacks for Computer Action
             RunResult result = await Runner.RunAsync(
-                agent, 
-                input:task, 
-                verboseCallback:Console.WriteLine, 
+                agent,
+                input: task,
+                verboseCallback: runnerVerboseCallbacks,
                 computerUseCallback: HandleComputerAction,
-                responseID:MainRunner.MainThreadId,
-                maxTurns:50
+                responseID: ResponseID,
+                maxTurns: 50,
+                cancellationToken: CancellationTokenSource
                 );
-            
+
             return result.Text ?? "Task Finished";
         }
 

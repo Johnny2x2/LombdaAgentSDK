@@ -14,6 +14,7 @@ namespace LombdaAgentSDK
         public delegate void ComputerActionCallbacks(ComputerToolAction computerCall);
         public delegate void RunnerVerboseCallbacks(string runnerAction);
         public delegate void StreamingCallbacks(string streamingResult);
+
         /// <summary>
         /// Invoke the agent loop to begin async
         /// </summary>
@@ -42,10 +43,16 @@ namespace LombdaAgentSDK
             RunnerVerboseCallbacks? verboseCallback = null,
             bool streaming = false,
             StreamingCallbacks? streamingCallback = null,
-            string responseID = ""
+            string responseID = "",
+            CancellationTokenSource? cancellationToken = default
             )
         {
             RunResult runResult = new RunResult();
+
+            if(cancellationToken != null) {
+                //Set the cancellation token for the agent client
+                agent.Client.CancelTokenSource = cancellationToken;
+            }
 
             //Setup the messages from previous runs or memory
             if (messages != null) 
@@ -60,8 +67,11 @@ namespace LombdaAgentSDK
             }
 
             //Add the latest message to the stream
-            runResult.Messages.Add(new ModelMessageItem("msg_"+Guid.NewGuid().ToString().Replace("-","_"), "USER", [new ModelMessageRequestTextContent(input),], ModelStatus.Completed));
-
+            if (!string.IsNullOrEmpty(input.Trim()))
+            {
+                runResult.Messages.Add(new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", [new ModelMessageRequestTextContent(input),], ModelStatus.Completed));
+            }
+            
             //Check if the input triggers a guardrail to stop the agent from continuing
             if (guard_rail != null)
             {
@@ -80,19 +90,39 @@ namespace LombdaAgentSDK
             int currentTurn = 0;
             runResult.Response.OutputItems = new List<ModelItem>();
 
-            do
+            try
             {
-                if (currentTurn >= maxTurns) throw new Exception("Max Turns Reached");
+                do
+                {
+                    CheckForCancellation(cancellationToken);
+                    
+                    if (currentTurn >= maxTurns) throw new Exception("Max Turns Reached");
 
-                runResult.Response = await _get_new_response(agent, runResult.Messages, streaming, streamingCallback, verboseCallback) ?? runResult.Response;
+                    runResult.Response = await _get_new_response(agent, runResult.Messages, streaming, streamingCallback, verboseCallback)! ?? runResult.Response;
 
-                currentTurn++;
+                    currentTurn++;
 
-            } while (await ProcessOutputItems(agent, runResult, verboseCallback, computerUseCallback) && !single_turn);
+                } while (await ProcessOutputItems(agent, runResult, verboseCallback, computerUseCallback) && !single_turn);
+            }
+            catch(Exception ex)
+            {
+                verboseCallback?.Invoke($"Exception during agent run: {ex.Message}");
+            }
+
             //Add output guardrail eventually
             
             return runResult;
         }
+
+
+        private static void CheckForCancellation(CancellationTokenSource? cancellationToken)
+        {
+            if (cancellationToken != null && cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException("Operation was cancelled by user.");
+            }
+        }
+
 
         /// <summary>
         /// Add output to messages and handle function and tool calls

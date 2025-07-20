@@ -1,4 +1,5 @@
 ﻿using BabyAGI;
+using BabyAGI.FunctionGenerator.DataModels;
 using BabyAGI.Utility;
 using ChromaDB.Client;
 using Examples.Demos.CodingAgent;
@@ -10,41 +11,43 @@ using LlmTornado.Embedding.Models;
 using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
+using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.StateMachine;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Examples.Demos.FunctionGenerator.States
 {
-    public struct FunctionFoundResult
+    public class CheckExistingFunctionState : AgentState<string, FunctionFoundResultOutput>
     {
-        public string FunctionName { get; set; }
-        public bool FunctionFound { get; set; }
-        public FunctionFoundResult(string functionName, bool functionFound) { FunctionName = functionName;  FunctionFound = functionFound; }
-    }
+        string OriginalTask = "";
+        public CheckExistingFunctionState(StateMachine stateMachine) : base(stateMachine) { }
 
-    public struct FunctionFoundResultOutput
-    {
-        public string UserInput { get; set; }
-        public FunctionFoundResult FoundResult { get; set; }
-        public FunctionFoundResultOutput(string userInput, FunctionFoundResult functionFound) 
-        { 
-            UserInput = userInput; 
-            FoundResult = functionFound;
+        public override Agent InitilizeStateAgent()
+        {
+           LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
+
+           return  new Agent(client,
+                "Code Assistant",
+                "You are an expert at reviewing functions and determining which to use to solve the Task at hand. If no suitable Function is found let the system know and a new one will be generated.",
+                _output_schema: typeof(FunctionFoundResult));
         }
-    }
 
-    public class CheckExistingFunctionState : BaseState<string, FunctionFoundResultOutput>
-    {
-        public FunctionGeneratorAgent StateController { get; set; }
-        public CheckExistingFunctionState(FunctionGeneratorAgent stateController) { StateController = stateController; }
         public async override Task<FunctionFoundResultOutput> Invoke(string args)
         {
             string[]? functions = await QueryFunctionDB(args);
 
             functions ??= [];
 
-            string instructions = string.Format("""
-            
-            
+            if (string.IsNullOrEmpty(OriginalTask))
+            {
+                OriginalTask = CurrentStateMachine.RuntimeProperties.TryGetValue("OriginalTask", out object orginalTask) ? orginalTask.ToString() : string.Empty;
+                if(string.IsNullOrEmpty(OriginalTask))
+                {
+                    throw new InvalidOperationException("Original task is not set in the runtime properties.");
+                }
+            }
+
+            string prompt = string.Format("""
             The user has provided the following request:
 
             "{0}"
@@ -56,18 +59,12 @@ namespace Examples.Demos.FunctionGenerator.States
 
             {2}
 
-            """, StateController.OriginalTask, args, string.Join("\n\n", functions));
+            """, OriginalTask, args, string.Join("\n\n", functions));
 
-            LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
 
-            Agent agent = new Agent(client,
-                "Code Assistant",
-                "You are an expert at reviewing functions and determining which to use to solve the Task at hand. If no suitable Function is found let the system know and a new one will be generated.",
-                _output_schema: typeof(FunctionFoundResult));
+            FunctionFoundResult result = await BeginRunnerAsync<FunctionFoundResult>(prompt);
 
-            RunResult result = await Runner.RunAsync(agent, instructions);
-
-            return new FunctionFoundResultOutput(args, result.ParseJson<FunctionFoundResult>());
+            return new FunctionFoundResultOutput(args, result);
         }
 
         public async Task<string[]?> QueryFunctionDB(string query)
