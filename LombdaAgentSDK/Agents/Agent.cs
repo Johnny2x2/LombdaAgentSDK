@@ -61,7 +61,7 @@ namespace LombdaAgentSDK.Agents
                                                    [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
             return new Agent(client, "");
         }
-        public Agent(ModelClient client, string _name, string _instructions = "", Type? _output_schema = null, List<Delegate>? _tools = null)
+        public Agent(ModelClient client, string _name = "Assistant", string _instructions = "", Type? _output_schema = null, List<Delegate>? _tools = null)
         {
             Client = client;
             AgentName = _name;

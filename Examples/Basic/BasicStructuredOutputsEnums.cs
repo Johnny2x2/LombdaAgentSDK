@@ -1,7 +1,8 @@
-﻿using LombdaAgentSDK;
+﻿using LlmTornado.Chat.Models;
+using LlmTornado.Code;
+using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
-using Newtonsoft.Json.Converters;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,7 +17,10 @@ namespace Examples.Basic
         [Test]
         public async Task RunHelloWorld()
         {
-            Agent agent = new Agent(new OpenAIModelClient("gpt-4o-mini", enableWebSearch:true), "Assistant", "Have fun", _output_schema:typeof(conditions));
+            LLMTornadoModelProvider client =
+                new(ChatModel.OpenAi.Gpt41.V41Mini, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),], true, enableWebSearch:true);
+
+            Agent agent = new Agent(client, "Assistant", "Have fun", _output_schema:typeof(conditions));
 
             RunResult result = await Runner.RunAsync(agent, "What is the weather in boston?");
 
@@ -29,7 +33,7 @@ namespace Examples.Basic
         public struct conditions
         {
             public string summary { get; set; }
-            [JsonConverter(typeof(StringEnumConverter))]
+            [JsonConverter(typeof(JsonStringEnumConverter))]
             public condition weather { get; set; }
         }
 

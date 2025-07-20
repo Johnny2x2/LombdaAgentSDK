@@ -10,6 +10,7 @@ namespace LombdaAgentSDK
 {
 #pragma warning disable OPENAICUA001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 #pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+    [Obsolete("Obsoleting OpenAIModelClient so we can use 1 middle man provider for all Providers... Please Use LLMTornadoModelProvider Class")]
     public partial class OpenAIModelClient : ModelClient
     {
         //Used to save the results of the computer response

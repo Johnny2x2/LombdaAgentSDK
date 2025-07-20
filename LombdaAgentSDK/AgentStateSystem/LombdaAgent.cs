@@ -79,14 +79,14 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// <remarks>Subscribe to this event to perform actions when a state machine is added to the
         /// collection. The event handler receives an argument of type <see cref="StateMachine.StateMachine"/>,
         /// representing the added state machine.</remarks>
-        public event Action<StateMachine.StateMachine> StateMachineAdded;
+        public event Action<StateMachine.StateMachine>? StateMachineAdded;
         /// <summary>
         /// Occurs when a state machine is removed from the collection.
         /// </summary>
         /// <remarks>This event is triggered whenever a state machine is removed, allowing subscribers to
         /// perform any necessary cleanup or updates in response to the removal. Ensure that any event handlers attached
         /// to this event are thread-safe, as the event may be raised from different threads.</remarks>
-        public event Action<StateMachine.StateMachine> StateMachineRemoved;
+        public event Action<StateMachine.StateMachine>? StateMachineRemoved;
 
         /// <summary>
         /// Used to handle streaming callbacks from the agent.
@@ -175,7 +175,7 @@ namespace LombdaAgentSDK.AgentStateSystem
         public void AddStateMachine(StateMachine.StateMachine stateMachine)
         {
             CurrentStateMachines.Add(stateMachine);
-            StateMachineAdded.Invoke(stateMachine);
+            StateMachineAdded?.Invoke(stateMachine);
         }
 
         /// <summary>
@@ -186,7 +186,7 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// <param name="stateMachine">The state machine to be removed. Cannot be null.</param>
         public void RemoveStateMachine(StateMachine.StateMachine stateMachine)
         {
-            StateMachineRemoved.Invoke(stateMachine); // Trigger the StateMachineRemoved event
+            StateMachineRemoved?.Invoke(stateMachine); // Trigger the StateMachineRemoved event
             CurrentStateMachines.Remove(stateMachine); // Remove the state machine from the collection
         }
 
@@ -247,9 +247,20 @@ namespace LombdaAgentSDK.AgentStateSystem
                 }
             }
 
+            RunResult fileDescription = new();
+
             //Add in file content if provided
             if (message != null)
             {
+                // If the message is a file, we need to describe it
+                var originalInstructions = ControlAgent.Instructions;
+                ControlAgent.Instructions = "I need you to take the input file and describe the file/image. Be the eyes for the next step who cannot see the image but needs context from within the file/image" +
+                    "Be as descriptive as possible.";
+                fileDescription = await Runner.RunAsync(ControlAgent, messages: new List<ModelItem>([message]), verboseCallback: MainVerboseCallback, cancellationToken: CancellationTokenSource);
+
+                //Restore the original instructions
+                ControlAgent.Instructions = originalInstructions;
+                //Add file to the conversation
                 CurrentResult.Messages.Add(message);
             }
 
@@ -259,7 +270,16 @@ namespace LombdaAgentSDK.AgentStateSystem
                 // If an input preprocessor is set, run it on the user input
                 if (InputPreprocessor != null)
                 {
-                    var preprocessedInput = await RunPreprocess(userInput);
+                    string inputMessage = userInput;
+                    if (message != null)
+                    {
+                        if (fileDescription.Messages.Count > 0 && fileDescription.Text != null)
+                        {
+                            // If a file description was generated, we use it to preprocess the input
+                            inputMessage = $"USER QUESTION: {userInput} \n\n With provided context for Included File: {fileDescription.Text}";
+                        }
+                    }
+                    var preprocessedInput = await RunPreprocess(inputMessage);
                     preprocessedInput = "The following CONTEXT has been prepocessed by an Agent tasked to process the input[may or may not be relevent]. <PREPOCESSED RESULTS>" + preprocessedInput + "</PREPOCESSED RESULTS>";
                     // Create a system message with the preprocessed input
                     var systemMessage = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "SYSTEM", new List<ModelMessageContent>([new ModelMessageSystemResponseTextContent(preprocessedInput)]), ModelStatus.Completed);
