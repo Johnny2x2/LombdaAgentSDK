@@ -392,12 +392,6 @@ StateMachine stateMachine = new()
     MaxThreads = 5 // Limit concurrent states
 };
 
-// Remember to dispose state resources
-public override void Dispose()
-{
-    CancelTokenSource.Dispose();
-    base.Dispose();
-}
 ```
 ### 3. Type Safety
 
