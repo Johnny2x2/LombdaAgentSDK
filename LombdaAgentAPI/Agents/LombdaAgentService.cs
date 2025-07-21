@@ -128,13 +128,7 @@ namespace LombdaAgentAPI.Agents
             ControlAgent = new Agent(client, _agentName, instructions);
             
             // CRITICAL FIX: Wire up streaming callbacks to enable real-time streaming
-            // The StreamingCallback should call the RootStreamingEvent 
-            StreamingCallback = (message) => RootStreamingEvent?.Invoke(message);
-            MainStreamingCallback = (message) => RootStreamingEvent?.Invoke(message);
-            
-            // Also set the callbacks on the ControlAgent
-            ControlAgent.StreamingCallback = StreamingCallback;
-            ControlAgent.MainStreamingCallback = MainStreamingCallback;
+
             
             Console.WriteLine($"[AGENT DEBUG] APILombdaAgent {_agentId} initialized with streaming callbacks");
         }

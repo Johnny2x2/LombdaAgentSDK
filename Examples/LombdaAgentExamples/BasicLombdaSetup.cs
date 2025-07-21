@@ -3,6 +3,7 @@ using LlmTornado.Chat.Models;
 using LlmTornado.Code;
 using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
+using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.AgentStateSystem;
 using System;
 using System.Collections.Generic;
@@ -68,9 +69,9 @@ namespace Examples.LombdaAgentExamples
             Assert.That(result, Is.Not.Null, "The result should not be null.");
         }
 
-        public void ReceiveStream(string stream)
+        public void ReceiveStream(ModelStreamingEvents stream)
         {
-            Console.Write($"{stream}");
+            Console.Write($"{stream.EventType}");
         }
     }
 

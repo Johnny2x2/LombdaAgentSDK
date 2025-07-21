@@ -148,14 +148,18 @@ namespace LombdaAgentAPI.Controllers
             var eventsReceived = 0;
 
             // DIAGNOSTIC: Track streaming events
-            void StreamHandler(string message)
+            void StreamHandler(ModelStreamingEvents message)
             {
                 try
                 {
                     eventsReceived++;
                     Console.WriteLine($"[STREAMING DEBUG] Event #{eventsReceived}: '{message}'");
                     // Queue the message for async processing
-                    messageQueue.Enqueue(message);
+                    if(message is ModelStreamingOutputTextDeltaEvent deltaText)
+                    {
+                        messageQueue.Enqueue(deltaText.DeltaText ?? "");
+                    }
+                    
                 }
                 catch (Exception ex)
                 {

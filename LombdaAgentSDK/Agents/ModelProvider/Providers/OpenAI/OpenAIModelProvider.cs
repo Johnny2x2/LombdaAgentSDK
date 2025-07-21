@@ -155,17 +155,26 @@ namespace LombdaAgentSDK
                 {
                     //Do nothing
                 }
+                else if(update is StreamingResponseCreatedUpdate created)
+                {
+                    streamingCallback?.Invoke(new ModelStreamingCreatedEvent(created.SequenceNumber, created.Response.Id));
+                }
+                else if(update is StreamingResponseCompletedUpdate completed)
+                {
+                    streamingCallback?.Invoke(new ModelStreamingCompletedEvent(completed.SequenceNumber, completed.Response.Id));
+                }
                 else if (update is StreamingResponseOutputItemDoneUpdate completedItem)
                 {
                     //Do nothing
                 }
                 else if (update is StreamingResponseOutputTextDeltaUpdate deltaUpdate)
                 {
-                    streamingCallback?.Invoke($"{deltaUpdate.Delta}");
+                    streamingCallback?
+                        .Invoke(new ModelStreamingOutputTextDeltaEvent(deltaUpdate.SequenceNumber, deltaUpdate.OutputIndex, deltaUpdate.ContentIndex, deltaUpdate.Delta, deltaUpdate.ItemId));
                 }
                 else if (update is StreamingResponseFunctionCallArgumentsDeltaUpdate deltaUpdateFuncArgs)
                 {
-                    streamingCallback?.Invoke($"{deltaUpdateFuncArgs.Delta}");
+                    //streamingCallback?.Invoke($"{deltaUpdateFuncArgs.Delta}");
                 }
                 else if (update is StreamingResponseContentPartAddedUpdate newContent)
                 {

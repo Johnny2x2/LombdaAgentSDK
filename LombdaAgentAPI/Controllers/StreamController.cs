@@ -1,5 +1,6 @@
 using LombdaAgentAPI.Agents;
 using LombdaAgentAPI.Models;
+using LombdaAgentSDK.Agents.DataClasses;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LombdaAgentAPI.Controllers
@@ -46,11 +47,13 @@ namespace LombdaAgentAPI.Controllers
             var cancellationTokenSource = new CancellationTokenSource();
             var token = cancellationTokenSource.Token;
 
+            //THIS NEED TO BE UPDATED TO USE ModelStreamingEvents 
             // Setup action to handle agent streaming events
-            void StreamHandler(string message)
+            void StreamHandler(ModelStreamingEvents message)
             {
                 try
                 {
+                    //THIS NEED TO BE UPDATED TO USE ModelStreamingEvents 
                     // Format as SSE message
                     var task = Response.WriteAsync($"event: message\n");
                     task.Wait(token);
