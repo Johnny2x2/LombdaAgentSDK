@@ -5,12 +5,19 @@ This guide will help you quickly get up and running with LombdaAgentSDK.
 ## Installation
 
 Install the SDK using NuGet:
+```bash
 dotnet add package LombdaAiAgents
+```
+
 Or clone the repository and reference the project:
+```bash
 git clone https://github.com/johnny2x2/LombdaAgentSDK.git
+```
 ## Basic Usage
 
 ### Creating a Simple Agent
+
+```csharp
 using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 
@@ -24,7 +31,10 @@ Agent agent = new Agent(
 // Run the agent
 RunResult result = await Runner.RunAsync(agent, "Tell me a joke");
 Console.WriteLine(result.Text);
+```
 ### Using Structured Output
+
+```csharp
 // Define a structured output type
 public class WeatherReport
 {
@@ -48,7 +58,10 @@ WeatherReport report = result.ParseJson<WeatherReport>();
 
 Console.WriteLine($"Temperature: {report.Temperature}°C");
 Console.WriteLine($"Conditions: {report.Conditions}");
+```
 ### Adding Tools
+
+```csharp
 // Define a tool
 [Tool(
     Description = "Get current weather in a location",
@@ -74,9 +87,12 @@ Agent agent = new Agent(
 // Run the agent
 RunResult result = await Runner.RunAsync(agent, "What's the weather in Boston?");
 Console.WriteLine(result.Text);
+```
 ## State Machine Basics
 
 ### Creating a Simple State
+
+```csharp
 using LombdaAgentSDK.StateMachine;
 
 // Define a state that processes string input and produces integer output
@@ -96,7 +112,10 @@ public class IntToResultState : BaseState<int, string>
         return $"The result is {input * 2}";
     }
 }
+```
 ### Connecting States
+
+```csharp
 // Create state instances
 StringToIntState inputState = new();
 IntToResultState resultState = new();
@@ -115,9 +134,12 @@ stateMachine.SetOutputState(resultState);
 // Execute the workflow
 List<string?> results = await stateMachine.Run("42");
 Console.WriteLine(results.First()); // "The result is 84"
+```
 ## Agent State Machine
 
 ### Creating Agent States
+
+```csharp
 using LombdaAgentSDK.AgentStateSystem;
 
 // Define a research plan structure
@@ -167,7 +189,10 @@ class ReportState : AgentState<ResearchPlan, string>
         return await BeginRunnerAsync<string>($"Research plan: {string.Join(", ", plan.items)}");
     }
 }
+```
 ### Creating an Agent State Machine
+
+```csharp
 using LombdaAgentSDK.AgentStateSystem;
 
 public class ResearchAgent : AgentStateMachine<string, string>
@@ -195,7 +220,10 @@ LombdaAgent lombdaAgent = new LombdaAgent();
 ResearchAgent researchAgent = new ResearchAgent(lombdaAgent);
 string report = await researchAgent.RunAsync("Research the best electric bikes under $1500");
 Console.WriteLine(report);
+```
 ### Using the LombdaAgent for Monitoring and Debugging
+
+```csharp
 // Create a LombdaAgent with event handling
 LombdaAgent lombdaAgent = new LombdaAgent();
 
@@ -214,9 +242,12 @@ ResearchAgent researchAgent = new ResearchAgent(lombdaAgent);
 string report = await researchAgent.RunAsync("Research quantum computing applications");
 
 // Output will include all the verbose logs and streaming updates
+```
 ### Using the Windows Debugging UI
 
 If you're developing on Windows, you can use the included debugging UI:
+
+```csharp
 using WinFormsAgentUI;
 
 // Create the debug form
@@ -234,9 +265,12 @@ ResearchAgent researchAgent = new ResearchAgent(lombdaAgent);
 await researchAgent.RunAsync("Research topic");
 
 // The UI will display logs and streaming chat in real-time
+```
 ## Using LLMTornado Provider
 
 LLMTornado provides access to multiple model providers:
+
+```csharp
 using LlmTornado.Models;
 using LlmTornado.Providers;
 
@@ -246,16 +280,22 @@ LLMTornadoModelProvider client = new(
 );
 
 Agent agent = new Agent(client, "Assistant", "You are helpful");
+```
 ## Advanced Features
 
 ### Streaming Responses
+
+```csharp
 RunResult result = await Runner.RunAsync(
     agent, 
     "Tell me a story",
     streaming: true,
     streamingCallback: (text) => Console.Write(text)
 );
+```
 ### Guard Rails
+
+```csharp
 public static async Task<GuardRailFunctionOutput> ContentFilter(string input)
 {
     // Check for inappropriate content
@@ -273,7 +313,10 @@ RunResult result = await Runner.RunAsync(
     "User input here",
     guard_rail: ContentFilter
 );
+```
 ### Parallel State Processing
+
+```csharp
 public class ParallelProcessingState : BaseState<string, ProcessedData>
 {
     public ParallelProcessingState()
@@ -287,7 +330,10 @@ public class ParallelProcessingState : BaseState<string, ProcessedData>
         return new ProcessedData { Result = $"Processed: {input}" };
     }
 }
+```
 ### Computer Use (Experimental)
+
+```csharp
 RunResult result = await Runner.RunAsync(
     agent, 
     "Take a screenshot",
@@ -295,9 +341,12 @@ RunResult result = await Runner.RunAsync(
         Console.WriteLine($"Computer action: {action.TypeText}");
     }
 );
+```
 ### Sharing Data Between States
 
 You can share data between states in an AgentStateMachine using SharedModelItems:
+
+```csharp
 // In your state's Invoke method
 var newModelItem = new ModelItem
 {
@@ -314,9 +363,12 @@ if (CurrentStateMachine.RuntimeProperties.TryGetValue("SharedKey", out object va
     string sharedValue = value.ToString();
     // Use the shared value
 }
+```
 ## Best Practices
 
 ### 1. Error Handling
+
+```csharp
 try
 {
     RunResult result = await Runner.RunAsync(agent, "User input");
@@ -330,7 +382,10 @@ catch (Exception ex)
 {
     Console.WriteLine($"Error: {ex.Message}");
 }
+```
 ### 2. Resource Management
+
+```csharp
 // Set appropriate limits for state machines
 StateMachine stateMachine = new()
 {
@@ -343,17 +398,23 @@ public override void Dispose()
     CancelTokenSource.Dispose();
     base.Dispose();
 }
+```
 ### 3. Type Safety
 
 Always use strongly typed states and structured output for better reliability:
+
+```csharp
 // Good: Strongly typed
 public class TypedState : BaseState<UserQuery, ProcessedResult>
 
 // Avoid: Generic object types
 public class GenericState : BaseState<object, object>
+```
 ### 4. Using IsDeadEnd for Failed States
 
 When a state fails and should not be re-run:
+
+```csharp
 public override async Task<TOutput> Invoke(TInput input)
 {
     try
@@ -368,6 +429,7 @@ public override async Task<TOutput> Invoke(TInput input)
         throw;
     }
 }
+```
 ## Next Steps
 
 - Explore the [API Reference](API_REFERENCE.md) for detailed class documentation
@@ -377,8 +439,20 @@ public override async Task<TOutput> Invoke(TInput input)
 
 ## Common Issues
 
-### API Key Not SetError: Value cannot be null. (Parameter 'key')Solution: Set your `OPENAI_API_KEY` environment variable.
+### API Key Not Set
 
-### State Transition FailuresState transitions fail silentlySolution: Check that your transition conditions return `true` and that input/output types match between connected states.
+**Error:** `Value cannot be null. (Parameter 'key')`
 
-### Tool Not FoundTool method not being calledSolution: Ensure methods are public, have the `[Tool]` attribute, and are included in the agent's tools list.
+**Solution:** Set your `OPENAI_API_KEY` environment variable.
+
+### State Transition Failures
+
+**Issue:** State transitions fail silently
+
+**Solution:** Check that your transition conditions return `true` and that input/output types match between connected states.
+
+### Tool Not Found
+
+**Issue:** Tool method not being called
+
+**Solution:** Ensure methods are public, have the `[Tool]` attribute, and are included in the agent's tools list.
