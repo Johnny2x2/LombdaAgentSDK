@@ -172,6 +172,7 @@ A complete research workflow using state machines.
 - `ReportState.cs` - Generates reports
 
 **State Flow:**
+
 ```
 User Query → Planning → Research → Report → Final Output
 ```
@@ -344,20 +345,6 @@ catch (Exception ex)
 
 ## Customization Examples
 
-### Custom Model Provider
-
-```csharp
-public class CustomModelClient : ModelClient
-{
-    public override async Task<ModelResponse> _CreateResponseAsync(
-        List<ModelItem> messages, 
-        ModelResponseOptions options)
-    {
-        // Custom implementation
-    }
-}
-```
-
 ### Custom State Types
 
 ```csharp
@@ -379,7 +366,7 @@ public class CustomState : BaseState<CustomInput, CustomOutput>
 // Configure thread limits for performance
 StateMachine sm = new() { MaxThreads = 10 };
 
-// Enable parallel processing in states
+// Enable parallel transitions to multiple states
 public class ParallelState : BaseState<Input, Output>
 {
     public ParallelState() 

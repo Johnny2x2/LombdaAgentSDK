@@ -3,7 +3,11 @@
 This document outlines the architecture and design principles of the LombdaAgentSDK.
 
 ## High-Level Architecture
+
+```
 User → Agent → Model Provider → Response → Tool Execution → Output
+```
+
 LombdaAgentSDK follows a modular architecture with several key components:
 
 1. **Agent**: Encapsulates LLM interactions and tool execution
@@ -26,7 +30,10 @@ An agent consists of:
 - **Conversation History**: Maintained message log
 
 ### Execution Flow
+
+```
 Input → Agent → Model → Tool Calls? → Execute Tools → Collect Responses → Final Output
+```
 ### Tool System
 
 Tools follow a standardized pattern:
@@ -49,7 +56,10 @@ States follow a generic pattern `BaseState<TInput, TOutput>` where:
 - **Transitions**: Conditions for moving to next states
 
 ### State Machine Flow
+
+```
 Entry State → Process → Transition Check → Next State → ... → Exit State
+```
 1. **Initialization**: Entry state receives initial input
 2. **Processing**: State executes its `Invoke()` method
 3. **Transition Evaluation**: Conditions are checked against output
@@ -68,7 +78,10 @@ State machines handle concurrency through:
 ## AgentStateMachine Architecture
 
 AgentStateMachine extends the basic state machine architecture with agent-specific capabilities:
+
+```
 LombdaAgent → AgentStateMachine → AgentStates → Agent Execution → Events
+```
 ### AgentState Design
 
 AgentState adds agent-specific features to BaseState:
@@ -79,7 +92,10 @@ AgentState adds agent-specific features to BaseState:
 - **BeginRunnerAsync**: Helper for agent execution
 
 ### Flow in AgentStateMachine
+
+```
 Initialize → Setup States → Configure Transitions → Connect Events → Run → Monitor → Complete
+```
 1. **Initialization**: LombdaAgent creates AgentStateMachine
 2. **State Setup**: AgentStates are created and configured
 3. **Event Binding**: Events are connected to LombdaAgent
@@ -90,7 +106,10 @@ Initialize → Setup States → Configure Transitions → Connect Events → Run
 ## LombdaAgent Architecture
 
 LombdaAgent serves as the central coordination point:
+
+```
 Application → LombdaAgent → State Machines → States → Agents → Events → UI/Logging
+```
 ### Responsibilities:
 
 - **State Machine Management**: Tracks active state machines
@@ -100,11 +119,17 @@ Application → LombdaAgent → State Machines → States → Agents → Events 
 - **Debugging**: Connects to UI components
 
 ### Communication Flow
+
+```
 Agent Action → Event → LombdaAgent → Event Handlers → UI/Logging
+```
 ## Event System Architecture
 
 The event system provides real-time communication between components:
+
+```
 Source → Event → Subscribers → Actions
+```
 ### Event Types:
 
 - **VerboseCallback**: Detailed operation logs
@@ -126,11 +151,14 @@ Source → Event → Subscribers → Actions
 ### Provider Abstraction
 
 The `ModelClient` abstract class provides a uniform interface regardless of the underlying model provider:
+
+```csharp
 public abstract class ModelClient
 {
     public abstract Task<ModelResponse> _CreateResponseAsync(List<ModelItem> messages, ModelResponseOptions options);
     public abstract Task<ModelResponse> _CreateStreamingResponseAsync(List<ModelItem> messages, ModelResponseOptions options, StreamingCallbacks callback);
 }
+```
 ### Supported Providers
 
 - **OpenAIModelClient**: Direct integration with OpenAI API
@@ -140,7 +168,10 @@ public abstract class ModelClient
 ## Data Flow Architecture
 
 ### Message Flow
+
+```
 User Input → ModelMessageItem → Conversation History → Model Provider → ModelResponse → Tool Calls → Output
+```
 ### Type Safety
 
 The SDK maintains strong typing throughout:
@@ -151,7 +182,10 @@ The SDK maintains strong typing throughout:
 ## Debugging UI Architecture
 
 The Windows debugging UI provides visualization of agent operations:
+
+```
 LombdaAgent → Events → UI → User
+```
 ### UI Components:
 
 - **Left Panel**: Streaming chat display

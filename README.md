@@ -25,7 +25,7 @@
 ## 📂 Installation
 
 Install with NuGet
-```
+```bash
 dotnet add package LombdaAiAgents
 ```
 Or include the library in your solution by adding the project reference.
@@ -35,7 +35,7 @@ Or include the library in your solution by adding the project reference.
 ## 🔧 Usage
 
 ### Run an Agent
-```
+```csharp
 LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Mini,
                         [new ProviderAuthentication(LLmProviders.OpenAi, 
                         Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
@@ -43,9 +43,9 @@ LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Mini,
 Agent agent = new Agent(client, "Assistant", "Have fun");
 
 RunResult result = await Runner.RunAsync(agent, "Hello World!");
-````
-### Automatic Structured Output from Type
 ```
+### Automatic Structured Output from Type
+```csharp
 [Description("Steps to complete problem")]
 public struct math_step
 {
@@ -61,7 +61,7 @@ RunResult result = await Runner.RunAsync(agent, "How can I solve 8x + 7 = -23?")
 math_step mathResult = result.ParseJson<math_step>();
 ```
 ### Simple Tool Use
-```
+```csharp
 void async Task Run()
 {
     Agent agent = new Agent(
@@ -138,14 +138,15 @@ Where `FooState : BaseState<InputType, OutputType>`
 Invoke(InputType input) Must Return the Output Type (Strongly Typed)
 
 You can only Transition to a state where the Output of the current state is the Input to the next state
-```
+```csharp
 class ConvertStringToIntState : BaseState<string, int>
 {
     public override async Task<int> Invoke(string input)
     {
         return int.Parse(this.Input)
     }
-}```
+}
+```
 
 You can build pipelines of states and let the agent transition between them based on the results.
 
@@ -197,10 +198,13 @@ stateMachine.SetEntryState(inputState);
 stateMachine.SetOutputState(resultState);
 
 //Run the StateMachine
-List<string?> stateResults = await stateMachine.Run("3");---
+List<string?> stateResults = await stateMachine.Run("3");
 ```
-### Simple Conversion from different Input to Output typesConvertStringToIntState inputState = new();
+
+### Simple Conversion from different Input to Output types
+
 ```csharp
+ConvertStringToIntState inputState = new();
 ConvertStringToIntState resultState = new();
 
 //Input State will convert string to int
@@ -254,7 +258,8 @@ class ReportingState : AgentState<string, ReportData>
 ### Using the LombdaAgent for Orchestration
 
 The `LombdaAgent` acts as a unifier between individual agents and the state machine. It provides centralized management, event handling, and debugging capabilities.
-```
+
+```csharp
 // Create a LombdaAgent instance
 LombdaAgent lombdaAgent = new LombdaAgent();
 
@@ -269,7 +274,8 @@ lombdaAgent.StreamingCallback += (update) => Console.WriteLine($"[STREAM] {updat
 ### Creating Multi-Agent Workflows with AgentStateMachine
 
 The `AgentStateMachine` provides a framework for creating complex multi-agent workflows:
-```
+
+```csharp
 public class ResearchAgent : AgentStateMachine<string, ReportData>
 {
     public ResearchAgent(LombdaAgent lombdaAgent) : base(lombdaAgent) { }
@@ -291,8 +297,7 @@ public class ResearchAgent : AgentStateMachine<string, ReportData>
         SetOutputState(reportingState);
     }
 }
-```
-```csharp
+
 // Use the state machine
 var agent = new ResearchAgent(new LombdaAgent());
 var result = await agent.RunAsync("Research quantum computing");
