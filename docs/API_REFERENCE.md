@@ -10,7 +10,7 @@ The primary class for creating AI agents.
 
 ```csharp
 public Agent(
-    IModelClient client,
+    ModelClient client,
     string _name,
     string _instructions,
     Tool[]? _tools = null,
