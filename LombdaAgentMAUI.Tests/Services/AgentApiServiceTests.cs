@@ -36,6 +36,7 @@ namespace LombdaAgentMAUI.Tests.Services
         [TearDown]
         public void TearDown()
         {
+            _agentApiService?.Dispose();
             _httpClient?.Dispose();
         }
 

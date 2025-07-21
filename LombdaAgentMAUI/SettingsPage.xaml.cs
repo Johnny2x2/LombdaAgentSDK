@@ -46,6 +46,9 @@ public partial class SettingsPage : ContentPage
                 _configService.ApiBaseUrl = apiUrlEntry.Text.TrimEnd('/') + "/";
                 await _configService.SaveSettingsAsync();
 
+                // Update the API service with the new URL
+                _agentApiService.UpdateBaseUrl(_configService.ApiBaseUrl);
+
                 if (statusLabel != null)
                 {
                     statusLabel.Text = "Settings saved successfully!";
@@ -77,11 +80,12 @@ public partial class SettingsPage : ContentPage
                 statusLabel.TextColor = Colors.Orange;
             }
 
-            // Update the API service with the current URL
+            // Update configuration and API service with the current URL from the entry field
             var apiUrlEntry = this.FindByName<Entry>("ApiUrlEntry");
             if (apiUrlEntry != null && !string.IsNullOrWhiteSpace(apiUrlEntry.Text))
             {
-                _configService.ApiBaseUrl = apiUrlEntry.Text.TrimEnd('/') + "/";
+                var testUrl = apiUrlEntry.Text.TrimEnd('/') + "/";
+                _agentApiService.UpdateBaseUrl(testUrl);
             }
 
             // Test the connection by trying to get agents

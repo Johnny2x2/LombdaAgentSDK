@@ -23,18 +23,8 @@ public static class MauiProgram
         // Register configuration service
         builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
 
-        // Register HTTP client with a factory for dynamic URL
-        builder.Services.AddTransient<HttpClient>(serviceProvider =>
-        {
-            var configService = serviceProvider.GetRequiredService<IConfigurationService>();
-            var httpClient = new HttpClient();
-            httpClient.BaseAddress = new Uri(configService.ApiBaseUrl);
-            httpClient.Timeout = TimeSpan.FromMinutes(5);
-            return httpClient;
-        });
-
-        // Register the API service
-        builder.Services.AddTransient<IAgentApiService, AgentApiService>();
+        // Register the MAUI-specific API service that handles dynamic URLs properly
+        builder.Services.AddSingleton<IAgentApiService, MauiAgentApiService>();
 
         // Register pages
         builder.Services.AddTransient<MainPage>();

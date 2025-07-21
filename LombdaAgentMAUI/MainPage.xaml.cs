@@ -29,26 +29,33 @@ public partial class MainPage : ContentPage
 
     private async void OnPageLoaded(object? sender, EventArgs e)
     {
-        // Load configuration first
-        await _configService.LoadSettingsAsync();
-
-        // Find controls and set up bindings
-        var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
-        var agentListView = this.FindByName<CollectionView>("AgentListView");
-
-        if (chatCollectionView != null)
-            chatCollectionView.ItemsSource = _chatMessages;
-        
-        if (agentListView != null)
-            agentListView.ItemsSource = _agentList;
-
-        await LoadAgentsAsync();
-        LogSystemMessage("Application started. Please select or create an agent.");
-        
-        // Add welcome message with setup instructions if no agents found
-        if (_agentList.Count == 0)
+        try
         {
-            LogSystemMessage("No agents found. Please check your API configuration in Settings.");
+            // Load configuration first
+            await _configService.LoadSettingsAsync();
+
+            // Find controls and set up bindings
+            var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
+            var agentListView = this.FindByName<CollectionView>("AgentListView");
+
+            if (chatCollectionView != null)
+                chatCollectionView.ItemsSource = _chatMessages;
+            
+            if (agentListView != null)
+                agentListView.ItemsSource = _agentList;
+
+            await LoadAgentsAsync();
+            LogSystemMessage("Application started. Please select or create an agent.");
+            
+            // Add welcome message with setup instructions if no agents found
+            if (_agentList.Count == 0)
+            {
+                LogSystemMessage("No agents found. Please check your API configuration in Settings.");
+            }
+        }
+        catch (Exception ex)
+        {
+            LogSystemMessage($"Error during page load: {ex.Message}");
         }
     }
 

@@ -2,17 +2,23 @@ using System.Globalization;
 
 namespace LombdaAgentMAUI.Converters
 {
+    /// <summary>
+    /// Converts boolean to Color for message background styling
+    /// </summary>
     public class BoolToColorConverter : IValueConverter
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
-            if (value is bool isUser)
+            if (value is bool isUser && isUser)
             {
-                return isUser 
-                    ? Color.FromArgb("#512BD4") // User message color
-                    : Color.FromArgb("#E0E0E0"); // Agent message color
+                // User messages - blue background
+                return Color.FromArgb("#512BD4");
             }
-            return Color.FromArgb("#E0E0E0");
+            else
+            {
+                // Agent messages - light gray background
+                return Color.FromArgb("#E0E0E0");
+            }
         }
 
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -21,17 +27,23 @@ namespace LombdaAgentMAUI.Converters
         }
     }
 
+    /// <summary>
+    /// Converts boolean to text Color for message text styling
+    /// </summary>
     public class BoolToTextColorConverter : IValueConverter
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
-            if (value is bool isUser)
+            if (value is bool isUser && isUser)
             {
-                return isUser 
-                    ? Colors.White // User message text color
-                    : Colors.Black; // Agent message text color
+                // User messages - white text (on blue background)
+                return Colors.White;
             }
-            return Colors.Black;
+            else
+            {
+                // Agent messages - black text (on light background)
+                return Colors.Black;
+            }
         }
 
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -40,17 +52,23 @@ namespace LombdaAgentMAUI.Converters
         }
     }
 
+    /// <summary>
+    /// Converts boolean to LayoutOptions for message alignment
+    /// </summary>
     public class BoolToLayoutOptionsConverter : IValueConverter
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
-            if (value is bool isUser)
+            if (value is bool isUser && isUser)
             {
-                return isUser 
-                    ? LayoutOptions.End // User messages align right
-                    : LayoutOptions.Start; // Agent messages align left
+                // User messages - align to the right
+                return LayoutOptions.End;
             }
-            return LayoutOptions.Start;
+            else
+            {
+                // Agent messages - align to the left
+                return LayoutOptions.Start;
+            }
         }
 
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

@@ -11,21 +11,60 @@ namespace LombdaAgentMAUI.Core.Services
         Task<AgentResponse?> GetAgentAsync(string id);
         Task<MessageResponse?> SendMessageAsync(string agentId, string message, string? threadId = null);
         Task SendMessageStreamAsync(string agentId, string message, string? threadId, Action<string> onMessageReceived, CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Update the base URL for API calls. This will create a new HttpClient instance.
+        /// </summary>
+        void UpdateBaseUrl(string baseUrl);
     }
 
-    public class AgentApiService : IAgentApiService
+    public class AgentApiService : IAgentApiService, IDisposable
     {
-        private readonly HttpClient _httpClient;
+        private HttpClient _httpClient;
         private readonly JsonSerializerOptions _jsonOptions;
+        private readonly bool _ownsHttpClient;
 
         public AgentApiService(HttpClient httpClient)
         {
             _httpClient = httpClient;
+            _ownsHttpClient = false; // DI-provided client, don't dispose
             _jsonOptions = new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                 PropertyNameCaseInsensitive = true
             };
+        }
+
+        // Constructor for creating our own HttpClient instances
+        private AgentApiService(string baseUrl)
+        {
+            _httpClient = CreateHttpClient(baseUrl);
+            _ownsHttpClient = true; // We own this client, dispose it
+            _jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                PropertyNameCaseInsensitive = true
+            };
+        }
+
+        private static HttpClient CreateHttpClient(string baseUrl)
+        {
+            var client = new HttpClient();
+            client.BaseAddress = new Uri(baseUrl);
+            client.Timeout = TimeSpan.FromMinutes(5);
+            return client;
+        }
+
+        public void UpdateBaseUrl(string baseUrl)
+        {
+            // If we own the current client, dispose it
+            if (_ownsHttpClient)
+            {
+                _httpClient?.Dispose();
+            }
+
+            // Create a new client with the new base URL
+            _httpClient = CreateHttpClient(baseUrl);
         }
 
         public async Task<List<string>> GetAgentsAsync()
@@ -158,6 +197,14 @@ namespace LombdaAgentMAUI.Core.Services
             {
                 System.Diagnostics.Debug.WriteLine($"Error in streaming: {ex.Message}");
                 onMessageReceived($"Error: {ex.Message}");
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_ownsHttpClient)
+            {
+                _httpClient?.Dispose();
             }
         }
     }
