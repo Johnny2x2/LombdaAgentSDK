@@ -410,26 +410,6 @@ public class TypedState : BaseState<UserQuery, ProcessedResult>
 // Avoid: Generic object types
 public class GenericState : BaseState<object, object>
 ```
-### 4. Using IsDeadEnd for Failed States
-
-When a state fails and should not be re-run:
-
-```csharp
-public override async Task<TOutput> Invoke(TInput input)
-{
-    try
-    {
-        // Attempt to process
-        return result;
-    }
-    catch (Exception)
-    {
-        // Mark as dead end to prevent re-running
-        IsDeadEnd = true;
-        throw;
-    }
-}
-```
 ## Next Steps
 
 - Explore the [API Reference](API_REFERENCE.md) for detailed class documentation
