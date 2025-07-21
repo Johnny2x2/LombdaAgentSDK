@@ -5,6 +5,13 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace LombdaAgentAPI.Controllers
 {
+    /// <summary>
+    /// Provides API endpoints for managing agents, including creating, retrieving, and sending messages to agents.
+    /// </summary>
+    /// <remarks>This controller handles HTTP requests related to agent operations. It supports retrieving a
+    /// list of agents, creating new agents, fetching agent details by ID, and sending messages to agents with optional
+    /// server-sent events streaming. The controller relies on an injected <see cref="ILombdaAgentService"/> to perform
+    /// agent-related operations.</remarks>
     [ApiController]
     [Route("v1/[controller]")]
     public class AgentsController : ControllerBase

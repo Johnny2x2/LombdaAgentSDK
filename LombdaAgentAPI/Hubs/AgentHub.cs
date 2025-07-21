@@ -3,6 +3,12 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace LombdaAgentAPI.Hubs
 {
+    /// <summary>
+    /// Represents a hub for managing agent streaming subscriptions.
+    /// </summary>
+    /// <remarks>The <see cref="AgentHub"/> class provides functionality to subscribe to and manage streaming
+    /// events for agents. It interacts with the <see cref="ILombdaAgentService"/> to handle subscription logic and
+    /// manages client connections through SignalR groups.</remarks>
     public class AgentHub : Hub
     {
         private readonly ILombdaAgentService _agentService;

@@ -9,6 +9,13 @@ using System.Collections.Concurrent;
 
 namespace LombdaAgentAPI.Agents
 {
+    /// <summary>
+    /// Provides services for managing and interacting with Lombda agents, including creating agents, retrieving agent
+    /// information, and managing streaming subscribers.
+    /// </summary>
+    /// <remarks>This service allows clients to create agents, retrieve a list of agent IDs, and manage
+    /// streaming subscribers for real-time communication. It uses a hub context to facilitate communication with
+    /// connected clients.</remarks>
     public class LombdaAgentService : ILombdaAgentService
     {
         private readonly ConcurrentDictionary<string, LombdaAgent> _agents = new();

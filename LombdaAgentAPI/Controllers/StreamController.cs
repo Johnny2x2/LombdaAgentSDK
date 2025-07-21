@@ -4,6 +4,12 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace LombdaAgentAPI.Controllers
 {
+    /// <summary>
+    /// Provides endpoints for streaming events from agents using Server-Sent Events (SSE).
+    /// </summary>
+    /// <remarks>This controller is responsible for managing the streaming of events from agents. It uses
+    /// Server-Sent Events to push updates to clients in real-time. The controller listens for events from agents and
+    /// forwards them to connected clients.</remarks>
     [ApiController]
     [Route("v1/[controller]")]
     public class StreamController : ControllerBase
