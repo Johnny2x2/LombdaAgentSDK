@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace LombdaAgentMAUI.Core.Models
 {
     /// <summary>
@@ -65,13 +67,61 @@ namespace LombdaAgentMAUI.Core.Models
     }
 
     /// <summary>
-    /// Chat message for the UI
+    /// Chat message for the UI with property change notifications
     /// </summary>
-    public class ChatMessage
+    public class ChatMessage : INotifyPropertyChanged
     {
-        public string Text { get; set; } = string.Empty;
-        public bool IsUser { get; set; }
-        public DateTime Timestamp { get; set; } = DateTime.Now;
+        private string _text = string.Empty;
+        private bool _isUser;
+        private DateTime _timestamp = DateTime.Now;
+
+        public string Text 
+        { 
+            get => _text; 
+            set 
+            {
+                if (_text != value)
+                {
+                    _text = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public bool IsUser 
+        { 
+            get => _isUser; 
+            set 
+            {
+                if (_isUser != value)
+                {
+                    _isUser = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public DateTime Timestamp 
+        { 
+            get => _timestamp; 
+            set 
+            {
+                if (_timestamp != value)
+                {
+                    _timestamp = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(DisplayTime));
+                }
+            }
+        }
+
         public string DisplayTime => Timestamp.ToString("HH:mm:ss");
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 }

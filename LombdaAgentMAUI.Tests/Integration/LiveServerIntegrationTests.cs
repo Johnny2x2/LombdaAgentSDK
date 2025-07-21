@@ -283,6 +283,12 @@ namespace LombdaAgentMAUI.Tests.Integration
             Console.WriteLine($"🔄 Received {receivedChunks.Count} streaming chunks");
             Console.WriteLine($"📝 Full response: {fullResponse}");
             Console.WriteLine($"🧵 Thread ID: {threadId}");
+            
+            // Log each chunk for debugging
+            for (int i = 0; i < receivedChunks.Count; i++)
+            {
+                Console.WriteLine($"📦 Chunk {i + 1}: '{receivedChunks[i]}'");
+            }
         }
 
         [Test]

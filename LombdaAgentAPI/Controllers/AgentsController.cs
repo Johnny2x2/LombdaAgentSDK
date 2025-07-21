@@ -124,41 +124,219 @@ namespace LombdaAgentAPI.Controllers
                 return;
             }
 
+            Console.WriteLine($"[STREAMING DEBUG] Starting stream for agent {id}");
+
+            // Set proper SSE headers
             Response.Headers.Append("Content-Type", "text/event-stream");
             Response.Headers.Append("Cache-Control", "no-cache");
             Response.Headers.Append("Connection", "keep-alive");
-
-            // Setup local streaming to capture the output
-            var buffer = new List<string>();
-            agent.RootStreamingEvent += (message) => 
+            Response.Headers.Append("Access-Control-Allow-Origin", "*");
+            Response.Headers.Append("X-Accel-Buffering", "no"); // Disable nginx buffering
+            
+            // Disable response buffering for real-time streaming
+            var feature = HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpResponseBodyFeature>();
+            if (feature != null)
             {
-                buffer.Add(message);
-                return;
-            };
+                feature.DisableBuffering();
+            }
 
-            string response;
+            // Use a thread-safe queue for streaming messages
+            var messageQueue = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            var streamingComplete = false;
+            var streamingError = false;
+            var errorMessage = "";
+            var eventsReceived = 0;
+
+            // DIAGNOSTIC: Track streaming events
+            void StreamHandler(string message)
+            {
+                try
+                {
+                    eventsReceived++;
+                    Console.WriteLine($"[STREAMING DEBUG] Event #{eventsReceived}: '{message}'");
+                    // Queue the message for async processing
+                    messageQueue.Enqueue(message);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[STREAMING DEBUG] Error queuing streaming data: {ex.Message}");
+                }
+            }
+
+            // Subscribe to agent streaming events
+            agent.RootStreamingEvent += StreamHandler;
+            Console.WriteLine($"[STREAMING DEBUG] Subscribed to RootStreamingEvent");
+
             try
             {
-                // Process the message
-                if (string.IsNullOrEmpty(request.ThreadId))
+                // Send initial heartbeat to establish the stream
+                await Response.WriteAsync("data: \n\n");
+                await Response.Body.FlushAsync();
+                Console.WriteLine($"[STREAMING DEBUG] Sent initial heartbeat");
+
+                // Start the agent processing in a separate task
+                var agentTask = Task.Run(async () =>
                 {
-                    response = await agent.StartNewConversation(request.Text, true);
+                    try
+                    {
+                        Console.WriteLine($"[STREAMING DEBUG] Starting agent conversation with streaming=true");
+                        string response;
+                        if (string.IsNullOrEmpty(request.ThreadId))
+                        {
+                            response = await agent.StartNewConversation(request.Text, true);
+                        }
+                        else
+                        {
+                            response = await agent.AddToConversation(request.Text, request.ThreadId, true);
+                        }
+                        
+                        Console.WriteLine($"[STREAMING DEBUG] Agent completed. Response length: {response?.Length ?? 0}");
+                        // Signal completion
+                        streamingComplete = true;
+                        return response;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[STREAMING DEBUG] Agent error: {ex.Message}");
+                        streamingError = true;
+                        errorMessage = ex.Message;
+                        return null;
+                    }
+                });
+
+                // Process the message queue in real-time
+                Console.WriteLine($"[STREAMING DEBUG] Entering message processing loop");
+                var loopCount = 0;
+                while (!streamingComplete && !streamingError)
+                {
+                    loopCount++;
+                    if (loopCount % 100 == 0) // Log every 100 iterations to avoid spam
+                    {
+                        Console.WriteLine($"[STREAMING DEBUG] Loop iteration {loopCount}, queue count: {messageQueue.Count}");
+                    }
+
+                    // Process all queued messages
+                    var messagesProcessed = 0;
+                    while (messageQueue.TryDequeue(out var message))
+                    {
+                        messagesProcessed++;
+                        await Response.WriteAsync($"event: message\n");
+                        await Response.WriteAsync($"data: {EscapeJsonString(message)}\n\n");
+                        await Response.Body.FlushAsync();
+                        Console.WriteLine($"[STREAMING DEBUG] Sent streaming message #{messagesProcessed}: '{message}'");
+                    }
+
+                    // Small delay to prevent tight loop but maintain responsiveness
+                    await Task.Delay(10);
+                }
+
+                Console.WriteLine($"[STREAMING DEBUG] Exited processing loop. Complete: {streamingComplete}, Error: {streamingError}");
+
+                // Process any remaining messages in the queue
+                var remainingMessages = 0;
+                while (messageQueue.TryDequeue(out var message))
+                {
+                    remainingMessages++;
+                    await Response.WriteAsync($"event: message\n");
+                    await Response.WriteAsync($"data: {EscapeJsonString(message)}\n\n");
+                    await Response.Body.FlushAsync();
+                }
+                
+                if (remainingMessages > 0)
+                {
+                    Console.WriteLine($"[STREAMING DEBUG] Processed {remainingMessages} remaining messages");
+                }
+
+                // Wait for agent task to complete and get the final response
+                var finalResponse = await agentTask;
+
+                Console.WriteLine($"[STREAMING DEBUG] Final summary - Events received: {eventsReceived}, Messages sent: {eventsReceived}");
+
+                if (streamingError)
+                {
+                    await Response.WriteAsync($"event: error\n");
+                    await Response.WriteAsync($"data: {{\n");
+                    await Response.WriteAsync($"data: \"error\": \"{EscapeJsonString(errorMessage)}\"\n");
+                    await Response.WriteAsync($"data: }}\n\n");
+                    await Response.Body.FlushAsync();
                 }
                 else
                 {
-                    response = await agent.AddToConversation(request.Text, request.ThreadId, true);
+                    // Send the completion event
+                    await Response.WriteAsync($"event: complete\n");
+                    await Response.WriteAsync($"data: {{\n");
+                    await Response.WriteAsync($"data: \"threadId\": \"{agent.MainThreadId}\",\n");
+                    await Response.WriteAsync($"data: \"text\": \"{EscapeJsonString(finalResponse ?? "")}\"\n");
+                    await Response.WriteAsync($"data: }}\n\n");
+                    await Response.Body.FlushAsync();
+                    Console.WriteLine($"[STREAMING DEBUG] Sent completion event");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[STREAMING DEBUG] Exception in streaming: {ex.Message}");
+                await Response.WriteAsync($"event: error\n");
+                await Response.WriteAsync($"data: {{\n");
+                await Response.WriteAsync($"data: \"error\": \"{EscapeJsonString(ex.Message)}\"\n");
+                await Response.WriteAsync($"data: }}\n\n");
+                await Response.Body.FlushAsync();
+            }
+            finally
+            {
+                // Always unsubscribe to prevent memory leaks
+                agent.RootStreamingEvent -= StreamHandler;
+                Console.WriteLine($"[STREAMING DEBUG] Unsubscribed from RootStreamingEvent");
+            }
+        }
+
+        /// <summary>
+        /// Test endpoint to manually trigger streaming events for debugging
+        /// </summary>
+        /// <param name="id">Agent ID</param>
+        /// <returns>Test streaming response</returns>
+        [HttpPost("{id}/test-stream")]
+        public async Task TestStreamingEvents(string id)
+        {
+            var agent = _agentService.GetAgent(id);
+            if (agent == null)
+            {
+                Response.StatusCode = 404;
+                await Response.WriteAsync("Agent not found");
+                return;
+            }
+
+            // Set proper SSE headers
+            Response.Headers.Append("Content-Type", "text/event-stream");
+            Response.Headers.Append("Cache-Control", "no-cache");
+            Response.Headers.Append("Connection", "keep-alive");
+            Response.Headers.Append("Access-Control-Allow-Origin", "*");
+
+            try
+            {
+                // Send initial heartbeat
+                await Response.WriteAsync("data: \n\n");
+                await Response.Body.FlushAsync();
+
+                // Manually trigger streaming events to test the infrastructure
+                for (int i = 1; i <= 5; i++)
+                {
+                    await Response.WriteAsync($"event: message\n");
+                    await Response.WriteAsync($"data: Test chunk {i}\n\n");
+                    await Response.Body.FlushAsync();
+                    await Task.Delay(500); // 500ms delay between chunks
                 }
 
-                // Write the completion event
+                // Send completion
                 await Response.WriteAsync($"event: complete\n");
                 await Response.WriteAsync($"data: {{\n");
-                await Response.WriteAsync($"data: \"threadId\": \"{agent.MainThreadId}\",\n");
-                await Response.WriteAsync($"data: \"text\": \"{EscapeJsonString(response)}\"\n");
+                await Response.WriteAsync($"data: \"threadId\": \"test-thread\",\n");
+                await Response.WriteAsync($"data: \"text\": \"Test completed\"\n");
                 await Response.WriteAsync($"data: }}\n\n");
                 await Response.Body.FlushAsync();
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[TEST STREAMING] Error: {ex.Message}");
                 await Response.WriteAsync($"event: error\n");
                 await Response.WriteAsync($"data: {{\n");
                 await Response.WriteAsync($"data: \"error\": \"{EscapeJsonString(ex.Message)}\"\n");

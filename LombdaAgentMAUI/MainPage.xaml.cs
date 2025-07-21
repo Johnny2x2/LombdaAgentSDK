@@ -187,7 +187,7 @@ public partial class MainPage : ContentPage
 
         LogSystemMessage("Testing streaming functionality...");
         
-        // Simulate a streaming response
+        // Simulate a streaming response using the new observable ChatMessage
         var testMessage = new ChatMessage
         {
             Text = "",
@@ -201,7 +201,7 @@ public partial class MainPage : ContentPage
         });
 
         // Simulate streaming text arriving character by character
-        var fullText = "This is a simulated streaming response to test the UI updates.";
+        var fullText = "This is a simulated streaming response to test the UI updates with property change notifications.";
         for (int i = 0; i < fullText.Length; i++)
         {
             await Task.Delay(50); // 50ms delay between characters
@@ -210,25 +210,30 @@ public partial class MainPage : ContentPage
             
             MainThread.BeginInvokeOnMainThread(() =>
             {
-                var index = _chatMessages.IndexOf(testMessage);
-                if (index >= 0)
-                {
-                    _chatMessages[index] = new ChatMessage
-                    {
-                        Text = currentText,
-                        IsUser = false,
-                        Timestamp = testMessage.Timestamp
-                    };
-                }
+                // Update the Text property directly - this will trigger PropertyChanged
+                testMessage.Text = currentText;
 
-                // Auto-scroll to bottom
-                var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
-                if (chatCollectionView != null && _chatMessages.Count > 0)
+                // Auto-scroll to bottom occasionally
+                if (i % 20 == 0) // Every 20 characters
                 {
-                    chatCollectionView.ScrollTo(_chatMessages.Last(), position: ScrollToPosition.End, animate: false);
+                    var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
+                    if (chatCollectionView != null && _chatMessages.Count > 0)
+                    {
+                        chatCollectionView.ScrollTo(_chatMessages.Last(), position: ScrollToPosition.End, animate: false);
+                    }
                 }
             });
         }
+        
+        // Final scroll
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
+            if (chatCollectionView != null && _chatMessages.Count > 0)
+            {
+                chatCollectionView.ScrollTo(_chatMessages.Last(), position: ScrollToPosition.End, animate: true);
+            }
+        });
         
         LogSystemMessage("Simulated streaming test completed.");
     }
@@ -378,7 +383,7 @@ public partial class MainPage : ContentPage
     {
         LogSystemMessage($"Starting streaming message to agent {_currentAgentId}...");
 
-        // Create a placeholder message for streaming
+        // Create a placeholder message for streaming - now with property change notifications
         var agentMessage = new ChatMessage
         {
             Text = "🤖 Thinking...",
@@ -415,30 +420,21 @@ public partial class MainPage : ContentPage
                     
                     LogSystemMessage($"Received streaming chunk: '{streamedText}' (total length: {streamedContent.Length})");
                     
+                    // Update the message text property directly - this will trigger UI updates via INotifyPropertyChanged
                     MainThread.BeginInvokeOnMainThread(() =>
                     {
                         try
                         {
-                            // Update the message text
                             agentMessage.Text = streamedContent;
-                            
-                            // Force UI update by removing and re-adding (simple approach)
-                            var index = _chatMessages.IndexOf(agentMessage);
-                            if (index >= 0)
-                            {
-                                _chatMessages[index] = new ChatMessage
-                                {
-                                    Text = streamedContent,
-                                    IsUser = false,
-                                    Timestamp = agentMessage.Timestamp
-                                };
-                            }
 
-                            // Auto-scroll to bottom
-                            var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
-                            if (chatCollectionView != null && _chatMessages.Count > 0)
+                            // Auto-scroll to bottom - but only occasionally to improve performance
+                            if (streamedContent.Length % 30 == 0) // Every 30 characters
                             {
-                                chatCollectionView.ScrollTo(_chatMessages.Last(), position: ScrollToPosition.End, animate: false);
+                                var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
+                                if (chatCollectionView != null && _chatMessages.Count > 0)
+                                {
+                                    chatCollectionView.ScrollTo(_chatMessages.Last(), position: ScrollToPosition.End, animate: false);
+                                }
                             }
                         }
                         catch (Exception uiEx)
@@ -451,6 +447,16 @@ public partial class MainPage : ContentPage
             );
 
             LogSystemMessage("SendMessageStreamWithThreadAsync completed");
+
+            // Final scroll to bottom
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
+                if (chatCollectionView != null && _chatMessages.Count > 0)
+                {
+                    chatCollectionView.ScrollTo(_chatMessages.Last(), position: ScrollToPosition.End, animate: true);
+                }
+            });
 
             // Update the thread ID from the streaming response
             if (!string.IsNullOrEmpty(resultThreadId))
@@ -471,16 +477,6 @@ public partial class MainPage : ContentPage
                 MainThread.BeginInvokeOnMainThread(() =>
                 {
                     agentMessage.Text = "❌ No response received from streaming. The agent may be taking longer than expected.";
-                    var index = _chatMessages.IndexOf(agentMessage);
-                    if (index >= 0)
-                    {
-                        _chatMessages[index] = new ChatMessage
-                        {
-                            Text = agentMessage.Text,
-                            IsUser = false,
-                            Timestamp = agentMessage.Timestamp
-                        };
-                    }
                 });
             }
         }
@@ -490,16 +486,6 @@ public partial class MainPage : ContentPage
             MainThread.BeginInvokeOnMainThread(() =>
             {
                 agentMessage.Text = "⏱️ Streaming timed out. The agent may be taking longer than expected.";
-                var index = _chatMessages.IndexOf(agentMessage);
-                if (index >= 0)
-                {
-                    _chatMessages[index] = new ChatMessage
-                    {
-                        Text = agentMessage.Text,
-                        IsUser = false,
-                        Timestamp = agentMessage.Timestamp
-                    };
-                }
             });
         }
         catch (Exception ex)
@@ -509,16 +495,6 @@ public partial class MainPage : ContentPage
             MainThread.BeginInvokeOnMainThread(() =>
             {
                 agentMessage.Text = $"❌ Streaming error: {ex.Message}";
-                var index = _chatMessages.IndexOf(agentMessage);
-                if (index >= 0)
-                {
-                    _chatMessages[index] = new ChatMessage
-                    {
-                        Text = agentMessage.Text,
-                        IsUser = false,
-                        Timestamp = agentMessage.Timestamp
-                    };
-                }
             });
         }
     }
