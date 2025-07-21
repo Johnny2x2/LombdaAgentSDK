@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="LombdaAgentMAUI.SettingsPage"
+             Title="Settings">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="20">
+            
+            <Label Text="API Configuration" 
+                   FontSize="18" 
+                   FontAttributes="Bold" />
+            
+            <Frame BackgroundColor="{AppThemeBinding Light=#F8F9FA, Dark=#2D2D30}" 
+                   BorderColor="{AppThemeBinding Light=#E9ECEF, Dark=#3E3E42}" 
+                   Padding="15">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="API Base URL" FontAttributes="Bold" />
+                    <Entry x:Name="ApiUrlEntry"
+                           Placeholder="https://localhost:5001/"
+                           Text="{Binding ApiBaseUrl, Mode=TwoWay}" />
+                    <Label Text="Enter the base URL of your LombdaAgent API" 
+                           FontSize="12" 
+                           TextColor="Gray" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <Button Text="Save Settings" 
+                    Clicked="OnSaveSettingsClicked"
+                    BackgroundColor="{AppThemeBinding Light=#007ACC, Dark=#0E639C}"
+                    TextColor="White" />
+
+            <Button Text="Test Connection" 
+                    Clicked="OnTestConnectionClicked"
+                    BackgroundColor="{AppThemeBinding Light=#28A745, Dark=#1E7E34}"
+                    TextColor="White" />
+
+            <Frame BackgroundColor="{AppThemeBinding Light=#F8F9FA, Dark=#2D2D30}" 
+                   BorderColor="{AppThemeBinding Light=#E9ECEF, Dark=#3E3E42}" 
+                   Padding="15">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Instructions" FontAttributes="Bold" />
+                    <Label FontSize="12" TextColor="Gray">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="1. Make sure your LombdaAgent API is running&#x0a;" />
+                                <Span Text="2. Enter the correct API URL (include https:// and port)&#x0a;" />
+                                <Span Text="3. Save settings and test the connection&#x0a;" />
+                                <Span Text="4. Go back to the main page to start chatting with agents" />
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                </VerticalStackLayout>
+            </Frame>
+
+            <Label x:Name="StatusLabel" 
+                   Text="Ready to configure" 
+                   HorizontalOptions="Center"
+                   TextColor="Gray" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
