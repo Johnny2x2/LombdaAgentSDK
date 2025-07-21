@@ -143,6 +143,96 @@ public partial class MainPage : ContentPage
         await LoadAgentsAsync();
     }
 
+    private async void OnTestResponseClicked(object? sender, EventArgs e)
+    {
+        // Add a test message to verify the UI is working
+        LogSystemMessage("Adding test messages to verify UI...");
+        
+        var testUserMessage = new ChatMessage
+        {
+            Text = "This is a test user message",
+            IsUser = true,
+            Timestamp = DateTime.Now
+        };
+        
+        var testAgentMessage = new ChatMessage
+        {
+            Text = "This is a test agent response to verify the UI is working correctly.",
+            IsUser = false,
+            Timestamp = DateTime.Now.AddSeconds(1)
+        };
+
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            _chatMessages.Add(testUserMessage);
+            _chatMessages.Add(testAgentMessage);
+            
+            var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
+            if (chatCollectionView != null && _chatMessages.Count > 0)
+            {
+                chatCollectionView.ScrollTo(_chatMessages.Last(), position: ScrollToPosition.End, animate: true);
+            }
+        });
+        
+        LogSystemMessage($"Test messages added. Total messages: {_chatMessages.Count}");
+    }
+
+    private async void OnTestStreamingClicked(object? sender, EventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_currentAgentId))
+        {
+            await DisplayAlert("Error", "Please select an agent first.", "OK");
+            return;
+        }
+
+        LogSystemMessage("Testing streaming functionality...");
+        
+        // Simulate a streaming response
+        var testMessage = new ChatMessage
+        {
+            Text = "",
+            IsUser = false,
+            Timestamp = DateTime.Now
+        };
+
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            _chatMessages.Add(testMessage);
+        });
+
+        // Simulate streaming text arriving character by character
+        var fullText = "This is a simulated streaming response to test the UI updates.";
+        for (int i = 0; i < fullText.Length; i++)
+        {
+            await Task.Delay(50); // 50ms delay between characters
+            
+            var currentText = fullText.Substring(0, i + 1);
+            
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                var index = _chatMessages.IndexOf(testMessage);
+                if (index >= 0)
+                {
+                    _chatMessages[index] = new ChatMessage
+                    {
+                        Text = currentText,
+                        IsUser = false,
+                        Timestamp = testMessage.Timestamp
+                    };
+                }
+
+                // Auto-scroll to bottom
+                var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
+                if (chatCollectionView != null && _chatMessages.Count > 0)
+                {
+                    chatCollectionView.ScrollTo(_chatMessages.Last(), position: ScrollToPosition.End, animate: false);
+                }
+            });
+        }
+        
+        LogSystemMessage("Simulated streaming test completed.");
+    }
+
     private void OnAgentSelected(object? sender, EventArgs e)
     {
         var agentPicker = this.FindByName<Picker>("AgentPicker");
@@ -233,11 +323,16 @@ public partial class MainPage : ContentPage
         var response = await _agentApiService.SendMessageAsync(_currentAgentId!, message, _currentThreadId);
         if (response != null)
         {
+            // Add detailed logging to see what we received
+            LogSystemMessage($"Response received - ThreadId: {response.ThreadId}");
+            LogSystemMessage($"Response text length: {response.Text?.Length ?? 0}");
+            LogSystemMessage($"Response text preview: {(string.IsNullOrEmpty(response.Text) ? "[EMPTY]" : response.Text.Substring(0, Math.Min(response.Text.Length, 100)))}...");
+
             _currentThreadId = response.ThreadId;
 
             var agentMessage = new ChatMessage
             {
-                Text = response.Text,
+                Text = response.Text ?? "[No response text received]",
                 IsUser = false,
                 Timestamp = DateTime.Now
             };
@@ -245,18 +340,37 @@ public partial class MainPage : ContentPage
             MainThread.BeginInvokeOnMainThread(() =>
             {
                 _chatMessages.Add(agentMessage);
+                LogSystemMessage($"Added agent message to chat. Total messages: {_chatMessages.Count}");
+                
                 var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
                 if (chatCollectionView != null && _chatMessages.Count > 0)
                 {
                     chatCollectionView.ScrollTo(_chatMessages.Last(), position: ScrollToPosition.End, animate: true);
+                    LogSystemMessage("Scrolled to bottom of chat");
+                }
+                else
+                {
+                    LogSystemMessage("Chat CollectionView not found or no messages");
                 }
             });
 
-            LogSystemMessage("Response received.");
+            LogSystemMessage("Response processing completed.");
         }
         else
         {
-            LogSystemMessage("Failed to get response from agent.");
+            LogSystemMessage("Failed to get response from agent - response was null.");
+            
+            // Add a message to the chat indicating the failure
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                var errorMessage = new ChatMessage
+                {
+                    Text = "❌ Failed to get response from agent. Please try again.",
+                    IsUser = false,
+                    Timestamp = DateTime.Now
+                };
+                _chatMessages.Add(errorMessage);
+            });
         }
     }
 
@@ -267,7 +381,7 @@ public partial class MainPage : ContentPage
         // Create a placeholder message for streaming
         var agentMessage = new ChatMessage
         {
-            Text = "",
+            Text = "🤖 Thinking...",
             IsUser = false,
             Timestamp = DateTime.Now
         };
@@ -279,17 +393,84 @@ public partial class MainPage : ContentPage
 
         _streamingCancellationTokenSource?.Cancel();
         _streamingCancellationTokenSource = new CancellationTokenSource();
+        
+        // Set a longer timeout for streaming (5 minutes)
+        _streamingCancellationTokenSource.CancelAfter(TimeSpan.FromMinutes(5));
 
-        await _agentApiService.SendMessageStreamAsync(
-            _currentAgentId!,
-            message,
-            _currentThreadId,
-            (streamedText) =>
+        var streamedContent = "";
+        var hasReceivedContent = false;
+
+        try
+        {
+            LogSystemMessage("Calling SendMessageStreamWithThreadAsync...");
+            
+            var resultThreadId = await _agentApiService.SendMessageStreamWithThreadAsync(
+                _currentAgentId!,
+                message,
+                _currentThreadId,
+                (streamedText) =>
+                {
+                    hasReceivedContent = true;
+                    streamedContent += streamedText;
+                    
+                    LogSystemMessage($"Received streaming chunk: '{streamedText}' (total length: {streamedContent.Length})");
+                    
+                    MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        try
+                        {
+                            // Update the message text
+                            agentMessage.Text = streamedContent;
+                            
+                            // Force UI update by removing and re-adding (simple approach)
+                            var index = _chatMessages.IndexOf(agentMessage);
+                            if (index >= 0)
+                            {
+                                _chatMessages[index] = new ChatMessage
+                                {
+                                    Text = streamedContent,
+                                    IsUser = false,
+                                    Timestamp = agentMessage.Timestamp
+                                };
+                            }
+
+                            // Auto-scroll to bottom
+                            var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
+                            if (chatCollectionView != null && _chatMessages.Count > 0)
+                            {
+                                chatCollectionView.ScrollTo(_chatMessages.Last(), position: ScrollToPosition.End, animate: false);
+                            }
+                        }
+                        catch (Exception uiEx)
+                        {
+                            LogSystemMessage($"Error updating UI: {uiEx.Message}");
+                        }
+                    });
+                },
+                _streamingCancellationTokenSource.Token
+            );
+
+            LogSystemMessage("SendMessageStreamWithThreadAsync completed");
+
+            // Update the thread ID from the streaming response
+            if (!string.IsNullOrEmpty(resultThreadId))
             {
+                _currentThreadId = resultThreadId;
+                LogSystemMessage($"Streaming completed successfully. Thread ID: {resultThreadId}");
+            }
+            else
+            {
+                LogSystemMessage("Streaming completed but no thread ID received");
+            }
+            
+            LogSystemMessage($"Final content length: {streamedContent.Length}");
+            
+            if (!hasReceivedContent)
+            {
+                LogSystemMessage("Warning: No streaming content was received");
                 MainThread.BeginInvokeOnMainThread(() =>
                 {
-                    agentMessage.Text += streamedText;
-                    // Force UI update by removing and re-adding (simple approach)
+                    agentMessage.Text = "❌ No response received from streaming. The agent may be taking longer than expected.";
                     var index = _chatMessages.IndexOf(agentMessage);
                     if (index >= 0)
                     {
@@ -300,19 +481,46 @@ public partial class MainPage : ContentPage
                             Timestamp = agentMessage.Timestamp
                         };
                     }
-
-                    // Auto-scroll to bottom
-                    var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
-                    if (chatCollectionView != null && _chatMessages.Count > 0)
-                    {
-                        chatCollectionView.ScrollTo(_chatMessages.Last(), position: ScrollToPosition.End, animate: false);
-                    }
                 });
-            },
-            _streamingCancellationTokenSource.Token
-        );
-
-        LogSystemMessage("Streaming completed.");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            LogSystemMessage("Streaming was cancelled (timeout or user cancellation)");
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                agentMessage.Text = "⏱️ Streaming timed out. The agent may be taking longer than expected.";
+                var index = _chatMessages.IndexOf(agentMessage);
+                if (index >= 0)
+                {
+                    _chatMessages[index] = new ChatMessage
+                    {
+                        Text = agentMessage.Text,
+                        IsUser = false,
+                        Timestamp = agentMessage.Timestamp
+                    };
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            LogSystemMessage($"Streaming error: {ex.Message}");
+            LogSystemMessage($"Error type: {ex.GetType().Name}");
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                agentMessage.Text = $"❌ Streaming error: {ex.Message}";
+                var index = _chatMessages.IndexOf(agentMessage);
+                if (index >= 0)
+                {
+                    _chatMessages[index] = new ChatMessage
+                    {
+                        Text = agentMessage.Text,
+                        IsUser = false,
+                        Timestamp = agentMessage.Timestamp
+                    };
+                }
+            });
+        }
     }
 
     private void OnClearClicked(object? sender, EventArgs e)
@@ -344,5 +552,74 @@ public partial class MainPage : ContentPage
         });
 
         System.Diagnostics.Debug.WriteLine(logMessage);
+    }
+
+    private async void OnTestDirectStreamingClicked(object? sender, EventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_currentAgentId))
+        {
+            await DisplayAlert("Error", "Please select an agent first.", "OK");
+            return;
+        }
+
+        LogSystemMessage("Testing direct streaming endpoint...");
+
+        try
+        {
+            // Test the streaming endpoint directly
+            var httpClient = new HttpClient();
+            httpClient.BaseAddress = new Uri(_configService.ApiBaseUrl);
+            httpClient.Timeout = TimeSpan.FromMinutes(5);
+
+            var request = new
+            {
+                text = "Hello, this is a test message",
+                threadId = _currentThreadId
+            };
+
+            var json = System.Text.Json.JsonSerializer.Serialize(request);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"v1/agents/{_currentAgentId}/messages/stream")
+            {
+                Content = content
+            };
+
+            httpRequest.Headers.Add("Accept", "text/event-stream");
+            httpRequest.Headers.Add("Cache-Control", "no-cache");
+
+            LogSystemMessage("Sending direct HTTP request...");
+
+            using var response = await httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
+            
+            LogSystemMessage($"Response status: {response.StatusCode}");
+            LogSystemMessage($"Response content type: {response.Content.Headers.ContentType}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                using var stream = await response.Content.ReadAsStreamAsync();
+                using var reader = new StreamReader(stream);
+
+                var lineCount = 0;
+                while (!reader.EndOfStream && lineCount < 20) // Limit to first 20 lines for testing
+                {
+                    var line = await reader.ReadLineAsync();
+                    if (line != null)
+                    {
+                        lineCount++;
+                        LogSystemMessage($"Line {lineCount}: {line}");
+                    }
+                }
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                LogSystemMessage($"Error response: {errorContent}");
+            }
+        }
+        catch (Exception ex)
+        {
+            LogSystemMessage($"Direct streaming test error: {ex.Message}");
+        }
     }
 }

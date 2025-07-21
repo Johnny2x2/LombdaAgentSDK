@@ -18,6 +18,9 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             
             <Picker x:Name="AgentPicker" 
@@ -28,15 +31,44 @@
             
             <Button x:Name="CreateAgentButton"
                     Grid.Column="1"
-                    Text="Create Agent"
+                    Text="Create"
                     Clicked="OnCreateAgentClicked"
-                    Margin="5,0,0,0" />
+                    Margin="2,0,0,0"
+                    FontSize="12" />
             
             <Button x:Name="RefreshButton"
                     Grid.Column="2"
                     Text="Refresh"
                     Clicked="OnRefreshClicked"
-                    Margin="5,0,0,0" />
+                    Margin="2,0,0,0"
+                    FontSize="12" />
+                    
+            <Button x:Name="TestButton"
+                    Grid.Column="3"
+                    Text="Test UI"
+                    Clicked="OnTestResponseClicked"
+                    Margin="2,0,0,0"
+                    BackgroundColor="Orange"
+                    TextColor="White"
+                    FontSize="12" />
+                    
+            <Button x:Name="TestStreamButton"
+                    Grid.Column="4"
+                    Text="Test Stream"
+                    Clicked="OnTestStreamingClicked"
+                    Margin="2,0,0,0"
+                    BackgroundColor="Purple"
+                    TextColor="White"
+                    FontSize="12" />
+                    
+            <Button x:Name="TestDirectStreamButton"
+                    Grid.Column="5"
+                    Text="Direct Test"
+                    Clicked="OnTestDirectStreamingClicked"
+                    Margin="2,0,0,0"
+                    BackgroundColor="Red"
+                    TextColor="White"
+                    FontSize="12" />
         </Grid>
 
         <!-- Main content area -->

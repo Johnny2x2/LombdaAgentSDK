@@ -261,7 +261,7 @@ namespace LombdaAgentMAUI.Tests.Integration
             var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromMinutes(2));
 
             // Act
-            await _apiService.SendMessageStreamAsync(
+            var threadId = await _apiService.SendMessageStreamWithThreadAsync(
                 createdAgent.Id,
                 testMessage,
                 null,
@@ -274,6 +274,7 @@ namespace LombdaAgentMAUI.Tests.Integration
 
             // Assert
             Assert.That(receivedChunks.Count, Is.GreaterThan(0), "Should receive at least one chunk");
+            Assert.That(threadId, Is.Not.Null.And.Not.Empty, "Should receive a thread ID");
             
             var fullResponse = string.Join("", receivedChunks);
             Assert.That(fullResponse, Is.Not.Empty, "Combined response should not be empty");
@@ -281,6 +282,7 @@ namespace LombdaAgentMAUI.Tests.Integration
             Console.WriteLine($"\n💬 Sent: {testMessage}");
             Console.WriteLine($"🔄 Received {receivedChunks.Count} streaming chunks");
             Console.WriteLine($"📝 Full response: {fullResponse}");
+            Console.WriteLine($"🧵 Thread ID: {threadId}");
         }
 
         [Test]
