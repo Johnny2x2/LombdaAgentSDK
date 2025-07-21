@@ -13,11 +13,9 @@ Located in `Examples/Basic/`, these examples demonstrate fundamental SDK usage.
 Simple "Hello World" example showing basic agent creation and execution.
 
 ```csharp
-```csharp
 Agent agent = new Agent(new OpenAIModelClient("gpt-4o-mini"), "Assistant", "Have fun");
 RunResult result = await Runner.RunAsync(agent, "What is the weather in boston?");
 Console.WriteLine($"[ASSISTANT]: {result.Text}");
-```
 ```
 
 **Key Concepts:**
@@ -32,7 +30,6 @@ Console.WriteLine($"[ASSISTANT]: {result.Text}");
 Demonstrates how to create and use tools with agents.
 
 ```csharp
-```csharp
 [Tool(Description = "Get the current weather in a given location")]
 public string GetCurrentWeather(string location, Unit unit = Unit.celsius)
 {
@@ -45,7 +42,6 @@ Agent agent = new Agent(
     "Have fun",  
     _tools : [GetCurrentLocation, GetCurrentWeather]
 );
-```
 ```
 
 **Key Concepts:**
@@ -60,7 +56,6 @@ Agent agent = new Agent(
 
 Shows how to get structured JSON output from agents.
 
-```csharp
 ```csharp
 public struct math_step
 {
@@ -77,7 +72,6 @@ Agent agent = new Agent(
 
 RunResult result = await Runner.RunAsync(agent, "How can I solve 8x + 7 = -23?");
 math_step mathResult = result.ParseJson<math_step>();
-```
 ```
 
 **Key Concepts:**
@@ -351,20 +345,6 @@ catch (Exception ex)
 
 ## Customization Examples
 
-### Custom Model Provider
-
-```csharp
-public class CustomModelClient : ModelClient
-{
-    public override async Task<ModelResponse> _CreateResponseAsync(
-        List<ModelItem> messages, 
-        ModelResponseOptions options)
-    {
-        // Custom implementation
-    }
-}
-```
-
 ### Custom State Types
 
 ```csharp
@@ -386,7 +366,7 @@ public class CustomState : BaseState<CustomInput, CustomOutput>
 // Configure thread limits for performance
 StateMachine sm = new() { MaxThreads = 10 };
 
-// Enable parallel processing in states
+// Enable parallel transitions to multiple states
 public class ParallelState : BaseState<Input, Output>
 {
     public ParallelState() 
