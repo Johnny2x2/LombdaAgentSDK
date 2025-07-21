@@ -294,7 +294,7 @@ namespace LombdaAgentSDK
                 {
                     if(data is ResponseEventCreated ResponseEvent)
                     {
-                        ResponseOutput.Id = ResponseEvent.Response.PreviousResponseId ?? ResponseEvent.Response.Id;
+                        ResponseOutput.Id = ResponseEvent.Response.Id ?? ResponseEvent.Response.PreviousResponseId;
                     }
                     else if (data is ResponseEventOutputTextDelta delta)
                     {
