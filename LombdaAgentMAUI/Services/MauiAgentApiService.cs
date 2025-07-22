@@ -85,6 +85,11 @@ namespace LombdaAgentMAUI.Services
             return await GetOrCreateApiService().SendMessageStreamWithEventsAsync(agentId, message, threadId, onMessageReceived, onEventReceived, cancellationToken);
         }
 
+        public async Task<string?> SendMessageStreamWithEventsAsync(string agentId, string message, string? threadId, Func<string, Task> onMessageReceived, Func<StreamingEventData, Task>? onEventReceived = null, CancellationToken cancellationToken = default)
+        {
+            return await GetOrCreateApiService().SendMessageStreamWithEventsAsync(agentId, message, threadId, onMessageReceived, onEventReceived, cancellationToken);
+        }
+
         public void Dispose()
         {
             _currentApiService?.Dispose();

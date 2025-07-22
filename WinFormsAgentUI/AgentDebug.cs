@@ -194,7 +194,7 @@ namespace WinFormsAgentUI
         /// dates the UI with verbose log messages from the agent.
         /// </summary>
         /// <param name="e"></param>
-        void Agent_StreamingLog(ModelStreamingEvents streamingEvent)
+        async Task Agent_StreamingLog(ModelStreamingEvents streamingEvent)
         {
             if (SystemRichTextBox.InvokeRequired) // Check if invoking is required
             {
@@ -305,7 +305,7 @@ namespace WinFormsAgentUI
         /// UI thread. If the method is called from a non-UI thread, it will invoke the append operation on the UI
         /// thread.</remarks>
         /// <param name="message">The message to be displayed in the chat. Cannot be null or empty.</param>
-        public void StreamChat(ModelStreamingEvents streamingEvent)
+        public async Task StreamChat(ModelStreamingEvents streamingEvent)
         {
             if (ChatRichTextBox.InvokeRequired)
             {

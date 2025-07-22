@@ -19,6 +19,8 @@ namespace LombdaAgentSDK.AgentStateSystem
 
     public delegate string UserInputRequestDelegate(string prompt);
 
+    public delegate Task ModelStreamingEvent(ModelStreamingEvents streamEvent);
+
     public abstract class LombdaAgent
     {
         public List<ModelItem> SharedModelItems = new List<ModelItem>();
@@ -61,7 +63,7 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// <summary>
         /// Streaming events from the Agents in the state machine system for logging purposes
         /// </summary>
-        public event Action<ModelStreamingEvents>? streamingEvent;
+        public event ModelStreamingEvent? streamingEvent;
         /// <summary>
         /// Occurs when a verbose message related to the Control Agent  is generated.
         /// </summary>
@@ -72,7 +74,7 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// <summary>
         /// Main streaming event for the Control Agent to handle streaming messages for the Control Agent conversation.
         /// </summary>
-        public event Action<ModelStreamingEvents>? RootStreamingEvent;
+        public event ModelStreamingEvent? RootStreamingEvent;
         /// <summary>
         /// Occurs when a new state machine is added.
         /// </summary>

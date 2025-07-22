@@ -28,9 +28,14 @@ namespace LombdaAgentMAUI.Core.Services
         Task<string?> SendMessageStreamWithThreadAsync(string agentId, string message, string? threadId, Action<string> onMessageReceived, CancellationToken cancellationToken = default);
         
         /// <summary>
-        /// Enhanced streaming method that provides detailed event information
+        /// Enhanced streaming method that provides detailed event information (legacy Action-based)
         /// </summary>
         Task<string?> SendMessageStreamWithEventsAsync(string agentId, string message, string? threadId, Action<string> onMessageReceived, Action<StreamingEventData>? onEventReceived = null, CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Enhanced streaming method that provides detailed event information with async callbacks
+        /// </summary>
+        Task<string?> SendMessageStreamWithEventsAsync(string agentId, string message, string? threadId, Func<string, Task> onMessageReceived, Func<StreamingEventData, Task>? onEventReceived = null, CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Update the base URL for API calls. This will create a new HttpClient instance.
@@ -163,17 +168,71 @@ namespace LombdaAgentMAUI.Core.Services
             }
         }
 
+        // Legacy method - use Action-based implementation
         public async Task SendMessageStreamAsync(string agentId, string message, string? threadId, Action<string> onMessageReceived, CancellationToken cancellationToken = default)
         {
             await SendMessageStreamWithEventsAsync(agentId, message, threadId, onMessageReceived, null, cancellationToken);
         }
 
+        // Legacy method - use Action-based implementation
         public async Task<string?> SendMessageStreamWithThreadAsync(string agentId, string message, string? threadId, Action<string> onMessageReceived, CancellationToken cancellationToken = default)
         {
             return await SendMessageStreamWithEventsAsync(agentId, message, threadId, onMessageReceived, null, cancellationToken);
         }
 
-        public async Task<string?> SendMessageStreamWithEventsAsync(string agentId, string message, string? threadId, Action<string> onMessageReceived, Action<StreamingEventData>? onEventReceived = null, CancellationToken cancellationToken = default)
+        // Action-based implementation (legacy compatibility)
+        public async Task<string?> SendMessageStreamWithEventsAsync(
+            string agentId, 
+            string message, 
+            string? threadId, 
+            Action<string> onMessageReceived, 
+            Action<StreamingEventData>? onEventReceived = null, 
+            CancellationToken cancellationToken = default)
+        {
+            // Wrap the action callbacks in async delegates
+            Func<string, Task> asyncMsgCallback = (text) => {
+                onMessageReceived(text);
+                return Task.CompletedTask;
+            };
+
+            Func<StreamingEventData, Task>? asyncEventCallback = null;
+            if (onEventReceived != null) {
+                asyncEventCallback = (eventData) => {
+                    onEventReceived(eventData);
+                    return Task.CompletedTask;
+                };
+            }
+
+            // Use the async implementation
+            return await SendMessageStreamWithEventsAsyncImplementation(
+                agentId, message, threadId, 
+                asyncMsgCallback, asyncEventCallback, 
+                cancellationToken);
+        }
+
+        // Async callback implementation
+        public async Task<string?> SendMessageStreamWithEventsAsync(
+            string agentId, 
+            string message, 
+            string? threadId, 
+            Func<string, Task> onMessageReceived, 
+            Func<StreamingEventData, Task>? onEventReceived = null, 
+            CancellationToken cancellationToken = default)
+        {
+            return await SendMessageStreamWithEventsAsyncImplementation(
+                agentId, message, threadId, 
+                onMessageReceived, onEventReceived, 
+                cancellationToken);
+        }
+
+        // The actual implementation that both overloads use
+        private async Task<string?> SendMessageStreamWithEventsAsyncImplementation(
+            string agentId, 
+            string message, 
+            string? threadId, 
+            Func<string, Task> onMessageReceived, 
+            Func<StreamingEventData, Task>? onEventReceived = null, 
+            CancellationToken cancellationToken = default)
         {
             try
             {
@@ -240,17 +299,34 @@ namespace LombdaAgentMAUI.Core.Services
                             switch (currentEvent)
                             {
                                 case "connected":
-                                    onEventReceived?.Invoke(new StreamingEventData { EventType = "connected" });
+                                    if (onEventReceived != null)
+                                    {
+                                        try
+                                        {
+                                            await onEventReceived(new StreamingEventData { EventType = "connected" });
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            System.Diagnostics.Debug.WriteLine($"[STREAM] Error in connected event callback: {ex.Message}");
+                                        }
+                                    }
                                     break;
 
                                 case "created":
                                     try
                                     {
                                         var createdData = JsonSerializer.Deserialize<StreamingEventData>(data, _jsonOptions);
-                                        if (createdData != null)
+                                        if (createdData != null && onEventReceived != null)
                                         {
                                             createdData.EventType = "created";
-                                            onEventReceived?.Invoke(createdData);
+                                            try
+                                            {
+                                                await onEventReceived(createdData);
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                System.Diagnostics.Debug.WriteLine($"[STREAM] Error in created event callback: {ex.Message}");
+                                            }
                                         }
                                     }
                                     catch (JsonException ex)
@@ -273,11 +349,30 @@ namespace LombdaAgentMAUI.Core.Services
                                             if (deltaData != null && !string.IsNullOrEmpty(deltaData.Text))
                                             {
                                                 chunksReceived++;
-                                                System.Diagnostics.Debug.WriteLine($"Calling onMessageReceived with delta #{chunksReceived}: '{deltaData.Text}'");
-                                                onMessageReceived(deltaData.Text);
+                                                System.Diagnostics.Debug.WriteLine($"[STREAM] Chunk #{chunksReceived}: '{deltaData.Text}' (length: {deltaData.Text.Length})");
+                                                
+                                                // Call the async message callback
+                                                try 
+                                                {
+                                                    await onMessageReceived(deltaData.Text);
+                                                }
+                                                catch (Exception callbackEx)
+                                                {
+                                                    System.Diagnostics.Debug.WriteLine($"[STREAM] Error in message callback: {callbackEx.Message}");
+                                                }
 
-                                                deltaData.EventType = "delta";
-                                                onEventReceived?.Invoke(deltaData);
+                                                if (onEventReceived != null)
+                                                {
+                                                    deltaData.EventType = "delta";
+                                                    try 
+                                                    {
+                                                        await onEventReceived(deltaData);
+                                                    }
+                                                    catch (Exception eventCallbackEx)
+                                                    {
+                                                        System.Diagnostics.Debug.WriteLine($"[STREAM] Error in event callback: {eventCallbackEx.Message}");
+                                                    }
+                                                }
                                             }
                                             jsonBuffer.Clear();
                                         }
@@ -293,10 +388,17 @@ namespace LombdaAgentMAUI.Core.Services
                                     try
                                     {
                                         var completeData = JsonSerializer.Deserialize<StreamingEventData>(data, _jsonOptions);
-                                        if (completeData != null)
+                                        if (completeData != null && onEventReceived != null)
                                         {
                                             completeData.EventType = "stream_complete";
-                                            onEventReceived?.Invoke(completeData);
+                                            try
+                                            {
+                                                await onEventReceived(completeData);
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                System.Diagnostics.Debug.WriteLine($"[STREAM] Error in stream_complete event callback: {ex.Message}");
+                                            }
                                         }
                                     }
                                     catch (JsonException ex)
@@ -329,16 +431,33 @@ namespace LombdaAgentMAUI.Core.Services
                                                 if (chunksReceived == 0 && !string.IsNullOrEmpty(completeResponse.Text))
                                                 {
                                                     System.Diagnostics.Debug.WriteLine($"No streaming chunks received, sending complete text: '{completeResponse.Text}'");
-                                                    onMessageReceived(completeResponse.Text);
+                                                    try
+                                                    {
+                                                        await onMessageReceived(completeResponse.Text);
+                                                    }
+                                                    catch (Exception ex)
+                                                    {
+                                                        System.Diagnostics.Debug.WriteLine($"[STREAM] Error sending complete text: {ex.Message}");
+                                                    }
                                                     chunksReceived = 1;
                                                 }
 
-                                                onEventReceived?.Invoke(new StreamingEventData 
-                                                { 
-                                                    EventType = "complete", 
-                                                    ThreadId = completeResponse.ThreadId,
-                                                    Text = completeResponse.Text
-                                                });
+                                                if (onEventReceived != null)
+                                                {
+                                                    try
+                                                    {
+                                                        await onEventReceived(new StreamingEventData 
+                                                        { 
+                                                            EventType = "complete", 
+                                                            ThreadId = completeResponse.ThreadId,
+                                                            Text = completeResponse.Text
+                                                        });
+                                                    }
+                                                    catch (Exception ex)
+                                                    {
+                                                        System.Diagnostics.Debug.WriteLine($"[STREAM] Error in complete event callback: {ex.Message}");
+                                                    }
+                                                }
                                             }
                                         }
                                         catch (JsonException ex)
@@ -363,8 +482,26 @@ namespace LombdaAgentMAUI.Core.Services
                                             if (errorData != null)
                                             {
                                                 errorData.EventType = currentEvent;
-                                                onEventReceived?.Invoke(errorData);
-                                                onMessageReceived($"Error: {errorData.Error}");
+                                                if (onEventReceived != null)
+                                                {
+                                                    try
+                                                    {
+                                                        await onEventReceived(errorData);
+                                                    }
+                                                    catch (Exception ex)
+                                                    {
+                                                        System.Diagnostics.Debug.WriteLine($"[STREAM] Error in error event callback: {ex.Message}");
+                                                    }
+                                                }
+
+                                                try
+                                                {
+                                                    await onMessageReceived($"Error: {errorData.Error}");
+                                                }
+                                                catch (Exception ex)
+                                                {
+                                                    System.Diagnostics.Debug.WriteLine($"[STREAM] Error sending error message: {ex.Message}");
+                                                }
                                             }
                                             jsonBuffer.Clear();
                                         }
@@ -387,11 +524,29 @@ namespace LombdaAgentMAUI.Core.Services
                                             if (reasoningData != null)
                                             {
                                                 reasoningData.EventType = "reasoning";
-                                                onEventReceived?.Invoke(reasoningData);
+                                                if (onEventReceived != null)
+                                                {
+                                                    try
+                                                    {
+                                                        await onEventReceived(reasoningData);
+                                                    }
+                                                    catch (Exception ex)
+                                                    {
+                                                        System.Diagnostics.Debug.WriteLine($"[STREAM] Error in reasoning event callback: {ex.Message}");
+                                                    }
+                                                }
+                                                
                                                 // Optionally add reasoning text to the main stream
                                                 if (!string.IsNullOrEmpty(reasoningData.Text))
                                                 {
-                                                    onMessageReceived($"[Reasoning] {reasoningData.Text}");
+                                                    try
+                                                    {
+                                                        await onMessageReceived($"[Reasoning] {reasoningData.Text}");
+                                                    }
+                                                    catch (Exception ex)
+                                                    {
+                                                        System.Diagnostics.Debug.WriteLine($"[STREAM] Error sending reasoning text: {ex.Message}");
+                                                    }
                                                 }
                                             }
                                             jsonBuffer.Clear();
@@ -406,7 +561,17 @@ namespace LombdaAgentMAUI.Core.Services
 
                                 default:
                                     System.Diagnostics.Debug.WriteLine($"Unhandled event type: {currentEvent}");
-                                    onEventReceived?.Invoke(new StreamingEventData { EventType = currentEvent ?? "unknown" });
+                                    if (onEventReceived != null)
+                                    {
+                                        try
+                                        {
+                                            await onEventReceived(new StreamingEventData { EventType = currentEvent ?? "unknown" });
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            System.Diagnostics.Debug.WriteLine($"[STREAM] Error in unknown event callback: {ex.Message}");
+                                        }
+                                    }
                                     break;
                             }
                         }
@@ -430,16 +595,33 @@ namespace LombdaAgentMAUI.Core.Services
                                         if (chunksReceived == 0 && !string.IsNullOrEmpty(completeResponse.Text))
                                         {
                                             System.Diagnostics.Debug.WriteLine($"Sending complete text: '{completeResponse.Text}'");
-                                            onMessageReceived(completeResponse.Text);
+                                            try
+                                            {
+                                                await onMessageReceived(completeResponse.Text);
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                System.Diagnostics.Debug.WriteLine($"[STREAM] Error sending complete text at event end: {ex.Message}");
+                                            }
                                             chunksReceived = 1;
                                         }
 
-                                        onEventReceived?.Invoke(new StreamingEventData 
-                                        { 
-                                            EventType = "complete", 
-                                            ThreadId = completeResponse.ThreadId,
-                                            Text = completeResponse.Text
-                                        });
+                                        if (onEventReceived != null)
+                                        {
+                                            try
+                                            {
+                                                await onEventReceived(new StreamingEventData 
+                                                { 
+                                                    EventType = "complete", 
+                                                    ThreadId = completeResponse.ThreadId,
+                                                    Text = completeResponse.Text
+                                                });
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                System.Diagnostics.Debug.WriteLine($"[STREAM] Error in complete event callback at event end: {ex.Message}");
+                                            }
+                                        }
                                     }
                                 }
                                 catch (JsonException ex)
@@ -475,7 +657,14 @@ namespace LombdaAgentMAUI.Core.Services
             {
                 System.Diagnostics.Debug.WriteLine($"Error in enhanced streaming: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-                onMessageReceived($"Error: {ex.Message}");
+                try
+                {
+                    await onMessageReceived($"Error: {ex.Message}");
+                }
+                catch (Exception callbackEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[STREAM] Error sending error message: {callbackEx.Message}");
+                }
                 return null;
             }
         }

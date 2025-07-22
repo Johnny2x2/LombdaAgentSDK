@@ -148,7 +148,7 @@ namespace LombdaAgentAPI.Controllers
             var eventsReceived = 0;
 
             // Enhanced streaming handler to handle different event types
-            void StreamHandler(ModelStreamingEvents streamingEvent)
+            async Task StreamHandler(ModelStreamingEvents streamingEvent)
             {
                 try
                 {
@@ -156,7 +156,8 @@ namespace LombdaAgentAPI.Controllers
                     Console.WriteLine($"[STREAMING DEBUG] Event #{eventsReceived}: Type='{streamingEvent.EventType}', Status='{streamingEvent.Status}'");
                     
                     // Queue the event for async processing
-                    messageQueue.Enqueue(streamingEvent);
+                    //messageQueue.Enqueue(streamingEvent);
+                    await ProcessStreamingEvent(streamingEvent);
                 }
                 catch (Exception ex)
                 {

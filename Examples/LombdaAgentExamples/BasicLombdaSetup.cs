@@ -69,7 +69,7 @@ namespace Examples.LombdaAgentExamples
             Assert.That(result, Is.Not.Null, "The result should not be null.");
         }
 
-        public void ReceiveStream(ModelStreamingEvents stream)
+        public async Task ReceiveStream(ModelStreamingEvents stream)
         {
             Console.Write($"{stream.EventType}");
         }

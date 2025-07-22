@@ -48,13 +48,12 @@ namespace LombdaAgentAPI.Controllers
             var token = cancellationTokenSource.Token;
 
             // Setup action to handle agent streaming events using the new ModelStreamingEvents system
-            void StreamHandler(ModelStreamingEvents streamingEvent)
+            async Task StreamHandler(ModelStreamingEvents streamingEvent)
             {
                 try
                 {
                     // Format different event types appropriately for SSE
-                    var task = FormatAndSendStreamingEvent(streamingEvent, token);
-                    task.Wait(token);
+                    await FormatAndSendStreamingEvent(streamingEvent, token);
                 }
                 catch (OperationCanceledException)
                 {

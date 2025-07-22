@@ -39,7 +39,7 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// <remarks>This event is triggered during the execution of a streaming operation, passing a
         /// string parameter that contains the current status or data update. Subscribers can use this event to receive
         /// real-time updates.</remarks>
-        public event Action<ModelStreamingEvents>? RunningStreamingCallback;
+        public event ModelStreamingEvent? RunningStreamingCallback;
 
         /// <summary>
         /// Gets or sets the <see cref="CancellationTokenSource"/> used to signal cancellation requests.
@@ -54,7 +54,7 @@ namespace LombdaAgentSDK.AgentStateSystem
         public Agent StateAgent { get; set; }
         public event Action<string>? RunningVerboseCallback;
 
-        public event Action<ModelStreamingEvents>? RunningStreamingCallback;
+        public event ModelStreamingEvent? RunningStreamingCallback;
 
         public CancellationTokenSource CancelTokenSource { get; set; } = new CancellationTokenSource();
 
