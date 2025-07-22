@@ -11,6 +11,7 @@ namespace LombdaAgentMAUI.Core.Models
         /// Name for the new agent
         /// </summary>
         public string Name { get; set; } = "Assistant";
+        public string AgentType { get; set; } = "Default";
     }
 
     /// <summary>
@@ -73,6 +74,7 @@ namespace LombdaAgentMAUI.Core.Models
     {
         private string _text = string.Empty;
         private bool _isUser;
+        private bool _isMarkdown = true; // Default to true for agent responses
         private DateTime _timestamp = DateTime.Now;
 
         public string Text 
@@ -96,6 +98,27 @@ namespace LombdaAgentMAUI.Core.Models
                 if (_isUser != value)
                 {
                     _isUser = value;
+                    OnPropertyChanged();
+                    // User messages are typically plain text, agent messages can be markdown
+                    if (_isUser)
+                    {
+                        IsMarkdown = false;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Indicates whether the text should be rendered as markdown
+        /// </summary>
+        public bool IsMarkdown
+        {
+            get => _isMarkdown;
+            set
+            {
+                if (_isMarkdown != value)
+                {
+                    _isMarkdown = value;
                     OnPropertyChanged();
                 }
             }
@@ -123,5 +146,57 @@ namespace LombdaAgentMAUI.Core.Models
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+    }
+
+    /// <summary>
+    /// Represents a chat session for a specific agent
+    /// </summary>
+    public class AgentSession
+    {
+        /// <summary>
+        /// Agent ID
+        /// </summary>
+        public string AgentId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Current thread ID for the conversation
+        /// </summary>
+        public string? ThreadId { get; set; }
+
+        /// <summary>
+        /// Last response ID (for API continuity)
+        /// </summary>
+        public string? LastResponseId { get; set; }
+
+        /// <summary>
+        /// Chat messages in this session
+        /// </summary>
+        public List<ChatMessage> Messages { get; set; } = new();
+
+        /// <summary>
+        /// Last activity timestamp
+        /// </summary>
+        public DateTime LastActivity { get; set; } = DateTime.Now;
+
+        /// <summary>
+        /// Agent name for display purposes
+        /// </summary>
+        public string AgentName { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Container for all agent sessions
+    /// </summary>
+    public class SessionData
+    {
+        /// <summary>
+        /// Dictionary of agent sessions keyed by agent ID
+        /// </summary>
+        public Dictionary<string, AgentSession> Sessions { get; set; } = new();
+
+        /// <summary>
+        /// Last selected agent ID
+        /// </summary>
+        public string? LastSelectedAgentId { get; set; }
     }
 }

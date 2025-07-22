@@ -23,6 +23,9 @@ public static class MauiProgram
         // Register configuration service
         builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
 
+        // Register session manager service
+        builder.Services.AddSingleton<ISessionManagerService, SessionManagerService>();
+
         // Register the MAUI-specific API service that handles dynamic URLs properly
         builder.Services.AddSingleton<IAgentApiService, MauiAgentApiService>();
 

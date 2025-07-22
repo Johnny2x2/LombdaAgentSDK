@@ -55,9 +55,14 @@ namespace LombdaAgentMAUI.Services
             return await GetOrCreateApiService().GetAgentsAsync();
         }
 
-        public async Task<AgentResponse?> CreateAgentAsync(string name)
+        public async Task<List<string>> GetAgentTypesAsync()
         {
-            return await GetOrCreateApiService().CreateAgentAsync(name);
+            return await GetOrCreateApiService().GetAgentTypesAsync();
+        }
+
+        public async Task<AgentResponse?> CreateAgentAsync(string name, string agentType = "Default")
+        {
+            return await GetOrCreateApiService().CreateAgentAsync(name, agentType);
         }
 
         public async Task<AgentResponse?> GetAgentAsync(string id)

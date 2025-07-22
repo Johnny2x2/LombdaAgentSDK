@@ -76,4 +76,35 @@ namespace LombdaAgentMAUI.Converters
             throw new NotImplementedException();
         }
     }
+
+    /// <summary>
+    /// Converts boolean IsMarkdown property to visibility for markdown/plain text rendering
+    /// </summary>
+    public class MarkdownVisibilityConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool isMarkdown)
+            {
+                // Parameter can be "markdown" or "plain" to indicate which view to show
+                var viewType = parameter?.ToString()?.ToLower();
+                
+                if (viewType == "markdown")
+                {
+                    return isMarkdown;
+                }
+                else if (viewType == "plain")
+                {
+                    return !isMarkdown;
+                }
+            }
+            
+            return false;
+        }
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }

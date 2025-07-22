@@ -21,7 +21,7 @@ namespace BabyAGI
         /// </summary>
         public BabyAgiStateMachine _stateMachine { get; set; } 
 
-        public BabyAGIRunner() : base() 
+        public BabyAGIRunner() : base("baby") 
         {             //Initialize the agent
             _stateMachine = new BabyAgiStateMachine(this);
             InputPreprocessor = RunStateMachine;

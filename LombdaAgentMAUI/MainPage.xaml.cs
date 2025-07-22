@@ -1,6 +1,6 @@
-﻿using LombdaAgentMAUI.Core.Models;
+﻿using System.Collections.ObjectModel;
+using LombdaAgentMAUI.Core.Models;
 using LombdaAgentMAUI.Core.Services;
-using System.Collections.ObjectModel;
 
 namespace LombdaAgentMAUI;
 
@@ -8,20 +8,25 @@ public partial class MainPage : ContentPage
 {
     private readonly IAgentApiService _agentApiService;
     private readonly IConfigurationService _configService;
+    private readonly ISessionManagerService _sessionManager;
     private readonly ObservableCollection<ChatMessage> _chatMessages;
     private readonly ObservableCollection<string> _agentList;
+    private readonly ObservableCollection<string> _agentTypes;
     private string? _currentAgentId;
     private string? _currentThreadId;
+    private string? _currentResponseId; // Track last response ID for API continuity
     private CancellationTokenSource? _streamingCancellationTokenSource;
 
-    public MainPage(IAgentApiService agentApiService, IConfigurationService configService)
+    public MainPage(IAgentApiService agentApiService, IConfigurationService configService, ISessionManagerService sessionManager)
     {
         InitializeComponent();
         
         _agentApiService = agentApiService;
         _configService = configService;
+        _sessionManager = sessionManager;
         _chatMessages = new ObservableCollection<ChatMessage>();
         _agentList = new ObservableCollection<string>();
+        _agentTypes = new ObservableCollection<string>();
 
         // Set up data binding after InitializeComponent
         this.Loaded += OnPageLoaded;
@@ -31,8 +36,10 @@ public partial class MainPage : ContentPage
     {
         try
         {
+            // Load configuration first
             await _configService.LoadSettingsAsync();
 
+            // Find controls and set up bindings
             var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
             var agentListView = this.FindByName<CollectionView>("AgentListView");
 
@@ -43,8 +50,14 @@ public partial class MainPage : ContentPage
                 agentListView.ItemsSource = _agentList;
 
             await LoadAgentsAsync();
+            await LoadAgentTypesAsync();
+            
+            // Try to restore the last selected agent after loading agents
+            await RestoreLastSelectedAgentAsync();
+            
             LogSystemMessage("Application started. Please select or create an agent.");
             
+            // Add welcome message with setup instructions if no agents found
             if (_agentList.Count == 0)
             {
                 LogSystemMessage("No agents found. Please check your API configuration in Settings.");
@@ -68,7 +81,7 @@ public partial class MainPage : ContentPage
             
             var agents = await _agentApiService.GetAgentsAsync();
             
-            await MainThread.InvokeOnMainThreadAsync(() =>
+            MainThread.BeginInvokeOnMainThread(() =>
             {
                 _agentList.Clear();
                 var agentPicker = this.FindByName<Picker>("AgentPicker");
@@ -98,11 +111,65 @@ public partial class MainPage : ContentPage
         }
     }
 
+    private async Task LoadAgentTypesAsync()
+    {
+        try
+        {
+            LogSystemMessage("Loading agent types...");
+            
+            var agentTypes = await _agentApiService.GetAgentTypesAsync();
+            
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                _agentTypes.Clear();
+                foreach (var agentType in agentTypes)
+                {
+                    _agentTypes.Add(agentType);
+                }
+                
+                LogSystemMessage($"Loaded {agentTypes.Count} agent types: {string.Join(", ", agentTypes)}");
+            });
+        }
+        catch (Exception ex)
+        {
+            LogSystemMessage($"Error loading agent types: {ex.Message}");
+        }
+    }
+
     private async void OnCreateAgentClicked(object? sender, EventArgs e)
     {
         try
         {
-            var name = await DisplayPromptAsync("Create Agent", "Enter agent name:", "OK", "Cancel", "Assistant");
+            // First, check if we have agent types loaded
+            if (_agentTypes.Count == 0)
+            {
+                LogSystemMessage("No agent types available. Refreshing agent types...");
+                await LoadAgentTypesAsync();
+                
+                if (_agentTypes.Count == 0)
+                {
+                    await DisplayAlert("Error", "No agent types available. Please check your API connection.", "OK");
+                    return;
+                }
+            }
+
+            // First, show agent type selection
+            string selectedAgentType = "Default";
+            if (_agentTypes.Count > 1)
+            {
+                var typeOptions = _agentTypes.ToArray();
+                selectedAgentType = await DisplayActionSheet("Select Agent Type", "Cancel", null, typeOptions);
+                
+                if (selectedAgentType == "Cancel" || string.IsNullOrEmpty(selectedAgentType))
+                    return;
+            }
+            else if (_agentTypes.Count == 1)
+            {
+                selectedAgentType = _agentTypes.First();
+            }
+
+            // Then, get the agent name
+            var name = await DisplayPromptAsync("Create Agent", $"Enter name for {selectedAgentType} agent:", "Create", "Cancel", "Assistant");
             if (string.IsNullOrWhiteSpace(name))
                 return;
 
@@ -110,17 +177,17 @@ public partial class MainPage : ContentPage
             if (loadingOverlay != null)
                 loadingOverlay.IsVisible = true;
 
-            LogSystemMessage($"Creating agent '{name}'...");
+            LogSystemMessage($"Creating agent '{name}' of type '{selectedAgentType}'...");
 
-            var response = await _agentApiService.CreateAgentAsync(name);
+            var response = await _agentApiService.CreateAgentAsync(name, selectedAgentType);
             if (response != null)
             {
-                LogSystemMessage($"Created agent: {response.Name} (ID: {response.Id})");
+                LogSystemMessage($"Created agent: {response.Name} (ID: {response.Id}, Type: {selectedAgentType})");
                 await LoadAgentsAsync();
             }
             else
             {
-                LogSystemMessage("Failed to create agent.");
+                LogSystemMessage($"Failed to create agent. Check if agent type '{selectedAgentType}' is valid.");
             }
         }
         catch (Exception ex)
@@ -138,94 +205,7 @@ public partial class MainPage : ContentPage
     private async void OnRefreshClicked(object? sender, EventArgs e)
     {
         await LoadAgentsAsync();
-    }
-
-    private async void OnTestResponseClicked(object? sender, EventArgs e)
-    {
-        LogSystemMessage("Adding test messages to verify UI...");
-        
-        var testUserMessage = new ChatMessage
-        {
-            Text = "This is a test user message",
-            IsUser = true,
-            Timestamp = DateTime.Now
-        };
-        
-        var testAgentMessage = new ChatMessage
-        {
-            Text = "This is a test agent response to verify the UI is working correctly.",
-            IsUser = false,
-            Timestamp = DateTime.Now.AddSeconds(1)
-        };
-
-        await MainThread.InvokeOnMainThreadAsync(() =>
-        {
-            _chatMessages.Add(testUserMessage);
-            _chatMessages.Add(testAgentMessage);
-            
-            var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
-            if (chatCollectionView != null && _chatMessages.Count > 0)
-            {
-                chatCollectionView.ScrollTo(_chatMessages.Last(), position: ScrollToPosition.End, animate: true);
-            }
-        });
-        
-        LogSystemMessage($"Test messages added. Total messages: {_chatMessages.Count}");
-    }
-
-    private async void OnTestStreamingClicked(object? sender, EventArgs e)
-    {
-        if (string.IsNullOrWhiteSpace(_currentAgentId))
-        {
-            await DisplayAlert("Error", "Please select an agent first.", "OK");
-            return;
-        }
-
-        LogSystemMessage("Testing streaming functionality...");
-        
-        var testMessage = new ChatMessage
-        {
-            Text = "",
-            IsUser = false,
-            Timestamp = DateTime.Now
-        };
-
-        await MainThread.InvokeOnMainThreadAsync(() =>
-        {
-            _chatMessages.Add(testMessage);
-        });
-
-        var fullText = "This is a simulated streaming response to test the UI updates with property change notifications.";
-        for (int i = 0; i < fullText.Length; i++)
-        {
-            await Task.Delay(50);
-            var currentText = fullText.Substring(0, i + 1);
-            
-            await MainThread.InvokeOnMainThreadAsync(() =>
-            {
-                testMessage.Text = currentText;
-
-                if (i % 20 == 0)
-                {
-                    var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
-                    if (chatCollectionView != null && _chatMessages.Count > 0)
-                    {
-                        chatCollectionView.ScrollTo(_chatMessages.Last(), position: ScrollToPosition.End, animate: false);
-                    }
-                }
-            });
-        }
-        
-        await MainThread.InvokeOnMainThreadAsync(() =>
-        {
-            var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
-            if (chatCollectionView != null && _chatMessages.Count > 0)
-            {
-                chatCollectionView.ScrollTo(_chatMessages.Last(), position: ScrollToPosition.End, animate: true);
-            }
-        });
-        
-        LogSystemMessage("Simulated streaming test completed.");
+        await LoadAgentTypesAsync();
     }
 
     private void OnAgentSelected(object? sender, EventArgs e)
@@ -233,10 +213,91 @@ public partial class MainPage : ContentPage
         var agentPicker = this.FindByName<Picker>("AgentPicker");
         if (agentPicker?.SelectedItem is string selectedAgentId)
         {
-            _currentAgentId = selectedAgentId;
-            _currentThreadId = null;
-            _chatMessages.Clear();
-            LogSystemMessage($"Selected agent: {selectedAgentId}");
+            SelectAgent(selectedAgentId);
+            
+            // Sync the list view selection
+            var agentListView = this.FindByName<CollectionView>("AgentListView");
+            if (agentListView != null)
+            {
+                var index = _agentList.IndexOf(selectedAgentId);
+                if (index >= 0)
+                {
+                    agentListView.SelectedItem = selectedAgentId;
+                }
+            }
+        }
+    }
+
+    // Event handler for when an agent is selected from the agent list
+    private void OnAgentListSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (e.CurrentSelection?.FirstOrDefault() is string selectedAgentId)
+        {
+            SelectAgent(selectedAgentId);
+            
+            // Sync the picker selection
+            var agentPicker = this.FindByName<Picker>("AgentPicker");
+            if (agentPicker != null)
+            {
+                agentPicker.SelectedItem = selectedAgentId;
+            }
+        }
+    }
+
+    // Common method to handle agent selection from both controls
+    private async void SelectAgent(string agentId)
+    {
+        try
+        {
+            // Save current session before switching if there's an active agent
+            if (!string.IsNullOrEmpty(_currentAgentId))
+            {
+                await SaveCurrentSessionAsync();
+            }
+
+            _currentAgentId = agentId;
+            
+            // Update the current agent label
+            var currentAgentLabel = this.FindByName<Label>("CurrentAgentLabel");
+            if (currentAgentLabel != null)
+            {
+                currentAgentLabel.Text = "Loading agent details...";
+            }
+            
+            LogSystemMessage($"Selected agent: {agentId}");
+            
+            // Load session for the selected agent
+            await LoadAgentSessionAsync(agentId);
+            
+            // Save this as the last selected agent
+            await _sessionManager.SaveLastSelectedAgentIdAsync(agentId);
+            
+            // Try to fetch agent details for better display
+            try
+            {
+                var agentDetails = await _agentApiService.GetAgentAsync(agentId);
+                if (agentDetails != null && currentAgentLabel != null)
+                {
+                    currentAgentLabel.Text = $"{agentDetails.Name} (ID: {agentId})";
+                    LogSystemMessage($"Loaded agent details: {agentDetails.Name}");
+                }
+                else if (currentAgentLabel != null)
+                {
+                    currentAgentLabel.Text = $"Agent ID: {agentId}";
+                }
+            }
+            catch (Exception ex)
+            {
+                LogSystemMessage($"Could not load agent details: {ex.Message}");
+                if (currentAgentLabel != null)
+                {
+                    currentAgentLabel.Text = $"Agent ID: {agentId}";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogSystemMessage($"Error selecting agent: {ex.Message}");
         }
     }
 
@@ -265,6 +326,9 @@ public partial class MainPage : ContentPage
                 Timestamp = DateTime.Now
             };
             _chatMessages.Add(userMessage);
+            
+            // Save session after adding user message
+            await SaveCurrentSessionAsync();
             
             if (messageEditor != null)
                 messageEditor.Text = string.Empty;
@@ -319,6 +383,7 @@ public partial class MainPage : ContentPage
             LogSystemMessage($"Response text length: {response.Text?.Length ?? 0}");
 
             _currentThreadId = response.ThreadId;
+            // Note: Regular messages don't typically return response IDs like streaming API
 
             var agentMessage = new ChatMessage
             {
@@ -339,6 +404,9 @@ public partial class MainPage : ContentPage
                 }
             });
 
+            // Save session after receiving response
+            await SaveCurrentSessionAsync();
+
             LogSystemMessage("Response processing completed.");
         }
         else
@@ -355,6 +423,9 @@ public partial class MainPage : ContentPage
                 };
                 _chatMessages.Add(errorMessage);
             });
+            
+            // Save session even with error message
+            await SaveCurrentSessionAsync();
         }
     }
 
@@ -391,15 +462,13 @@ public partial class MainPage : ContentPage
         // Run the streaming operation on a background task to prevent UI blocking
         try
         {
-            LogSystemMessage("🔄 Starting background streaming task...");
+            LogSystemMessage("🔄 Starting streaming request...");
             
             // Use Task.Run to execute streaming on background thread
             await Task.Run(async () =>
             {
                 try
                 {
-                    LogSystemMessage("🔄 Calling SendMessageStreamWithEventsAsync on background thread...");
-                    
                     var resultThreadId = await _agentApiService.SendMessageStreamWithEventsAsync(
                         _currentAgentId!,
                         message,
@@ -415,7 +484,11 @@ public partial class MainPage : ContentPage
                                 hasReceivedFirstDelta = true;
                             }
                             
-                            LogSystemMessage($"📥 Text chunk #{updateCount}: '{streamedText.Replace("\n", "\\n")}' (total: {streamedContent.Length})");
+                            // Only log every 10th chunk to reduce log spam
+                            if (updateCount % 10 == 0)
+                            {
+                                LogSystemMessage($"📥 Received {updateCount} text chunks (total: {streamedContent.Length} chars)");
+                            }
                             
                             // Capture content for UI update
                             string currentContent;
@@ -431,7 +504,6 @@ public partial class MainPage : ContentPage
                                     if (_chatMessages.Contains(agentMessage))
                                     {
                                         agentMessage.Text = currentContent;
-                                        LogSystemMessage($"✅ Updated UI with chunk #{updateCount} (length: {currentContent.Length})");
 
                                         // CRITICAL: Yield control to let the GUI framework work
                                         await Task.Yield();
@@ -446,15 +518,52 @@ public partial class MainPage : ContentPage
                                     LogSystemMessage($"❌ Error updating UI: {ex.Message}");
                                 }
                             });
-                            
-                            LogSystemMessage($"🔄 Completed processing chunk #{updateCount}");
                         },
                         // Event callback - runs on background thread
                         (eventData) =>
                         {
                             eventCount++;
                             var elapsedMs = (DateTime.Now - startTime).TotalMilliseconds;
-                            LogSystemMessage($"🔔 Event #{eventCount}: {eventData.EventType} (at {elapsedMs:0}ms)");
+                            
+                            // Track response ID from streaming events
+                            if (eventData.EventType == "created" && !string.IsNullOrEmpty(eventData.ResponseId))
+                            {
+                                _currentResponseId = eventData.ResponseId;
+                                LogSystemMessage($"📝 Stream created (ID: {eventData.ResponseId})");
+                            }
+                            
+                            // Only log important events to reduce clutter
+                            switch (eventData.EventType)
+                            {
+                                case "connected":
+                                    LogSystemMessage("✅ Connected to streaming endpoint");
+                                    break;
+                                    
+                                case "created":
+                                    // Already logged above when tracking response ID
+                                    break;
+                                    
+                                case "complete":
+                                    LogSystemMessage($"🏁 Response complete (Thread: {eventData.ThreadId})");
+                                    break;
+                                    
+                                case "error":
+                                case "stream_error":
+                                    LogSystemMessage($"❌ Error: {eventData.Error}");
+                                    break;
+                                    
+                                case "reasoning":
+                                    LogSystemMessage($"🧠 Reasoning step received");
+                                    break;
+                                    
+                                // Skip logging delta events as they're too verbose
+                                case "delta":
+                                    break;
+                                    
+                                default:
+                                    LogSystemMessage($"ℹ️ Event: {eventData.EventType}");
+                                    break;
+                            }
 
                             // Queue UI update without blocking the streaming thread
                             Dispatcher.DispatchAsync(async () =>
@@ -463,7 +572,6 @@ public partial class MainPage : ContentPage
                                 {
                                     if (!_chatMessages.Contains(agentMessage))
                                     {
-                                        LogSystemMessage("⚠️ Agent message no longer in collection during event");
                                         return;
                                     }
                                     
@@ -479,26 +587,17 @@ public partial class MainPage : ContentPage
                                             if (shouldUpdateFromEvent)
                                             {
                                                 agentMessage.Text = "🔗 Connected, waiting for response...";
-                                                LogSystemMessage("📱 UI updated: Connected");
                                             }
-                                            LogSystemMessage("✅ Connected to streaming endpoint");
                                             break;
                                             
                                         case "created":
                                             if (shouldUpdateFromEvent)
                                             {
                                                 agentMessage.Text = "⚡ Processing your request...";
-                                                LogSystemMessage("📱 UI updated: Processing");
                                             }
-                                            LogSystemMessage($"📝 Stream created (ID: {eventData.ResponseId})");
-                                            break;
-                                            
-                                        case "delta":
-                                            LogSystemMessage($"📄 Delta event processed (length: {eventData.Text?.Length ?? 0})");
                                             break;
                                             
                                         case "complete":
-                                            LogSystemMessage($"🏁 Response complete (Thread: {eventData.ThreadId})");
                                             if (!string.IsNullOrEmpty(eventData.ThreadId))
                                             {
                                                 _currentThreadId = eventData.ThreadId;
@@ -508,15 +607,6 @@ public partial class MainPage : ContentPage
                                         case "error":
                                         case "stream_error":
                                             agentMessage.Text = $"❌ Error: {eventData.Error}";
-                                            LogSystemMessage($"❌ Error: {eventData.Error}");
-                                            break;
-                                            
-                                        case "reasoning":
-                                            LogSystemMessage($"🧠 Reasoning: {eventData.Text?.Replace("\n", "\\n")}");
-                                            break;
-                                            
-                                        default:
-                                            LogSystemMessage($"ℹ️ Unknown event: {eventData.EventType}");
                                             break;
                                     }
                                     
@@ -532,7 +622,7 @@ public partial class MainPage : ContentPage
                         _streamingCancellationTokenSource.Token
                     );
 
-                    LogSystemMessage("✅ Background streaming completed successfully");
+                    LogSystemMessage("✅ Streaming request completed");
                     
                     // Final updates on UI thread
                     await MainThread.InvokeOnMainThreadAsync(() =>
@@ -548,7 +638,7 @@ public partial class MainPage : ContentPage
                             if (_chatMessages.Contains(agentMessage))
                             {
                                 agentMessage.Text = finalContent;
-                                LogSystemMessage($"✅ Final text update (length: {finalContent.Length})");
+                                LogSystemMessage($"✅ Response complete ({finalContent.Length} characters)");
                             }
                         }
 
@@ -566,11 +656,11 @@ public partial class MainPage : ContentPage
                     }
                     
                     var totalTime = (DateTime.Now - startTime).TotalSeconds;
-                    LogSystemMessage($"📊 Stats - Content: {streamedContent.Length} chars, Updates: {updateCount}, Events: {eventCount}, Time: {totalTime:0.00}s");
+                    LogSystemMessage($"📊 Streaming completed in {totalTime:0.1}s");
                     
                     if (!hasReceivedContent)
                     {
-                        LogSystemMessage("⚠️ No streaming content received - check if streaming is working from API");
+                        LogSystemMessage("⚠️ No streaming content received - check API connection");
                         await MainThread.InvokeOnMainThreadAsync(() =>
                         {
                             if (_chatMessages.Contains(agentMessage))
@@ -579,51 +669,28 @@ public partial class MainPage : ContentPage
                             }
                         });
                     }
+                    
+                    // Save session after streaming completes
+                    await SaveCurrentSessionAsync();
                 }
-                catch (OperationCanceledException)
+                catch (Exception streamEx)
                 {
-                    LogSystemMessage("⏱️ Streaming cancelled/timeout");
-                    await MainThread.InvokeOnMainThreadAsync(() =>
-                    {
-                        if (_chatMessages.Contains(agentMessage))
-                        {
-                            agentMessage.Text = "⏱️ Streaming timed out.";
-                        }
-                    });
-                }
-                catch (Exception ex)
-                {
-                    LogSystemMessage($"❌ Streaming error: {ex.Message}");
-                    await MainThread.InvokeOnMainThreadAsync(() =>
-                    {
-                        if (_chatMessages.Contains(agentMessage))
-                        {
-                            agentMessage.Text = $"❌ Error: {ex.Message}";
-                        }
-                    });
-                }
-            }, _streamingCancellationTokenSource.Token);
-            
-            LogSystemMessage("✅ Streaming task completed, UI thread released");
-        }
-        catch (Exception ex)
-        {
-            LogSystemMessage($"❌ Error in streaming task: {ex.Message}");
-            await MainThread.InvokeOnMainThreadAsync(() =>
-            {
-                if (_chatMessages.Contains(agentMessage))
-                {
-                    agentMessage.Text = $"❌ Task error: {ex.Message}";
+                    LogSystemMessage($"❌ Error during streaming: {streamEx.Message}");
                 }
             });
         }
-    }
-
-    private void OnClearClicked(object? sender, EventArgs e)
-    {
-        _chatMessages.Clear();
-        _currentThreadId = null;
-        LogSystemMessage("Chat cleared. New conversation will start with next message.");
+        catch (Exception ex)
+        {
+            LogSystemMessage($"❌ Error in streaming logic: {ex.Message}");
+        }
+        finally
+        {
+            // Final cancellation and cleanup
+            _streamingCancellationTokenSource?.Cancel();
+            _streamingCancellationTokenSource = null;
+            
+            LogSystemMessage("🔚 Streaming process ended");
+        }
     }
 
     private void LogSystemMessage(string message)
@@ -684,71 +751,255 @@ public partial class MainPage : ContentPage
         }
     }
 
-    private async void OnTestDirectStreamingClicked(object? sender, EventArgs e)
+    private async Task SaveCurrentSessionAsync()
     {
-        if (string.IsNullOrWhiteSpace(_currentAgentId))
-        {
-            await DisplayAlert("Error", "Please select an agent first.", "OK");
+        if (string.IsNullOrEmpty(_currentAgentId))
             return;
-        }
-
-        LogSystemMessage("Testing direct streaming endpoint...");
 
         try
         {
-            var httpClient = new HttpClient();
-            httpClient.BaseAddress = new Uri(_configService.ApiBaseUrl);
-            httpClient.Timeout = TimeSpan.FromMinutes(5);
-
-            var request = new
+            var session = new AgentSession
             {
-                text = "Hello, this is a test message",
-                threadId = _currentThreadId
+                AgentId = _currentAgentId,
+                ThreadId = _currentThreadId,
+                LastResponseId = _currentResponseId,
+                Messages = _chatMessages.ToList(),
+                LastActivity = DateTime.Now
             };
 
-            var json = System.Text.Json.JsonSerializer.Serialize(request);
-            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-
-            var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"v1/agents/{_currentAgentId}/messages/stream")
+            // Try to get agent name for better session display
+            try
             {
-                Content = content
-            };
-
-            httpRequest.Headers.Add("Accept", "text/event-stream");
-            httpRequest.Headers.Add("Cache-Control", "no-cache");
-
-            LogSystemMessage("Sending direct HTTP request...");
-
-            using var response = await httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
-            
-            LogSystemMessage($"Response status: {response.StatusCode}");
-            LogSystemMessage($"Response content type: {response.Content.Headers.ContentType}");
-
-            if (response.IsSuccessStatusCode)
-            {
-                using var stream = await response.Content.ReadAsStreamAsync();
-                using var reader = new StreamReader(stream);
-
-                var lineCount = 0;
-                while (!reader.EndOfStream && lineCount < 20)
+                var agentDetails = await _agentApiService.GetAgentAsync(_currentAgentId);
+                if (agentDetails != null)
                 {
-                    var line = await reader.ReadLineAsync();
-                    if (line != null)
+                    session.AgentName = agentDetails.Name;
+                }
+            }
+            catch
+            {
+                // If we can't get agent details, just use the ID
+                session.AgentName = _currentAgentId;
+            }
+
+            await _sessionManager.SaveSessionAsync(session);
+            
+            // Update Clear Session button visibility
+            var clearSessionButton = this.FindByName<Button>("ClearSessionButton");
+            if (clearSessionButton != null)
+            {
+                clearSessionButton.IsVisible = _chatMessages.Count > 0;
+            }
+            
+            LogSystemMessage($"Saved session for agent {_currentAgentId} ({_chatMessages.Count} messages)");
+        }
+        catch (Exception ex)
+        {
+            LogSystemMessage($"Error saving session: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Load the chat session for the specified agent
+    /// </summary>
+    private async Task LoadAgentSessionAsync(string agentId)
+    {
+        try
+        {
+            var session = await _sessionManager.GetSessionAsync(agentId);
+            var clearSessionButton = this.FindByName<Button>("ClearSessionButton");
+            
+            // Clear current messages
+            _chatMessages.Clear();
+            
+            if (session != null && session.Messages.Count > 0)
+            {
+                // Restore session data
+                _currentThreadId = session.ThreadId;
+                _currentResponseId = session.LastResponseId;
+                
+                // Restore chat messages
+                foreach (var message in session.Messages)
+                {
+                    _chatMessages.Add(message);
+                }
+                
+                // Show clear session button since there's history
+                if (clearSessionButton != null)
+                {
+                    clearSessionButton.IsVisible = true;
+                }
+                
+                LogSystemMessage($"Restored session for agent {agentId}: {session.Messages.Count} messages, ThreadId: {session.ThreadId}");
+                
+                // Scroll to the bottom to show the latest message
+                if (_chatMessages.Count > 0)
+                {
+                    var chatCollectionView = this.FindByName<CollectionView>("ChatCollectionView");
+                    if (chatCollectionView != null)
                     {
-                        lineCount++;
-                        LogSystemMessage($"Line {lineCount}: {line}");
+                        await MainThread.InvokeOnMainThreadAsync(async () =>
+                        {
+                            await Task.Delay(100); // Small delay to ensure UI is updated
+                            chatCollectionView.ScrollTo(_chatMessages.Last(), position: ScrollToPosition.End, animate: false);
+                        });
                     }
                 }
             }
             else
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                LogSystemMessage($"Error response: {errorContent}");
+                // No existing session, start fresh
+                _currentThreadId = null;
+                _currentResponseId = null;
+                
+                // Hide clear session button since there's no history
+                if (clearSessionButton != null)
+                {
+                    clearSessionButton.IsVisible = false;
+                }
+                
+                LogSystemMessage($"Starting new session for agent {agentId}");
             }
         }
         catch (Exception ex)
         {
-            LogSystemMessage($"Direct streaming test error: {ex.Message}");
+            LogSystemMessage($"Error loading session for agent {agentId}: {ex.Message}");
+            // On error, start with a clean session
+            _chatMessages.Clear();
+            _currentThreadId = null;
+            _currentResponseId = null;
+            
+            // Hide clear session button on error
+            var clearSessionButton = this.FindByName<Button>("ClearSessionButton");
+            if (clearSessionButton != null)
+            {
+                clearSessionButton.IsVisible = false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Restore the last selected agent and its session
+    /// </summary>
+    private async Task RestoreLastSelectedAgentAsync()
+    {
+        try
+        {
+            var lastAgentId = await _sessionManager.GetLastSelectedAgentIdAsync();
+            if (!string.IsNullOrEmpty(lastAgentId) && _agentList.Contains(lastAgentId))
+            {
+                LogSystemMessage($"Restoring last selected agent: {lastAgentId}");
+                
+                // Update UI controls to show the selected agent
+                var agentPicker = this.FindByName<Picker>("AgentPicker");
+                var agentListView = this.FindByName<CollectionView>("AgentListView");
+                
+                if (agentPicker != null)
+                {
+                    agentPicker.SelectedItem = lastAgentId;
+                }
+                
+                if (agentListView != null)
+                {
+                    agentListView.SelectedItem = lastAgentId;
+                }
+                
+                // Load the agent session without triggering the selection events
+                await LoadAgentSessionAsync(lastAgentId);
+                _currentAgentId = lastAgentId;
+                
+                // Update agent label
+                var currentAgentLabel = this.FindByName<Label>("CurrentAgentLabel");
+                if (currentAgentLabel != null)
+                {
+                    try
+                    {
+                        var agentDetails = await _agentApiService.GetAgentAsync(lastAgentId);
+                        if (agentDetails != null)
+                        {
+                            currentAgentLabel.Text = $"{agentDetails.Name} (ID: {lastAgentId})";
+                        }
+                        else
+                        {
+                            currentAgentLabel.Text = $"Agent ID: {lastAgentId}";
+                        }
+                    }
+                    catch
+                    {
+                        currentAgentLabel.Text = $"Agent ID: {lastAgentId}";
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogSystemMessage($"Error restoring last selected agent: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Called when the page is appearing - good place to save session
+    /// </summary>
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+    }
+
+    /// <summary>
+    /// Called when the page is disappearing - save current session
+    /// </summary>
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        
+        // Save current session when page is disappearing
+        if (!string.IsNullOrEmpty(_currentAgentId))
+        {
+            Task.Run(async () => await SaveCurrentSessionAsync());
+        }
+    }
+
+    private void OnClearClicked(object? sender, EventArgs e)
+    {
+        _chatMessages.Clear();
+        _currentThreadId = null;
+        _currentResponseId = null;
+        LogSystemMessage("Chat cleared. New conversation will start with next message.");
+        
+        // Save the cleared session
+        if (!string.IsNullOrEmpty(_currentAgentId))
+        {
+            Task.Run(async () => await SaveCurrentSessionAsync());
+        }
+    }
+
+    private async void OnClearSessionClicked(object? sender, EventArgs e)
+    {
+        if (string.IsNullOrEmpty(_currentAgentId))
+            return;
+
+        try
+        {
+            var result = await DisplayAlert("Clear Session", 
+                $"This will permanently delete the chat history for this agent. Are you sure?", 
+                "Yes, Clear", "Cancel");
+                
+            if (result)
+            {
+                // Clear the session from storage
+                await _sessionManager.ClearSessionAsync(_currentAgentId);
+                
+                // Clear current chat display
+                _chatMessages.Clear();
+                _currentThreadId = null;
+                _currentResponseId = null;
+                
+                LogSystemMessage($"Session cleared for agent {_currentAgentId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            LogSystemMessage($"Error clearing session: {ex.Message}");
         }
     }
 }

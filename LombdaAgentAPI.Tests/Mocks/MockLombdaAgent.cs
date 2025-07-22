@@ -18,7 +18,7 @@ namespace LombdaAgentAPI.Tests.Mocks
 
 
 
-        public MockLombdaAgent(string agentId, string agentName)
+        public MockLombdaAgent(string agentId, string agentName) : base(agentName)
         {
             _agentId = agentId;
             _agentName = agentName;
@@ -30,7 +30,7 @@ namespace LombdaAgentAPI.Tests.Mocks
         {
             // Create a mock agent for testing
             ControlAgent = new Agent(
-                new OpenAIModelClient("gpt-4o"),
+                new MockModelClient(),
                 _agentName,
                 $"You are a mock agent named {_agentName} for testing purposes."
             );

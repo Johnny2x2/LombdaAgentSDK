@@ -42,7 +42,7 @@ namespace LombdaAgentAPI.Tests.Unit
         public void CreateAgent_ReturnsNewAgentId()
         {
             // Act
-            var agentId = _service.CreateAgent("TestAgent");
+            var agentId = _service.CreateAgent("TestAgent","Default");
             
             // Assert
             Assert.That(agentId, Is.Not.Null.And.Not.Empty);
@@ -82,7 +82,7 @@ namespace LombdaAgentAPI.Tests.Unit
         public void AddStreamingSubscriber_ReturnsTrue_WhenAgentExists()
         {
             // Arrange
-            var agentId = _service.CreateAgent("TestAgent");
+            var agentId = _service.CreateAgent("TestAgent", "Default");
             
             // Act
             var result = _service.AddStreamingSubscriber(agentId, "connection-id");
@@ -95,7 +95,7 @@ namespace LombdaAgentAPI.Tests.Unit
         public void RemoveStreamingSubscriber_RemovesSubscription()
         {
             // Arrange
-            var agentId = _service.CreateAgent("TestAgent");
+            var agentId = _service.CreateAgent("TestAgent", "Default");
             _service.AddStreamingSubscriber(agentId, "connection-id");
             
             // Act

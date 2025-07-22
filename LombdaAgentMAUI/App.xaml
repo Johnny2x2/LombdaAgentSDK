@@ -15,6 +15,7 @@
             <converters:BoolToColorConverter x:Key="BoolToColorConverter" />
             <converters:BoolToTextColorConverter x:Key="BoolToTextColorConverter" />
             <converters:BoolToLayoutOptionsConverter x:Key="BoolToLayoutOptionsConverter" />
+            <converters:MarkdownVisibilityConverter x:Key="MarkdownVisibilityConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

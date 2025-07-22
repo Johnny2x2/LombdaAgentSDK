@@ -23,6 +23,12 @@ namespace LombdaAgentSDK.AgentStateSystem
 
     public abstract class LombdaAgent
     {
+        private readonly string _agentName;
+        public string AgentName => _agentName;
+
+        private string _agentId = Guid.NewGuid().ToString();
+        public string AgentId => _agentId;
+
         public List<ModelItem> SharedModelItems = new List<ModelItem>();
         /// <summary>
         /// Agent used to manage the active conversation and report results of the state machines.
@@ -109,16 +115,18 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// Represents the main callback for verbose operation used to trigger the event handler for the Control Agent.
         /// </summary>
         public RunnerVerboseCallbacks? MainVerboseCallback;
+        
 
         /// <summary>
         /// Master Cancellation token source for the Control Agent and the rest of the state machines.
         /// </summary>
         public CancellationTokenSource CancellationTokenSource { get; set; } = new CancellationTokenSource();
 
-        public LombdaAgent()
+        public LombdaAgent(string agentName)
         {
             // Initialize the agent and set up the callbacks
             InitializeAgent(); 
+            _agentName = agentName;
             StreamingCallback += RecieveStreamingCallbacks;  //Route State Agents streaming callbacks to the agent's event handler
             VerboseCallback += RecieveVerboseCallbacks; //Route State Agents verbose callbacks to the agent's event handler  
             MainStreamingCallback += RootStreamingCallback; //Setup the main streaming callback for the Control Agent

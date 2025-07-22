@@ -82,7 +82,7 @@ namespace Examples.LombdaAgentExamples
         /// </summary>
         public ResearchAgent _stateMachine { get; set; }
 
-        public BasicLombdaAgent() : base()
+        public BasicLombdaAgent() : base("basic")
         {             //Initialize the state machine
             _stateMachine = new ResearchAgent(this);
             InputPreprocessor = RunStateMachine;

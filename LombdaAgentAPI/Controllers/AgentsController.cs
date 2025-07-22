@@ -1,6 +1,7 @@
 using LombdaAgentAPI.Agents;
 using LombdaAgentAPI.Models;
 using LombdaAgentSDK.Agents.DataClasses;
+using LombdaAgentSDK.AgentStateSystem;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LombdaAgentAPI.Controllers
@@ -34,6 +35,16 @@ namespace LombdaAgentAPI.Controllers
         }
 
         /// <summary>
+        /// Get list of all available agent types
+        /// </summary>
+        /// <returns>List of agent type names</returns>
+        [HttpGet("types")]
+        public ActionResult<IEnumerable<string>> GetAgentTypes()
+        {
+            return Ok(_agentService.GetAgentTypes());
+        }
+
+        /// <summary>
         /// Create a new agent
         /// </summary>
         /// <param name="request">Agent creation request</param>
@@ -41,7 +52,11 @@ namespace LombdaAgentAPI.Controllers
         [HttpPost]
         public ActionResult<AgentResponse> CreateAgent(AgentCreationRequest request)
         {
-            var agentId = _agentService.CreateAgent(request.Name);
+            var agentId = _agentService.CreateAgent(request.Name, request.AgentType);
+            if (agentId == "0")
+            {
+                return BadRequest($"Invalid agent type: {request.AgentType}. Use GET /v1/agents/types to see available types.");
+            }
             return Ok(new AgentResponse { Id = agentId, Name = request.Name });
         }
 
@@ -57,7 +72,7 @@ namespace LombdaAgentAPI.Controllers
             if (agent == null)
                 return NotFound();
 
-            if (agent is APILombdaAgent apiAgent)
+            if (agent is LombdaAgent apiAgent)
             {
                 return Ok(new AgentResponse
                 {

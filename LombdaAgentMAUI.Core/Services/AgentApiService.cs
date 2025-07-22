@@ -21,21 +21,17 @@ namespace LombdaAgentMAUI.Core.Services
     public interface IAgentApiService
     {
         Task<List<string>> GetAgentsAsync();
-        Task<AgentResponse?> CreateAgentAsync(string name);
+        Task<List<string>> GetAgentTypesAsync();
+        Task<AgentResponse?> CreateAgentAsync(string name, string agentType = "Default");
         Task<AgentResponse?> GetAgentAsync(string id);
         Task<MessageResponse?> SendMessageAsync(string agentId, string message, string? threadId = null);
         Task SendMessageStreamAsync(string agentId, string message, string? threadId, Action<string> onMessageReceived, CancellationToken cancellationToken = default);
         Task<string?> SendMessageStreamWithThreadAsync(string agentId, string message, string? threadId, Action<string> onMessageReceived, CancellationToken cancellationToken = default);
         
         /// <summary>
-        /// Enhanced streaming method that provides detailed event information (legacy Action-based)
+        /// Enhanced streaming method that provides detailed event information
         /// </summary>
         Task<string?> SendMessageStreamWithEventsAsync(string agentId, string message, string? threadId, Action<string> onMessageReceived, Action<StreamingEventData>? onEventReceived = null, CancellationToken cancellationToken = default);
-        
-        /// <summary>
-        /// Enhanced streaming method that provides detailed event information with async callbacks
-        /// </summary>
-        Task<string?> SendMessageStreamWithEventsAsync(string agentId, string message, string? threadId, Func<string, Task> onMessageReceived, Func<StreamingEventData, Task>? onEventReceived = null, CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Update the base URL for API calls. This will create a new HttpClient instance.
@@ -109,11 +105,28 @@ namespace LombdaAgentMAUI.Core.Services
             }
         }
 
-        public async Task<AgentResponse?> CreateAgentAsync(string name)
+        public async Task<List<string>> GetAgentTypesAsync()
         {
             try
             {
-                var request = new AgentCreationRequest { Name = name };
+                var response = await _httpClient.GetAsync("v1/agents/types");
+                response.EnsureSuccessStatusCode();
+                
+                var content = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<List<string>>(content, _jsonOptions) ?? new List<string>();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting agent types: {ex.Message}");
+                return new List<string>();
+            }
+        }
+
+        public async Task<AgentResponse?> CreateAgentAsync(string name, string agentType = "Default")
+        {
+            try
+            {
+                var request = new AgentCreationRequest { Name = name, AgentType = agentType };
                 var json = JsonSerializer.Serialize(request, _jsonOptions);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
