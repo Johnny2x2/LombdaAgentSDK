@@ -381,7 +381,7 @@ public partial class MainPage : ContentPage
 
     private async Task SendStreamingMessage(string message)
     {
-        LogSystemMessage($"Starting streaming message to agent {_currentAgentId}...");
+        LogSystemMessage($"Starting enhanced streaming message to agent {_currentAgentId}...");
 
         // Create a placeholder message for streaming - now with property change notifications
         var agentMessage = new ChatMessage
@@ -404,12 +404,13 @@ public partial class MainPage : ContentPage
 
         var streamedContent = "";
         var hasReceivedContent = false;
+        var eventCount = 0;
 
         try
         {
-            LogSystemMessage("Calling SendMessageStreamWithThreadAsync...");
+            LogSystemMessage("Calling SendMessageStreamWithEventsAsync...");
             
-            var resultThreadId = await _agentApiService.SendMessageStreamWithThreadAsync(
+            var resultThreadId = await _agentApiService.SendMessageStreamWithEventsAsync(
                 _currentAgentId!,
                 message,
                 _currentThreadId,
@@ -443,10 +444,63 @@ public partial class MainPage : ContentPage
                         }
                     });
                 },
+                (eventData) =>
+                {
+                    eventCount++;
+                    LogSystemMessage($"Event #{eventCount}: {eventData.EventType} (Sequence: {eventData.SequenceId})");
+                    
+                    switch (eventData.EventType)
+                    {
+                        case "connected":
+                            LogSystemMessage("✅ Connected to streaming endpoint");
+                            MainThread.BeginInvokeOnMainThread(() =>
+                            {
+                                agentMessage.Text = "🔗 Connected, waiting for response...";
+                            });
+                            break;
+                            
+                        case "created":
+                            LogSystemMessage($"📝 Stream created (Response ID: {eventData.ResponseId})");
+                            MainThread.BeginInvokeOnMainThread(() =>
+                            {
+                                agentMessage.Text = "⚡ Processing your request...";
+                            });
+                            break;
+                            
+                        case "delta":
+                            LogSystemMessage($"📄 Text delta received (Output: {eventData.OutputIndex}, Content: {eventData.ContentIndex})");
+                            break;
+                            
+                        case "stream_complete":
+                            LogSystemMessage($"✅ Stream completed (Response ID: {eventData.ResponseId})");
+                            break;
+                            
+                        case "complete":
+                            LogSystemMessage($"🏁 Final response complete (Thread ID: {eventData.ThreadId})");
+                            break;
+                            
+                        case "reasoning":
+                            LogSystemMessage($"🧠 Reasoning: {eventData.Text}");
+                            break;
+                            
+                        case "error":
+                        case "stream_error":
+                            LogSystemMessage($"❌ Error event: {eventData.Error}");
+                            MainThread.BeginInvokeOnMainThread(() =>
+                            {
+                                agentMessage.Text = $"❌ Error: {eventData.Error}";
+                            });
+                            break;
+                            
+                        default:
+                            LogSystemMessage($"ℹ️ Unknown event: {eventData.EventType}");
+                            break;
+                    }
+                },
                 _streamingCancellationTokenSource.Token
             );
 
-            LogSystemMessage("SendMessageStreamWithThreadAsync completed");
+            LogSystemMessage("SendMessageStreamWithEventsAsync completed");
 
             // Final scroll to bottom
             MainThread.BeginInvokeOnMainThread(() =>
@@ -462,18 +516,18 @@ public partial class MainPage : ContentPage
             if (!string.IsNullOrEmpty(resultThreadId))
             {
                 _currentThreadId = resultThreadId;
-                LogSystemMessage($"Streaming completed successfully. Thread ID: {resultThreadId}");
+                LogSystemMessage($"✅ Streaming completed successfully. Thread ID: {resultThreadId}");
             }
             else
             {
-                LogSystemMessage("Streaming completed but no thread ID received");
+                LogSystemMessage("⚠️ Streaming completed but no thread ID received");
             }
             
-            LogSystemMessage($"Final content length: {streamedContent.Length}");
+            LogSystemMessage($"📊 Final stats - Content length: {streamedContent.Length}, Events: {eventCount}");
             
             if (!hasReceivedContent)
             {
-                LogSystemMessage("Warning: No streaming content was received");
+                LogSystemMessage("⚠️ Warning: No streaming content was received");
                 MainThread.BeginInvokeOnMainThread(() =>
                 {
                     agentMessage.Text = "❌ No response received from streaming. The agent may be taking longer than expected.";
@@ -482,7 +536,7 @@ public partial class MainPage : ContentPage
         }
         catch (OperationCanceledException)
         {
-            LogSystemMessage("Streaming was cancelled (timeout or user cancellation)");
+            LogSystemMessage("⏱️ Streaming was cancelled (timeout or user cancellation)");
             MainThread.BeginInvokeOnMainThread(() =>
             {
                 agentMessage.Text = "⏱️ Streaming timed out. The agent may be taking longer than expected.";
@@ -490,7 +544,7 @@ public partial class MainPage : ContentPage
         }
         catch (Exception ex)
         {
-            LogSystemMessage($"Streaming error: {ex.Message}");
+            LogSystemMessage($"❌ Streaming error: {ex.Message}");
             LogSystemMessage($"Error type: {ex.GetType().Name}");
             MainThread.BeginInvokeOnMainThread(() =>
             {

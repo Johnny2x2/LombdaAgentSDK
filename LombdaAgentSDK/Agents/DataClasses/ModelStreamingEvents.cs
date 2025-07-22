@@ -151,7 +151,7 @@ namespace LombdaAgentSDK.Agents.DataClasses
         public int ContentPartIndex { get; set; } = 0;
         public string? ItemId { get; set; } = null;
         public string? DeltaText { get; set; } = null;
-        public ModelStreamingOutputTextDeltaEvent(int seqNum, int outputIndex, int contentIndex,string content, string itemId = "", string responseID = "") : base(seqNum, responseID, ModelStreamingEventType.Error, ModelStreamingStatus.Failed)
+        public ModelStreamingOutputTextDeltaEvent(int seqNum, int outputIndex, int contentIndex, string content, string itemId = "", string responseID = "") : base(seqNum, responseID, ModelStreamingEventType.OutputTextDelta, ModelStreamingStatus.InProgress)
         {
             OutputIndex = outputIndex;
             ContentPartIndex = contentIndex;
@@ -166,7 +166,7 @@ namespace LombdaAgentSDK.Agents.DataClasses
         public int ContentPartIndex { get; set; } = 0;
         public string? ItemId { get; set; } = null; 
         public string? DeltaText { get; set; } = null;
-        public ModelStreamingOutputTextDoneEvent(int seqNum, int outputIndex, int contentIndex, string content, string itemId = "", string responseID = "") : base(seqNum, responseID, ModelStreamingEventType.Error, ModelStreamingStatus.Failed)
+        public ModelStreamingOutputTextDoneEvent(int seqNum, int outputIndex, int contentIndex, string content, string itemId = "", string responseID = "") : base(seqNum, responseID, ModelStreamingEventType.TextDone, ModelStreamingStatus.Completed)
         {
             OutputIndex = outputIndex;
             ContentPartIndex = contentIndex;

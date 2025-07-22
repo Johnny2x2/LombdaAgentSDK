@@ -127,10 +127,7 @@ namespace LombdaAgentAPI.Agents
             string instructions = $"You are an assistant named {_agentName}. Be helpful, concise, and clear in your responses.";
             ControlAgent = new Agent(client, _agentName, instructions);
             
-            // CRITICAL FIX: Wire up streaming callbacks to enable real-time streaming
-
-            
-            Console.WriteLine($"[AGENT DEBUG] APILombdaAgent {_agentId} initialized with streaming callbacks");
+            Console.WriteLine($"[AGENT DEBUG] APILombdaAgent {_agentId} initialized with proper streaming integration");
         }
     }
 }

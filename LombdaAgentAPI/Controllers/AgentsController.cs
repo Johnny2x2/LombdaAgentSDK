@@ -141,29 +141,26 @@ namespace LombdaAgentAPI.Controllers
             }
 
             // Use a thread-safe queue for streaming messages
-            var messageQueue = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            var messageQueue = new System.Collections.Concurrent.ConcurrentQueue<ModelStreamingEvents>();
             var streamingComplete = false;
             var streamingError = false;
             var errorMessage = "";
             var eventsReceived = 0;
 
-            // DIAGNOSTIC: Track streaming events
-            void StreamHandler(ModelStreamingEvents message)
+            // Enhanced streaming handler to handle different event types
+            void StreamHandler(ModelStreamingEvents streamingEvent)
             {
                 try
                 {
                     eventsReceived++;
-                    Console.WriteLine($"[STREAMING DEBUG] Event #{eventsReceived}: '{message}'");
-                    // Queue the message for async processing
-                    if(message is ModelStreamingOutputTextDeltaEvent deltaText)
-                    {
-                        messageQueue.Enqueue(deltaText.DeltaText ?? "");
-                    }
+                    Console.WriteLine($"[STREAMING DEBUG] Event #{eventsReceived}: Type='{streamingEvent.EventType}', Status='{streamingEvent.Status}'");
                     
+                    // Queue the event for async processing
+                    messageQueue.Enqueue(streamingEvent);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[STREAMING DEBUG] Error queuing streaming data: {ex.Message}");
+                    Console.WriteLine($"[STREAMING DEBUG] Error queuing streaming event: {ex.Message}");
                 }
             }
 
@@ -173,10 +170,11 @@ namespace LombdaAgentAPI.Controllers
 
             try
             {
-                // Send initial heartbeat to establish the stream
-                await Response.WriteAsync("data: \n\n");
+                // Send initial connection event
+                await Response.WriteAsync("event: connected\n");
+                await Response.WriteAsync("data: {\"status\": \"connected\"}\n\n");
                 await Response.Body.FlushAsync();
-                Console.WriteLine($"[STREAMING DEBUG] Sent initial heartbeat");
+                Console.WriteLine($"[STREAMING DEBUG] Sent connection event");
 
                 // Start the agent processing in a separate task
                 var agentTask = Task.Run(async () =>
@@ -195,7 +193,6 @@ namespace LombdaAgentAPI.Controllers
                         }
                         
                         Console.WriteLine($"[STREAMING DEBUG] Agent completed. Response length: {response?.Length ?? 0}");
-                        // Signal completion
                         streamingComplete = true;
                         return response;
                     }
@@ -214,47 +211,42 @@ namespace LombdaAgentAPI.Controllers
                 while (!streamingComplete && !streamingError)
                 {
                     loopCount++;
-                    if (loopCount % 100 == 0) // Log every 100 iterations to avoid spam
+                    if (loopCount % 1000 == 0) // Log every 1000 iterations to avoid spam
                     {
                         Console.WriteLine($"[STREAMING DEBUG] Loop iteration {loopCount}, queue count: {messageQueue.Count}");
                     }
 
-                    // Process all queued messages
-                    var messagesProcessed = 0;
-                    while (messageQueue.TryDequeue(out var message))
+                    // Process all queued events
+                    var eventsProcessed = 0;
+                    while (messageQueue.TryDequeue(out var streamingEvent))
                     {
-                        messagesProcessed++;
-                        await Response.WriteAsync($"event: message\n");
-                        await Response.WriteAsync($"data: {EscapeJsonString(message)}\n\n");
-                        await Response.Body.FlushAsync();
-                        Console.WriteLine($"[STREAMING DEBUG] Sent streaming message #{messagesProcessed}: '{message}'");
+                        eventsProcessed++;
+                        await ProcessStreamingEvent(streamingEvent);
                     }
 
                     // Small delay to prevent tight loop but maintain responsiveness
-                    await Task.Delay(10);
+                    await Task.Delay(5);
                 }
 
                 Console.WriteLine($"[STREAMING DEBUG] Exited processing loop. Complete: {streamingComplete}, Error: {streamingError}");
 
-                // Process any remaining messages in the queue
-                var remainingMessages = 0;
-                while (messageQueue.TryDequeue(out var message))
+                // Process any remaining events in the queue
+                var remainingEvents = 0;
+                while (messageQueue.TryDequeue(out var streamingEvent))
                 {
-                    remainingMessages++;
-                    await Response.WriteAsync($"event: message\n");
-                    await Response.WriteAsync($"data: {EscapeJsonString(message)}\n\n");
-                    await Response.Body.FlushAsync();
+                    remainingEvents++;
+                    await ProcessStreamingEvent(streamingEvent);
                 }
                 
-                if (remainingMessages > 0)
+                if (remainingEvents > 0)
                 {
-                    Console.WriteLine($"[STREAMING DEBUG] Processed {remainingMessages} remaining messages");
+                    Console.WriteLine($"[STREAMING DEBUG] Processed {remainingEvents} remaining events");
                 }
 
                 // Wait for agent task to complete and get the final response
                 var finalResponse = await agentTask;
 
-                Console.WriteLine($"[STREAMING DEBUG] Final summary - Events received: {eventsReceived}, Messages sent: {eventsReceived}");
+                Console.WriteLine($"[STREAMING DEBUG] Final summary - Events received: {eventsReceived}");
 
                 if (streamingError)
                 {
@@ -290,6 +282,71 @@ namespace LombdaAgentAPI.Controllers
                 // Always unsubscribe to prevent memory leaks
                 agent.RootStreamingEvent -= StreamHandler;
                 Console.WriteLine($"[STREAMING DEBUG] Unsubscribed from RootStreamingEvent");
+            }
+
+            // Helper method to process different streaming event types
+            async Task ProcessStreamingEvent(ModelStreamingEvents streamingEvent)
+            {
+                switch (streamingEvent.EventType)
+                {
+                    case ModelStreamingEventType.Created:
+                        await Response.WriteAsync($"event: created\n");
+                        await Response.WriteAsync($"data: {{\"sequenceId\": {streamingEvent.SequenceId}, \"responseId\": \"{streamingEvent.ResponseId}\"}}\n\n");
+                        break;
+
+                    case ModelStreamingEventType.OutputTextDelta:
+                        if (streamingEvent is ModelStreamingOutputTextDeltaEvent deltaEvent)
+                        {
+                            await Response.WriteAsync($"event: delta\n");
+                            await Response.WriteAsync($"data: {{\n");
+                            await Response.WriteAsync($"data: \"sequenceId\": {deltaEvent.SequenceId},\n");
+                            await Response.WriteAsync($"data: \"outputIndex\": {deltaEvent.OutputIndex},\n");
+                            await Response.WriteAsync($"data: \"contentIndex\": {deltaEvent.ContentPartIndex},\n");
+                            await Response.WriteAsync($"data: \"text\": \"{EscapeJsonString(deltaEvent.DeltaText ?? "")}\",\n");
+                            await Response.WriteAsync($"data: \"itemId\": \"{deltaEvent.ItemId ?? ""}\"\n");
+                            await Response.WriteAsync($"data: }}\n\n");
+                            Console.WriteLine($"[STREAMING DEBUG] Sent delta: '{deltaEvent.DeltaText}'");
+                        }
+                        break;
+
+                    case ModelStreamingEventType.Completed:
+                        await Response.WriteAsync($"event: stream_complete\n");
+                        await Response.WriteAsync($"data: {{\"sequenceId\": {streamingEvent.SequenceId}, \"responseId\": \"{streamingEvent.ResponseId}\"}}\n\n");
+                        break;
+
+                    case ModelStreamingEventType.Error:
+                        if (streamingEvent is ModelStreamingErrorEvent errorEvent)
+                        {
+                            await Response.WriteAsync($"event: stream_error\n");
+                            await Response.WriteAsync($"data: {{\n");
+                            await Response.WriteAsync($"data: \"sequenceId\": {errorEvent.SequenceId},\n");
+                            await Response.WriteAsync($"data: \"error\": \"{EscapeJsonString(errorEvent.ErrorMessage ?? "")}\",\n");
+                            await Response.WriteAsync($"data: \"code\": \"{EscapeJsonString(errorEvent.ErrorCode ?? "")}\"\n");
+                            await Response.WriteAsync($"data: }}\n\n");
+                        }
+                        break;
+
+                    case ModelStreamingEventType.ReasoningPartAdded:
+                        if (streamingEvent is ModelStreamingReasoningPartAddedEvent reasoningEvent)
+                        {
+                            await Response.WriteAsync($"event: reasoning\n");
+                            await Response.WriteAsync($"data: {{\n");
+                            await Response.WriteAsync($"data: \"sequenceId\": {reasoningEvent.SequenceId},\n");
+                            await Response.WriteAsync($"data: \"outputIndex\": {reasoningEvent.OutputIndex},\n");
+                            await Response.WriteAsync($"data: \"text\": \"{EscapeJsonString(reasoningEvent.DeltaText ?? "")}\",\n");
+                            await Response.WriteAsync($"data: \"itemId\": \"{reasoningEvent.ItemId}\"\n");
+                            await Response.WriteAsync($"data: }}\n\n");
+                        }
+                        break;
+
+                    default:
+                        // For any other event types, send a generic event
+                        await Response.WriteAsync($"event: {streamingEvent.EventType.ToString().ToLowerInvariant()}\n");
+                        await Response.WriteAsync($"data: {{\"sequenceId\": {streamingEvent.SequenceId}, \"status\": \"{streamingEvent.Status}\"}}\n\n");
+                        break;
+                }
+
+                await Response.Body.FlushAsync();
             }
         }
 

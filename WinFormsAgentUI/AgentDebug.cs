@@ -97,7 +97,7 @@ namespace WinFormsAgentUI
             if (stateProcess.State is IAgentState agentState)
             {
                 agentState.RunningVerboseCallback += Agent_VerboseLog;
-                agentState.RunningStreamingCallback += Agent_VerboseLog;
+                agentState.RunningStreamingCallback += Agent_StreamingLog;
             }
         }
 
@@ -107,7 +107,7 @@ namespace WinFormsAgentUI
             if (state is IAgentState agentState)
             {
                 agentState.RunningVerboseCallback -= Agent_VerboseLog;
-                agentState.RunningStreamingCallback -= Agent_VerboseLog;
+                agentState.RunningStreamingCallback -= Agent_StreamingLog;
             }
         }
 

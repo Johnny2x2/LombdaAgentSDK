@@ -4,6 +4,20 @@ using LombdaAgentMAUI.Core.Models;
 
 namespace LombdaAgentMAUI.Core.Services
 {
+    // Define the streaming events to match the API
+    public class StreamingEventData
+    {
+        public string EventType { get; set; } = string.Empty;
+        public int SequenceId { get; set; }
+        public string? ResponseId { get; set; }
+        public string? Text { get; set; }
+        public string? Error { get; set; }
+        public string? ThreadId { get; set; }
+        public int OutputIndex { get; set; }
+        public int ContentIndex { get; set; }
+        public string? ItemId { get; set; }
+    }
+
     public interface IAgentApiService
     {
         Task<List<string>> GetAgentsAsync();
@@ -12,6 +26,11 @@ namespace LombdaAgentMAUI.Core.Services
         Task<MessageResponse?> SendMessageAsync(string agentId, string message, string? threadId = null);
         Task SendMessageStreamAsync(string agentId, string message, string? threadId, Action<string> onMessageReceived, CancellationToken cancellationToken = default);
         Task<string?> SendMessageStreamWithThreadAsync(string agentId, string message, string? threadId, Action<string> onMessageReceived, CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Enhanced streaming method that provides detailed event information
+        /// </summary>
+        Task<string?> SendMessageStreamWithEventsAsync(string agentId, string message, string? threadId, Action<string> onMessageReceived, Action<StreamingEventData>? onEventReceived = null, CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Update the base URL for API calls. This will create a new HttpClient instance.
@@ -146,85 +165,15 @@ namespace LombdaAgentMAUI.Core.Services
 
         public async Task SendMessageStreamAsync(string agentId, string message, string? threadId, Action<string> onMessageReceived, CancellationToken cancellationToken = default)
         {
-            try
-            {
-                var request = new MessageRequest { Text = message, ThreadId = threadId };
-                var json = JsonSerializer.Serialize(request, _jsonOptions);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"v1/agents/{agentId}/messages/stream")
-                {
-                    Content = content
-                };
-
-                httpRequest.Headers.Add("Accept", "text/event-stream");
-                httpRequest.Headers.Add("Cache-Control", "no-cache");
-
-                using var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-                response.EnsureSuccessStatusCode();
-
-                using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                using var reader = new StreamReader(stream);
-
-                var buffer = new StringBuilder();
-                string? currentEvent = null;
-                
-                while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
-                {
-                    var line = await reader.ReadLineAsync();
-                    if (line == null) break;
-
-                    // Handle Server-Sent Events format
-                    if (line.StartsWith("event: "))
-                    {
-                        currentEvent = line.Substring(7).Trim();
-                    }
-                    else if (line.StartsWith("data: "))
-                    {
-                        var data = line.Substring(6);
-                        
-                        if (currentEvent == "message")
-                        {
-                            // This is a streaming message chunk
-                            if (!string.IsNullOrWhiteSpace(data))
-                            {
-                                onMessageReceived(data);
-                            }
-                        }
-                        else if (currentEvent == "complete")
-                        {
-                            // This is the final complete response with thread ID
-                            try
-                            {
-                                var completeResponse = JsonSerializer.Deserialize<MessageResponse>(data, _jsonOptions);
-                                if (completeResponse != null)
-                                {
-                                    // Store the thread ID for future messages (if needed)
-                                    // Note: In MAUI, we'll handle this in the UI layer
-                                    System.Diagnostics.Debug.WriteLine($"Streaming complete. ThreadId: {completeResponse.ThreadId}");
-                                }
-                            }
-                            catch (JsonException ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"Error parsing complete response: {ex.Message}");
-                            }
-                        }
-                    }
-                    else if (string.IsNullOrEmpty(line))
-                    {
-                        // Empty line resets the event
-                        currentEvent = null;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error in streaming: {ex.Message}");
-                onMessageReceived($"Error: {ex.Message}");
-            }
+            await SendMessageStreamWithEventsAsync(agentId, message, threadId, onMessageReceived, null, cancellationToken);
         }
 
         public async Task<string?> SendMessageStreamWithThreadAsync(string agentId, string message, string? threadId, Action<string> onMessageReceived, CancellationToken cancellationToken = default)
+        {
+            return await SendMessageStreamWithEventsAsync(agentId, message, threadId, onMessageReceived, null, cancellationToken);
+        }
+
+        public async Task<string?> SendMessageStreamWithEventsAsync(string agentId, string message, string? threadId, Action<string> onMessageReceived, Action<StreamingEventData>? onEventReceived = null, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -241,7 +190,7 @@ namespace LombdaAgentMAUI.Core.Services
                 httpRequest.Headers.Add("Cache-Control", "no-cache");
                 httpRequest.Headers.Add("Connection", "keep-alive");
 
-                System.Diagnostics.Debug.WriteLine("Starting streaming request...");
+                System.Diagnostics.Debug.WriteLine("Starting enhanced streaming request...");
                 
                 using var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
                 
@@ -258,13 +207,13 @@ namespace LombdaAgentMAUI.Core.Services
                 var chunksReceived = 0;
                 var jsonBuffer = new StringBuilder(); // Buffer for multi-line JSON
                 
-                System.Diagnostics.Debug.WriteLine("Starting to read streaming response...");
+                System.Diagnostics.Debug.WriteLine("Starting to read enhanced streaming response...");
                 
                 while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
                 {
                     try
                     {
-                        var line = await reader.ReadLineAsync();
+                        var line = await reader.ReadLineAsync(cancellationToken);
                         if (line == null) 
                         {
                             System.Diagnostics.Debug.WriteLine("Received null line, stream may be ending");
@@ -287,54 +236,178 @@ namespace LombdaAgentMAUI.Core.Services
                             var data = line.Substring(6);
                             System.Diagnostics.Debug.WriteLine($"Data received for event '{currentEvent}': '{data}'");
                             
-                            if (currentEvent == "message")
+                            // Handle different event types based on the new API
+                            switch (currentEvent)
                             {
-                                // This is a streaming message chunk
-                                if (!string.IsNullOrWhiteSpace(data))
-                                {
-                                    chunksReceived++;
-                                    System.Diagnostics.Debug.WriteLine($"Calling onMessageReceived with chunk #{chunksReceived}: '{data}'");
-                                    onMessageReceived(data);
-                                }
-                            }
-                            else if (currentEvent == "complete")
-                            {
-                                // Accumulate JSON data (might be split across multiple lines)
-                                jsonBuffer.Append(data);
-                                
-                                // Check if this line ends the JSON object
-                                if (data.Trim().EndsWith("}"))
-                                {
-                                    // Complete JSON received, try to parse it
-                                    var completeJson = jsonBuffer.ToString();
-                                    System.Diagnostics.Debug.WriteLine($"Complete JSON accumulated: {completeJson}");
-                                    
+                                case "connected":
+                                    onEventReceived?.Invoke(new StreamingEventData { EventType = "connected" });
+                                    break;
+
+                                case "created":
                                     try
                                     {
-                                        var completeResponse = JsonSerializer.Deserialize<MessageResponse>(completeJson, _jsonOptions);
-                                        if (completeResponse != null)
+                                        var createdData = JsonSerializer.Deserialize<StreamingEventData>(data, _jsonOptions);
+                                        if (createdData != null)
                                         {
-                                            resultThreadId = completeResponse.ThreadId;
-                                            System.Diagnostics.Debug.WriteLine($"Streaming complete. ThreadId: {completeResponse.ThreadId}");
-                                            
-                                            // If there's text in the complete response and we didn't get streaming chunks,
-                                            // send the complete text as a single chunk
-                                            if (chunksReceived == 0 && !string.IsNullOrEmpty(completeResponse.Text))
-                                            {
-                                                System.Diagnostics.Debug.WriteLine($"No streaming chunks received, sending complete text: '{completeResponse.Text}'");
-                                                onMessageReceived(completeResponse.Text);
-                                                chunksReceived = 1;
-                                            }
+                                            createdData.EventType = "created";
+                                            onEventReceived?.Invoke(createdData);
                                         }
                                     }
                                     catch (JsonException ex)
                                     {
-                                        System.Diagnostics.Debug.WriteLine($"Error parsing complete response: {ex.Message}");
-                                        System.Diagnostics.Debug.WriteLine($"JSON that failed to parse: {completeJson}");
+                                        System.Diagnostics.Debug.WriteLine($"Error parsing created event: {ex.Message}");
                                     }
+                                    break;
+
+                                case "delta":
+                                    try
+                                    {
+                                        // Accumulate JSON data (might be split across multiple lines)
+                                        jsonBuffer.Append(data);
+                                        
+                                        // Check if this line ends the JSON object
+                                        if (data.Trim().EndsWith("}"))
+                                        {
+                                            var completeJson = jsonBuffer.ToString();
+                                            var deltaData = JsonSerializer.Deserialize<StreamingEventData>(completeJson, _jsonOptions);
+                                            if (deltaData != null && !string.IsNullOrEmpty(deltaData.Text))
+                                            {
+                                                chunksReceived++;
+                                                System.Diagnostics.Debug.WriteLine($"Calling onMessageReceived with delta #{chunksReceived}: '{deltaData.Text}'");
+                                                onMessageReceived(deltaData.Text);
+
+                                                deltaData.EventType = "delta";
+                                                onEventReceived?.Invoke(deltaData);
+                                            }
+                                            jsonBuffer.Clear();
+                                        }
+                                    }
+                                    catch (JsonException ex)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"Error parsing delta event: {ex.Message}");
+                                        jsonBuffer.Clear();
+                                    }
+                                    break;
+
+                                case "stream_complete":
+                                    try
+                                    {
+                                        var completeData = JsonSerializer.Deserialize<StreamingEventData>(data, _jsonOptions);
+                                        if (completeData != null)
+                                        {
+                                            completeData.EventType = "stream_complete";
+                                            onEventReceived?.Invoke(completeData);
+                                        }
+                                    }
+                                    catch (JsonException ex)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"Error parsing stream_complete event: {ex.Message}");
+                                    }
+                                    break;
+
+                                case "complete":
+                                    // Accumulate JSON data (might be split across multiple lines)
+                                    jsonBuffer.Append(data);
                                     
-                                    jsonBuffer.Clear();
-                                }
+                                    // Check if this line ends the JSON object
+                                    if (data.Trim().EndsWith("}"))
+                                    {
+                                        // Complete JSON received, try to parse it
+                                        var completeJson = jsonBuffer.ToString();
+                                        System.Diagnostics.Debug.WriteLine($"Complete JSON accumulated: {completeJson}");
+                                        
+                                        try
+                                        {
+                                            var completeResponse = JsonSerializer.Deserialize<MessageResponse>(completeJson, _jsonOptions);
+                                            if (completeResponse != null)
+                                            {
+                                                resultThreadId = completeResponse.ThreadId;
+                                                System.Diagnostics.Debug.WriteLine($"Final response complete. ThreadId: {completeResponse.ThreadId}");
+                                                
+                                                // If there's text in the complete response and we didn't get streaming chunks,
+                                                // send the complete text as a single chunk
+                                                if (chunksReceived == 0 && !string.IsNullOrEmpty(completeResponse.Text))
+                                                {
+                                                    System.Diagnostics.Debug.WriteLine($"No streaming chunks received, sending complete text: '{completeResponse.Text}'");
+                                                    onMessageReceived(completeResponse.Text);
+                                                    chunksReceived = 1;
+                                                }
+
+                                                onEventReceived?.Invoke(new StreamingEventData 
+                                                { 
+                                                    EventType = "complete", 
+                                                    ThreadId = completeResponse.ThreadId,
+                                                    Text = completeResponse.Text
+                                                });
+                                            }
+                                        }
+                                        catch (JsonException ex)
+                                        {
+                                            System.Diagnostics.Debug.WriteLine($"Error parsing complete response: {ex.Message}");
+                                            System.Diagnostics.Debug.WriteLine($"JSON that failed to parse: {completeJson}");
+                                        }
+                                        
+                                        jsonBuffer.Clear();
+                                    }
+                                    break;
+
+                                case "stream_error":
+                                case "error":
+                                    try
+                                    {
+                                        jsonBuffer.Append(data);
+                                        if (data.Trim().EndsWith("}"))
+                                        {
+                                            var completeJson = jsonBuffer.ToString();
+                                            var errorData = JsonSerializer.Deserialize<StreamingEventData>(completeJson, _jsonOptions);
+                                            if (errorData != null)
+                                            {
+                                                errorData.EventType = currentEvent;
+                                                onEventReceived?.Invoke(errorData);
+                                                onMessageReceived($"Error: {errorData.Error}");
+                                            }
+                                            jsonBuffer.Clear();
+                                        }
+                                    }
+                                    catch (JsonException ex)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"Error parsing error event: {ex.Message}");
+                                        jsonBuffer.Clear();
+                                    }
+                                    break;
+
+                                case "reasoning":
+                                    try
+                                    {
+                                        jsonBuffer.Append(data);
+                                        if (data.Trim().EndsWith("}"))
+                                        {
+                                            var completeJson = jsonBuffer.ToString();
+                                            var reasoningData = JsonSerializer.Deserialize<StreamingEventData>(completeJson, _jsonOptions);
+                                            if (reasoningData != null)
+                                            {
+                                                reasoningData.EventType = "reasoning";
+                                                onEventReceived?.Invoke(reasoningData);
+                                                // Optionally add reasoning text to the main stream
+                                                if (!string.IsNullOrEmpty(reasoningData.Text))
+                                                {
+                                                    onMessageReceived($"[Reasoning] {reasoningData.Text}");
+                                                }
+                                            }
+                                            jsonBuffer.Clear();
+                                        }
+                                    }
+                                    catch (JsonException ex)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"Error parsing reasoning event: {ex.Message}");
+                                        jsonBuffer.Clear();
+                                    }
+                                    break;
+
+                                default:
+                                    System.Diagnostics.Debug.WriteLine($"Unhandled event type: {currentEvent}");
+                                    onEventReceived?.Invoke(new StreamingEventData { EventType = currentEvent ?? "unknown" });
+                                    break;
                             }
                         }
                         else if (string.IsNullOrEmpty(line))
@@ -352,7 +425,7 @@ namespace LombdaAgentMAUI.Core.Services
                                     if (completeResponse != null)
                                     {
                                         resultThreadId = completeResponse.ThreadId;
-                                        System.Diagnostics.Debug.WriteLine($"Streaming complete. ThreadId: {completeResponse.ThreadId}");
+                                        System.Diagnostics.Debug.WriteLine($"Response complete. ThreadId: {completeResponse.ThreadId}");
                                         
                                         if (chunksReceived == 0 && !string.IsNullOrEmpty(completeResponse.Text))
                                         {
@@ -360,6 +433,13 @@ namespace LombdaAgentMAUI.Core.Services
                                             onMessageReceived(completeResponse.Text);
                                             chunksReceived = 1;
                                         }
+
+                                        onEventReceived?.Invoke(new StreamingEventData 
+                                        { 
+                                            EventType = "complete", 
+                                            ThreadId = completeResponse.ThreadId,
+                                            Text = completeResponse.Text
+                                        });
                                     }
                                 }
                                 catch (JsonException ex)
@@ -388,12 +468,12 @@ namespace LombdaAgentMAUI.Core.Services
                     }
                 }
                 
-                System.Diagnostics.Debug.WriteLine($"Streaming ended. Total chunks received: {chunksReceived}");
+                System.Diagnostics.Debug.WriteLine($"Enhanced streaming ended. Total chunks received: {chunksReceived}");
                 return resultThreadId;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error in streaming: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error in enhanced streaming: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
                 onMessageReceived($"Error: {ex.Message}");
                 return null;
