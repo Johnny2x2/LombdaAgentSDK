@@ -60,8 +60,8 @@ namespace LombdaAgentSDK.Agents.DataClasses
         public ModelStreamingEvents(int seqNum, string responseId = "", ModelStreamingEventType type = ModelStreamingEventType.Created, ModelStreamingStatus status = ModelStreamingStatus.InProgress)
         {
             SequenceId = seqNum;
-            EventType = ModelStreamingEventType.Created;
-            Status = ModelStreamingStatus.InProgress;
+            EventType = type;
+            Status = status;
             ResponseId = responseId;
         }
     }
