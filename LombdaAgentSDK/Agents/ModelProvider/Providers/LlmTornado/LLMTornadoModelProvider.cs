@@ -206,7 +206,7 @@ namespace LombdaAgentSDK
             return request;
         }
 
-        public async Task<ModelResponse> HandleStreaming(Conversation chat, List<ModelItem> messages, ModelResponseOptions options, Runner.StreamingCallbacks streamingCallback = null)
+        public async Task<ModelResponse> HandleStreaming(Conversation chat, List<ModelItem> messages, ModelResponseOptions options, StreamingCallbacks streamingCallback = null)
         {
             ModelResponse ResponseOutput = new();
             ResponseOutput.Model = options.Model;
@@ -214,34 +214,48 @@ namespace LombdaAgentSDK
             ResponseOutput.OutputItems = new List<ModelItem>();
             ResponseOutput.Messages = messages;
 
+            
             //Create Open response
             await chat.StreamResponseRich(new ChatStreamEventHandler
             {
+                MessageTokenExHandler = (exText) =>
+                {
+                    
+                    //Call the streaming callback for text
+                    return ValueTask.CompletedTask;
+                },
+                ImageTokenHandler = (image) =>
+                {
+                    //Call the streaming callback for image
+                    return ValueTask.CompletedTask;
+                },
                 MessageTokenHandler = (text) =>
                 {
-                    streamingCallback?.Invoke(text);
+                    streamingCallback?.Invoke(new ModelStreamingOutputTextDeltaEvent(1,1,1,text));
                     return ValueTask.CompletedTask;
                 },
                 ReasoningTokenHandler = (reasoning) =>
                 {
-                    streamingCallback?.Invoke(reasoning.Content);
                     return ValueTask.CompletedTask;
                 },
                 BlockFinishedHandler = (message) =>
                 {
                     //Call the streaming callback for completion
+                    streamingCallback?.Invoke(new ModelStreamingCompletedEvent(1, message.Id.ToString()));
                     ResponseOutput.OutputItems.Add(ConvertFromProviderItem(message));
                     return ValueTask.CompletedTask;
                 },
                 MessagePartHandler = (part) =>
                 {
+                    if (part.Type == ChatMessageTypes.Text) 
+                    { 
+                    }
                     return ValueTask.CompletedTask;
                 },
                 FunctionCallHandler = (toolCall) =>
                 {
                     foreach(FunctionCall call in toolCall)
                     {
-                        streamingCallback?.Invoke($"INVOKING -> [{call.Name}]");
                         //Add the tool call to the response output
                         ResponseOutput.OutputItems.Add(new ModelFunctionCallItem(
                             call.ToolCall?.Id!,
@@ -252,14 +266,28 @@ namespace LombdaAgentSDK
                             ));
                     }
                     return ValueTask.CompletedTask;
+                },
+                MessageTypeResolvedHandler = (messageType) =>
+                {
+                    return ValueTask.CompletedTask;
+                },
+                MutateChatRequestHandler = (request) =>
+                {
+                    streamingCallback?.Invoke(new ModelStreamingCreatedEvent(1));
+                    //Mutate the request if needed
+                    return ValueTask.FromResult(request);
+                },
+                HttpExceptionHandler = (exception) =>
+                {
+                    //Handle any exceptions that occur during streaming
+                    return ValueTask.CompletedTask;
                 }
-
             });
 
             return ResponseOutput;
         }
 
-        public override async Task<ModelResponse> CreateStreamingResponseAsync(List<ModelItem> messages, ModelResponseOptions options, Runner.StreamingCallbacks streamingCallback = null)
+        public override async Task<ModelResponse> CreateStreamingResponseAsync(List<ModelItem> messages, ModelResponseOptions options, StreamingCallbacks streamingCallback = null)
         {
             if (AllowComputerUse)
             {
@@ -269,7 +297,7 @@ namespace LombdaAgentSDK
             return UseResponseAPI ? await StreamingResponseAPIAsync(messages, options, streamingCallback) : await StreamingChatAPIAsync(messages, options, streamingCallback);
         }
 
-        public async Task<ModelResponse> StreamingChatAPIAsync(List<ModelItem> messages, ModelResponseOptions options, Runner.StreamingCallbacks streamingCallback = null)
+        public async Task<ModelResponse> StreamingChatAPIAsync(List<ModelItem> messages, ModelResponseOptions options, StreamingCallbacks streamingCallback = null)
         {
             Conversation chat = Client.Chat.CreateConversation(CurrentModel);
 
@@ -278,7 +306,7 @@ namespace LombdaAgentSDK
             return await HandleStreaming(chat, messages, options, streamingCallback);
         }
 
-        public async Task<ModelResponse> StreamingResponseAPIAsync(List<ModelItem> messages, ModelResponseOptions options, Runner.StreamingCallbacks streamingCallback = null)
+        public async Task<ModelResponse> StreamingResponseAPIAsync(List<ModelItem> messages, ModelResponseOptions options, StreamingCallbacks streamingCallback = null)
         {
             ResponseRequest request = SetupResponseClient(messages, options);
 
@@ -287,32 +315,45 @@ namespace LombdaAgentSDK
             ResponseOutput.OutputFormat = options.OutputFormat ?? null;
             ResponseOutput.OutputItems = new List<ModelItem>();
             ResponseOutput.Messages = messages;
-
+            
             await Client.Responses.StreamResponseRich(request, new ResponseStreamEventHandler
             {
                 OnEvent = (data) =>
                 {
                     if(data is ResponseEventCreated ResponseEvent)
                     {
-                        ResponseOutput.Id = ResponseEvent.Response.PreviousResponseId ?? ResponseEvent.Response.Id;
+                        streamingCallback?.Invoke(new ModelStreamingCreatedEvent(ResponseEvent.SequenceNumber, ResponseEvent.Response.Id));
+                        ResponseOutput.Id = ResponseEvent.Response.Id ?? ResponseEvent.Response.PreviousResponseId;
+                    }
+                    else if(data is ResponseEventReasoningSummaryPartAdded reasoningPartAdded)
+                    {
+                        streamingCallback?.Invoke(new ModelStreamingReasoningPartAddedEvent(reasoningPartAdded.SequenceNumber, reasoningPartAdded.OutputIndex, reasoningPartAdded.SummaryIndex,reasoningPartAdded.ItemId,reasoningPartAdded.Part.Text));
+                    }
+                    else if(data is ResponseEventReasoningSummaryPartDone reasoningPartDone)
+                    {
+                        streamingCallback?.Invoke(new ModelStreamingReasoningPartDoneEvent(reasoningPartDone.SequenceNumber, reasoningPartDone.OutputIndex, reasoningPartDone.SummaryIndex, reasoningPartDone.ItemId, reasoningPartDone.Part.Text));
                     }
                     else if (data is ResponseEventOutputTextDelta delta)
                     {
-                        streamingCallback?.Invoke(delta.Delta);
+                        streamingCallback?.Invoke(new ModelStreamingOutputTextDeltaEvent(delta.SequenceNumber, delta.OutputIndex, delta.ContentIndex, delta.Delta, delta.ItemId));
                     }
-
                     else if (data is ResponseEventOutputItemDone itemDone)
                     {
+                        streamingCallback?.Invoke(new ModelStreamingOutputItemDoneEvent(itemDone.SequenceNumber, itemDone.OutputIndex));
                         ResponseOutput.OutputItems.Add(ConvertFromProviderOutputItem(itemDone.Item));
-
-                        if (itemDone.Item is ResponseFunctionToolCallItem call)
-                        {
-                            streamingCallback?.Invoke($"INVOKING -> [{call.Name}]");
-                        }
-                        
+                    }
+                    else if (data is ResponseEventCompleted completed)
+                    {
+                        streamingCallback?.Invoke(new ModelStreamingCompletedEvent(completed.SequenceNumber, completed.Response.PreviousResponseId ?? ""));
+                        ResponseOutput.Id = completed.Response.Id ?? completed.Response.PreviousResponseId;
+                    }
+                    else if (data is ResponseEventError error)
+                    {
+                        streamingCallback?.Invoke(new ModelStreamingErrorEvent(error.SequenceNumber, error.Message, error.Code));
                     }
 
-                    return ValueTask.CompletedTask;
+
+                   return ValueTask.CompletedTask;
                 }
 
             });

@@ -1,5 +1,6 @@
 using LombdaAgentAPI.Agents;
 using LombdaAgentAPI.Models;
+using LombdaAgentSDK.Agents.DataClasses;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LombdaAgentAPI.Controllers
@@ -46,18 +47,13 @@ namespace LombdaAgentAPI.Controllers
             var cancellationTokenSource = new CancellationTokenSource();
             var token = cancellationTokenSource.Token;
 
-            // Setup action to handle agent streaming events
-            void StreamHandler(string message)
+            // Setup action to handle agent streaming events using the new ModelStreamingEvents system
+            async Task StreamHandler(ModelStreamingEvents streamingEvent)
             {
                 try
                 {
-                    // Format as SSE message
-                    var task = Response.WriteAsync($"event: message\n");
-                    task.Wait(token);
-                    task = Response.WriteAsync($"data: {message}\n\n");
-                    task.Wait(token);
-                    task = Response.Body.FlushAsync(token);
-                    task.Wait(token);
+                    // Format different event types appropriately for SSE
+                    await FormatAndSendStreamingEvent(streamingEvent, token);
                 }
                 catch (OperationCanceledException)
                 {
@@ -75,6 +71,11 @@ namespace LombdaAgentAPI.Controllers
 
             try
             {
+                // Send initial connection event
+                await Response.WriteAsync("event: connected\n");
+                await Response.WriteAsync("data: {\"status\": \"connected\", \"agentId\": \"" + id + "\"}\n\n");
+                await Response.Body.FlushAsync(token);
+
                 // Keep the connection open until cancellation
                 while (!token.IsCancellationRequested)
                 {
@@ -95,6 +96,87 @@ namespace LombdaAgentAPI.Controllers
                 agent.RootStreamingEvent -= StreamHandler;
                 cancellationTokenSource.Dispose();
             }
+        }
+
+        /// <summary>
+        /// Helper method to format and send different types of streaming events
+        /// </summary>
+        private async Task FormatAndSendStreamingEvent(ModelStreamingEvents streamingEvent, CancellationToken token)
+        {
+            switch (streamingEvent.EventType)
+            {
+                case ModelStreamingEventType.Created:
+                    await Response.WriteAsync($"event: created\n");
+                    await Response.WriteAsync($"data: {{\"sequenceId\": {streamingEvent.SequenceId}, \"responseId\": \"{streamingEvent.ResponseId}\"}}\n\n");
+                    break;
+
+                case ModelStreamingEventType.OutputTextDelta:
+                    if (streamingEvent is ModelStreamingOutputTextDeltaEvent deltaEvent)
+                    {
+                        await Response.WriteAsync($"event: text_delta\n");
+                        await Response.WriteAsync($"data: {{\n");
+                        await Response.WriteAsync($"data: \"sequenceId\": {deltaEvent.SequenceId},\n");
+                        await Response.WriteAsync($"data: \"outputIndex\": {deltaEvent.OutputIndex},\n");
+                        await Response.WriteAsync($"data: \"contentIndex\": {deltaEvent.ContentPartIndex},\n");
+                        await Response.WriteAsync($"data: \"text\": \"{EscapeJsonString(deltaEvent.DeltaText ?? "")}\",\n");
+                        await Response.WriteAsync($"data: \"itemId\": \"{deltaEvent.ItemId ?? ""}\"\n");
+                        await Response.WriteAsync($"data: }}\n\n");
+                    }
+                    break;
+
+                case ModelStreamingEventType.Completed:
+                    await Response.WriteAsync($"event: completed\n");
+                    await Response.WriteAsync($"data: {{\"sequenceId\": {streamingEvent.SequenceId}, \"responseId\": \"{streamingEvent.ResponseId}\"}}\n\n");
+                    break;
+
+                case ModelStreamingEventType.Error:
+                    if (streamingEvent is ModelStreamingErrorEvent errorEvent)
+                    {
+                        await Response.WriteAsync($"event: error\n");
+                        await Response.WriteAsync($"data: {{\n");
+                        await Response.WriteAsync($"data: \"sequenceId\": {errorEvent.SequenceId},\n");
+                        await Response.WriteAsync($"data: \"error\": \"{EscapeJsonString(errorEvent.ErrorMessage ?? "")}\",\n");
+                        await Response.WriteAsync($"data: \"code\": \"{EscapeJsonString(errorEvent.ErrorCode ?? "")}\"\n");
+                        await Response.WriteAsync($"data: }}\n\n");
+                    }
+                    break;
+
+                case ModelStreamingEventType.ReasoningPartAdded:
+                    if (streamingEvent is ModelStreamingReasoningPartAddedEvent reasoningEvent)
+                    {
+                        await Response.WriteAsync($"event: reasoning\n");
+                        await Response.WriteAsync($"data: {{\n");
+                        await Response.WriteAsync($"data: \"sequenceId\": {reasoningEvent.SequenceId},\n");
+                        await Response.WriteAsync($"data: \"outputIndex\": {reasoningEvent.OutputIndex},\n");
+                        await Response.WriteAsync($"data: \"text\": \"{EscapeJsonString(reasoningEvent.DeltaText ?? "")}\",\n");
+                        await Response.WriteAsync($"data: \"itemId\": \"{reasoningEvent.ItemId}\"\n");
+                        await Response.WriteAsync($"data: }}\n\n");
+                    }
+                    break;
+
+                default:
+                    // For any other event types, send a generic event
+                    await Response.WriteAsync($"event: {streamingEvent.EventType.ToString().ToLowerInvariant()}\n");
+                    await Response.WriteAsync($"data: {{\"sequenceId\": {streamingEvent.SequenceId}, \"status\": \"{streamingEvent.Status}\", \"type\": \"{streamingEvent.EventType}\"}}\n\n");
+                    break;
+            }
+
+            await Response.Body.FlushAsync(token);
+        }
+
+        /// <summary>
+        /// Helper method to escape JSON strings for safe transmission
+        /// </summary>
+        private static string EscapeJsonString(string s)
+        {
+            if (string.IsNullOrEmpty(s))
+                return string.Empty;
+
+            return s.Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\n", "\\n")
+                .Replace("\r", "\\r")
+                .Replace("\t", "\\t");
         }
     }
 }

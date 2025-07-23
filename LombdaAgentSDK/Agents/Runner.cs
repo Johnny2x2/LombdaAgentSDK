@@ -6,6 +6,7 @@ using LlmTornado.Common;
 
 namespace LombdaAgentSDK
 {
+ 
     /// <summary>
     /// <c>Runner</c> to run the agent loop
     /// </summary>
@@ -13,7 +14,7 @@ namespace LombdaAgentSDK
     {
         public delegate void ComputerActionCallbacks(ComputerToolAction computerCall);
         public delegate void RunnerVerboseCallbacks(string runnerAction);
-        public delegate void StreamingCallbacks(string streamingResult);
+        
 
         /// <summary>
         /// Invoke the agent loop to begin async

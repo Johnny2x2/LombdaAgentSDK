@@ -1,7 +1,9 @@
 using BabyAGI;
 using Examples.Demos.FunctionGenerator;
+using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.StateMachine;
+using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
 using System.Data;
 using System.Windows.Forms;
 using static System.Net.Mime.MediaTypeNames;
@@ -31,7 +33,7 @@ namespace WinFormsAgentUI
             Agent = new BabyAGIRunner();
             //Setup the verbose logging 
             Agent.verboseEvent += Agent_VerboseLog;
-            Agent.streamingEvent += Agent_VerboseLog;
+            Agent.streamingEvent += Agent_StreamingLog;
             Agent.RootVerboseEvent += Root_VerboseLog;
             Agent.RootStreamingEvent += StreamChat;
             Agent.StateMachineAdded += AddStateWatcher;
@@ -95,7 +97,7 @@ namespace WinFormsAgentUI
             if (stateProcess.State is IAgentState agentState)
             {
                 agentState.RunningVerboseCallback += Agent_VerboseLog;
-                agentState.RunningStreamingCallback += Agent_VerboseLog;
+                agentState.RunningStreamingCallback += Agent_StreamingLog;
             }
         }
 
@@ -105,7 +107,7 @@ namespace WinFormsAgentUI
             if (state is IAgentState agentState)
             {
                 agentState.RunningVerboseCallback -= Agent_VerboseLog;
-                agentState.RunningStreamingCallback -= Agent_VerboseLog;
+                agentState.RunningStreamingCallback -= Agent_StreamingLog;
             }
         }
 
@@ -188,6 +190,26 @@ namespace WinFormsAgentUI
             }
         }
 
+        /// <summary>
+        /// dates the UI with verbose log messages from the agent.
+        /// </summary>
+        /// <param name="e"></param>
+        async Task Agent_StreamingLog(ModelStreamingEvents streamingEvent)
+        {
+            if (SystemRichTextBox.InvokeRequired) // Check if invoking is required
+            {
+                // If on a different thread, use Invoke to call this method on the UI thread
+                SystemRichTextBox.Invoke(Agent_StreamingLog, streamingEvent);
+                return;
+            }
+            else
+            {
+                if(streamingEvent is ModelStreamingOutputTextDeltaEvent deltaEvent)
+                {
+                    SystemRichTextBox.AppendText(deltaEvent.DeltaText + Environment.NewLine);
+                }
+            }
+        }
         /// <summary>
         /// Logs a verbose message to the system's rich text box, ensuring thread-safe operations.
         /// </summary>
@@ -283,15 +305,18 @@ namespace WinFormsAgentUI
         /// UI thread. If the method is called from a non-UI thread, it will invoke the append operation on the UI
         /// thread.</remarks>
         /// <param name="message">The message to be displayed in the chat. Cannot be null or empty.</param>
-        public void StreamChat(string message)
+        public async Task StreamChat(ModelStreamingEvents streamingEvent)
         {
             if (ChatRichTextBox.InvokeRequired)
             {
-                ChatRichTextBox.Invoke(new Action(() => AppendToChat(message)));
+                ChatRichTextBox.Invoke(new Action(() => StreamChat(streamingEvent)));
             }
             else
             {
-                AppendToChat(message);
+                if (streamingEvent is ModelStreamingOutputTextDeltaEvent deltaEvent)
+                {
+                    AppendToChat(deltaEvent.DeltaText ?? "");
+                }  
             }
         }
 
