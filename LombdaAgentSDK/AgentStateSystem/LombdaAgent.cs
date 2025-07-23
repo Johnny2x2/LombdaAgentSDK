@@ -19,8 +19,16 @@ namespace LombdaAgentSDK.AgentStateSystem
 
     public delegate string UserInputRequestDelegate(string prompt);
 
+    public delegate Task ModelStreamingEvent(ModelStreamingEvents streamEvent);
+
     public abstract class LombdaAgent
     {
+        private readonly string _agentName;
+        public string AgentName => _agentName;
+
+        private string _agentId = Guid.NewGuid().ToString();
+        public string AgentId => _agentId;
+
         public List<ModelItem> SharedModelItems = new List<ModelItem>();
         /// <summary>
         /// Agent used to manage the active conversation and report results of the state machines.
@@ -61,7 +69,7 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// <summary>
         /// Streaming events from the Agents in the state machine system for logging purposes
         /// </summary>
-        public event Action<string>? streamingEvent;
+        public event ModelStreamingEvent? streamingEvent;
         /// <summary>
         /// Occurs when a verbose message related to the Control Agent  is generated.
         /// </summary>
@@ -72,7 +80,7 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// <summary>
         /// Main streaming event for the Control Agent to handle streaming messages for the Control Agent conversation.
         /// </summary>
-        public event Action<string>? RootStreamingEvent;
+        public event ModelStreamingEvent? RootStreamingEvent;
         /// <summary>
         /// Occurs when a new state machine is added.
         /// </summary>
@@ -107,16 +115,18 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// Represents the main callback for verbose operation used to trigger the event handler for the Control Agent.
         /// </summary>
         public RunnerVerboseCallbacks? MainVerboseCallback;
+        
 
         /// <summary>
         /// Master Cancellation token source for the Control Agent and the rest of the state machines.
         /// </summary>
         public CancellationTokenSource CancellationTokenSource { get; set; } = new CancellationTokenSource();
 
-        public LombdaAgent()
+        public LombdaAgent(string agentName)
         {
             // Initialize the agent and set up the callbacks
             InitializeAgent(); 
+            _agentName = agentName;
             StreamingCallback += RecieveStreamingCallbacks;  //Route State Agents streaming callbacks to the agent's event handler
             VerboseCallback += RecieveVerboseCallbacks; //Route State Agents verbose callbacks to the agent's event handler  
             MainStreamingCallback += RootStreamingCallback; //Setup the main streaming callback for the Control Agent
@@ -128,7 +138,7 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// Used to send streaming messages from the Control Agent
         /// </summary>
         /// <param name="message"></param>
-        private void RootStreamingCallback(string message)
+        private void RootStreamingCallback(ModelStreamingEvents message)
         {
             RootStreamingEvent?.Invoke(message);
         }
@@ -149,7 +159,7 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// to handle the message. Ensure that the <paramref name="message"/> is not null to avoid potential
         /// exceptions.</remarks>
         /// <param name="message">The message to be passed to the streaming event. Cannot be null.</param>
-        private void RecieveStreamingCallbacks(string message)
+        private void RecieveStreamingCallbacks(ModelStreamingEvents message)
         {
             streamingEvent?.Invoke(message);
         }

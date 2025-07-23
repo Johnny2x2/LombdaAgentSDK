@@ -9,6 +9,10 @@ namespace LombdaAgentAPI.Models
         /// Name for the new agent
         /// </summary>
         public string Name { get; set; } = "Assistant";
+        /// <summary>
+        /// Gets or sets the type of agent.
+        /// </summary>
+        public string AgentType { get; set; } = "Default";
     }
 
     /// <summary>

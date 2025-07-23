@@ -19,11 +19,26 @@ namespace LombdaAgentAPI.Agents
         LombdaAgent? GetAgent(string agentId);
 
         /// <summary>
+        /// Gets all available agent types
+        /// </summary>
+        /// <returns>List of agent type names</returns>
+        List<string> GetAgentTypes();
+
+        /// <summary>
+        /// Registers a new agent type
+        /// </summary>
+        /// <param name="typeName">Name for the agent type</param>
+        /// <param name="agentType">Type that inherits from LombdaAgent</param>
+        /// <returns>True if registration successful</returns>
+        bool RegisterAgentType(string typeName, Type agentType);
+
+        /// <summary>
         /// Creates a new agent
         /// </summary>
         /// <param name="agentName">Name for the agent</param>
+        /// <param name="agentType">Type Of Agent to create</param>
         /// <returns>The agent ID</returns>
-        string CreateAgent(string agentName);
+        string CreateAgent(string agentName, string agentType);
 
         /// <summary>
         /// Adds a subscriber for agent streaming events

@@ -18,7 +18,7 @@ namespace LombdaAgentAPI.Tests.Mocks
 
 
 
-        public MockLombdaAgent(string agentId, string agentName)
+        public MockLombdaAgent(string agentId, string agentName) : base(agentName)
         {
             _agentId = agentId;
             _agentName = agentName;
@@ -30,7 +30,7 @@ namespace LombdaAgentAPI.Tests.Mocks
         {
             // Create a mock agent for testing
             ControlAgent = new Agent(
-                new OpenAIModelClient("gpt-4o"),
+                new MockModelClient(),
                 _agentName,
                 $"You are a mock agent named {_agentName} for testing purposes."
             );
@@ -52,7 +52,7 @@ namespace LombdaAgentAPI.Tests.Mocks
                     foreach (var word in words)
                     {
                         // Emit each word as a separate streaming event
-                        MainStreamingCallback?.Invoke(word + " ");
+                        MainStreamingCallback?.Invoke(new ModelStreamingOutputTextDeltaEvent(1, 1, 1, word + " ", "msg_123", "resp_1943"));
                         await Task.Delay(100);
                     }
                 });
@@ -99,7 +99,7 @@ namespace LombdaAgentAPI.Tests.Mocks
             });
         }
 
-        public Task<ModelResponse> _CreateStreamingResponseAsync(List<ModelItem> messages, ModelResponseOptions options = null, Runner.StreamingCallbacks streamingCallback = null)
+        public Task<ModelResponse> _CreateStreamingResponseAsync(List<ModelItem> messages, ModelResponseOptions options = null, StreamingCallbacks streamingCallback = null)
         {
             // Simulate streaming by invoking the callback a few times
             if (streamingCallback != null)
@@ -109,7 +109,7 @@ namespace LombdaAgentAPI.Tests.Mocks
                     var words = "This is a mock streaming response.".Split(' ');
                     foreach (var word in words)
                     {
-                        streamingCallback(word + " ");
+                        streamingCallback?.Invoke(new ModelStreamingOutputTextDeltaEvent(1,1,1,word+" ","msg_123","resp_1943"));
                         await Task.Delay(100);
                     }
                 });
