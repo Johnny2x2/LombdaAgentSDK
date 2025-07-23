@@ -102,11 +102,14 @@ namespace LombdaAgentAPI.Controllers
                 string response;
                 if (string.IsNullOrEmpty(request.ThreadId))
                 {
-                    response = await agent.StartNewConversation(request.Text, false);
+                    response = !string.IsNullOrEmpty(request.FileBase64Data) ? 
+                        await agent.StartNewConversation(request.Text, request.FileBase64Data, false) :
+                        await agent.StartNewConversation(request.Text, false);  
                 }
                 else
                 {
-                    response = await agent.AddToConversation(request.Text, request.ThreadId, false);
+                    response = !string.IsNullOrEmpty(request.FileBase64Data) ? await agent.AddBase64ImageToConversation(request.Text, request.FileBase64Data, false, request.ThreadId) : 
+                                               await agent.AddToConversation(request.Text, request.ThreadId, false);
                 }
 
                 return Ok(new MessageResponse
@@ -201,11 +204,13 @@ namespace LombdaAgentAPI.Controllers
                         string response;
                         if (string.IsNullOrEmpty(request.ThreadId))
                         {
-                            response = await agent.StartNewConversation(request.Text, true);
+                            response = !string.IsNullOrEmpty(request.FileBase64Data) ? await agent.StartNewConversation(request.Text, request.FileBase64Data, true) :
+                                await agent.StartNewConversation(request.Text, true);
                         }
                         else
                         {
-                            response = await agent.AddToConversation(request.Text, request.ThreadId, true);
+                            response = !string.IsNullOrEmpty(request.FileBase64Data) ? await agent.AddBase64ImageToConversation(request.Text,request.FileBase64Data,true, request.ThreadId) : 
+                            await agent.AddToConversation(request.Text, request.ThreadId, true);
                         }
                         
                         Console.WriteLine($"[STREAMING DEBUG] Agent completed. Response length: {response?.Length ?? 0}");

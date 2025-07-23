@@ -45,6 +45,11 @@ namespace LombdaAgentAPI.Models
         /// Optional thread ID for conversation context
         /// </summary>
         public string? ThreadId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the file data encoded in Base64 format in URL format.
+        /// </summary>
+        public string? FileBase64Data{ get; set; } = string.Empty;
     }
 
     /// <summary>

@@ -367,18 +367,44 @@ namespace LombdaAgentSDK.AgentStateSystem
         /// langword="true"/>.</param>
         /// <returns>A task that represents the asynchronous operation. The task result contains a string that identifies the
         /// message added to the conversation.</returns>
-        public async Task<string> AddImageToConversation(string userInput, string fileId, bool streaming = true)
+        public async Task<string> AddImageToConversation(string userInput, string fileId, bool streaming = true, string threadID = "")
         {
+            if (!string.IsNullOrEmpty(threadID))
+            {
+                MainThreadId = threadID;
+            }
             //import image from disk
-            using( var fileStream = new FileStream(fileId, FileMode.Open, FileAccess.Read))
+            using ( var fileStream = new FileStream(fileId, FileMode.Open, FileAccess.Read))
             {
                 byte[] data = new byte[fileStream.Length];
                 await fileStream.ReadAsync(data, 0, (int)fileStream.Length);
                 var imageContent = new ModelMessageImageFileContent(BinaryData.FromBytes(data), $"image/{Path.GetExtension(fileId).Replace(".","")}");
-                var messageContent = new ModelMessageRequestTextContent(userInput);
-                var fileItem = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", new List<ModelMessageContent>([messageContent, imageContent]),ModelStatus.Completed);
+                var fileItem = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", new List<ModelMessageContent>([imageContent]),ModelStatus.Completed);
                 return await AddToConversation(userInput, fileItem, streaming: streaming);
             }
+        }
+
+        /// <summary>
+        /// Adds a file to the conversation with the specified user input and file identifier.
+        /// </summary>
+        /// <remarks>This method reads the specified file from disk and adds it to the conversation as an
+        /// image file content. The user input is included as text content in the same message.</remarks>
+        /// <param name="userInput">The text input provided by the user to accompany the file.</param>
+        /// <param name="fileId">The identifier of the file to be added to the conversation. This should be a valid path to the file on disk.</param>
+        /// <param name="streaming">A boolean value indicating whether the operation should be performed in streaming mode. The default is <see
+        /// langword="true"/>.</param>
+        /// <returns>A task that represents the asynchronous operation. The task result contains a string that identifies the
+        /// message added to the conversation.</returns>
+        public async Task<string> AddBase64ImageToConversation(string userInput, string base64, bool streaming = true, string threadID = "")
+        {
+            if(!string.IsNullOrEmpty(threadID))
+            {
+                MainThreadId = threadID;
+            }
+
+            var imageContent = new ModelMessageImageFileContent() { DataUri = base64 };
+            var fileItem = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", new List<ModelMessageContent>([imageContent]), ModelStatus.Completed);
+            return await AddToConversation(userInput, fileItem, streaming: streaming);
         }
 
         /// <summary>
@@ -394,6 +420,16 @@ namespace LombdaAgentSDK.AgentStateSystem
             CurrentResult = new RunResult();
             MainThreadId = "";
             return await AddToConversation(userInput, streaming:streaming);
+        }
+
+
+        public async Task<string> StartNewConversation(string userInput, string base64, bool streaming = true)
+        {
+            CurrentResult = new RunResult();
+            MainThreadId = "";
+            var imageContent = new ModelMessageImageFileContent() { DataUri = base64 };
+            var fileItem = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", new List<ModelMessageContent>([imageContent]), ModelStatus.Completed);
+            return await AddToConversation(userInput, fileItem, streaming: streaming);
         }
     }
 }
