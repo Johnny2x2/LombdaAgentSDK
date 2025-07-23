@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\BabyAGI\BabyAGI.csproj" />
     <ProjectReference Include="..\LombdaAgentSDK\LombdaAgentSDK.csproj" />
   </ItemGroup>
 

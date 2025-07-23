@@ -8,13 +8,14 @@ This API provides HTTP endpoints to interact with LombdaAgent instances. It supp
    ```
    setx OPENAI_API_KEY "your-api-key-here"
    ```
-
-2. Run the API project:
+2. Update `Agent\LombdaAgentService.cs` and register your agents in the `RegisterAgents` method.
+   
+3. Run the API project:
    ```
    dotnet run
    ```
 
-3. API will be available at:
+4. API will be available at:
    - HTTP: https://localhost:5001
    - Swagger UI: https://localhost:5001/swagger
 
