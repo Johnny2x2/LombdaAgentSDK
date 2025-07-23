@@ -17,7 +17,7 @@
 * ✅ StateMachine Code is completely decoupled from Agent pipelines
 * 🧠 `AgentStateMachine` for creating stateful multi-agent workflows
 * 🌐 `LombdaAgent` to unify Agent and StateMachine operations
-* 🪟 Debugging UI for Windows with streaming chat and verbose logging
+* 🪟  MAUI Debugging UI with streaming chat
 * 📢 Event system for monitoring agent operations and debugging
 * 📦 BabyAGI
 ---
@@ -316,16 +316,6 @@ lombdaAgent.RunningStreamingCallback += (update) => {
     UI.UpdateStreamingPanel(update);
 };
 ```
-
-### Debugging UI for Windows
-
-LombdaAgentSDK now includes a basic debugging UI for Windows applications:
-
-- Left panel: Streaming chat updates in real-time
-- Right panel: Verbose logging with detailed operation information
-- Allows monitoring the state transitions and agent communications
-
-To use the debugging UI, reference the WinFormsAgentUI project in your solution.
 
 ## 📚 Documentation
 

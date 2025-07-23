@@ -32,6 +32,7 @@ Request body:
 ```json
 {
   "name": "MyAssistant"
+  "type": "Default"
 }
 ```
 
