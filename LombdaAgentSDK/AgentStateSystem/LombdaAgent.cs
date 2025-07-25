@@ -299,6 +299,16 @@ namespace LombdaAgentSDK.AgentStateSystem
                     userMessage.Content.Add(new ModelMessageSystemResponseTextContent(preprocessedInput));
 
                 }
+
+                if(message != null)
+                {
+                    //Add file to the conversation
+                    if (message is ModelMessageItem item)
+                    {
+                        userMessage.Content.Add(item.Content.FirstOrDefault()!);
+                    }
+                }
+
                 // Create a new message item with the user input
                 userMessage.Content.Add(new ModelMessageRequestTextContent(userInput));
                 CurrentResult.Messages.Add(userMessage);
