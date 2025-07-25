@@ -126,7 +126,7 @@ namespace LombdaAgentSDK.Agents.DataClasses
 
         public ModelMessageImageFileContent() { ContentType = ModelContentType.InputImage; }
 
-        public ModelMessageImageFileContent(BinaryData imageData, string mediaType) : base(data:imageData, mediaType: mediaType)
+        public ModelMessageImageFileContent(BinaryData imageData = null, string mediaType = "image/jpg") : base(data:imageData, mediaType: mediaType)
         {
             ContentType = ModelContentType.InputImage;
         }
@@ -134,7 +134,7 @@ namespace LombdaAgentSDK.Agents.DataClasses
         public ModelMessageImageFileContent(string imageUrl)
         {
             ContentType = ModelContentType.InputImage;
-            ImageURL = imageUrl;
+            DataUri = imageUrl;
         }
 
         /// <summary>
@@ -160,6 +160,7 @@ namespace LombdaAgentSDK.Agents.DataClasses
         {
             ContentType = ModelContentType.InputImage;
             ImageUrl = imageData;
+            DataUri = imageData.OriginalString;
         }
     }
 
@@ -190,18 +191,22 @@ namespace LombdaAgentSDK.Agents.DataClasses
         /// </summary>
         public string MediaType { get; set; }
 
-        public ModelMessageFileContent(string fileName = "", BinaryData data = null, string mediaType = "")
+        public ModelMessageFileContent(string fileName = "", BinaryData? data = null, string mediaType = "")
         {
             if(ContentType == ModelContentType.Unknown)
             {
                 ContentType = ModelContentType.InputFile;
             }
 
-            DataBytes = data;
             FileName = fileName;
-            MediaType = mediaType;
-            string base64EncodedData = Convert.ToBase64String(data.ToArray());
-            DataUri = $"data:{MediaType};base64,{base64EncodedData}";
+            
+            if (data != null)
+            {
+                DataBytes = data;
+                MediaType = mediaType;
+                string base64EncodedData = Convert.ToBase64String(data.ToArray());
+                DataUri = $"data:{MediaType};base64,{base64EncodedData}";
+            }
         }
 
         /// <summary>

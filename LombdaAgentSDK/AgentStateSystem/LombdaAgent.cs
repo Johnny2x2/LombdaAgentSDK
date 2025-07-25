@@ -258,7 +258,7 @@ namespace LombdaAgentSDK.AgentStateSystem
             }
 
             RunResult fileDescription = new();
-
+            var userMessage = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", new List<ModelMessageContent>(), ModelStatus.Completed);
             //Add in file content if provided
             if (message != null)
             {
@@ -271,7 +271,10 @@ namespace LombdaAgentSDK.AgentStateSystem
                 //Restore the original instructions
                 ControlAgent.Instructions = originalInstructions;
                 //Add file to the conversation
-                CurrentResult.Messages.Add(message);
+                if(message is ModelMessageItem item)
+                {
+                    userMessage.Content.Add(item.Content.FirstOrDefault()!);
+                }
             }
 
             //If userInput is not empty, create a new message item and add it to the conversation
@@ -292,11 +295,11 @@ namespace LombdaAgentSDK.AgentStateSystem
                     var preprocessedInput = await RunPreprocess(inputMessage);
                     preprocessedInput = "The following CONTEXT has been prepocessed by an Agent tasked to process the input[may or may not be relevent]. <PREPOCESSED RESULTS>" + preprocessedInput + "</PREPOCESSED RESULTS>";
                     // Create a system message with the preprocessed input
-                    var systemMessage = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "SYSTEM", new List<ModelMessageContent>([new ModelMessageSystemResponseTextContent(preprocessedInput)]), ModelStatus.Completed);
-                    CurrentResult.Messages.Add(systemMessage);
+                    userMessage.Content.Add(new ModelMessageSystemResponseTextContent(preprocessedInput));
+
                 }
                 // Create a new message item with the user input
-                var userMessage = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", new List<ModelMessageContent>([new ModelMessageRequestTextContent(userInput)]), ModelStatus.Completed);
+                userMessage.Content.Add(new ModelMessageRequestTextContent(userInput));
                 CurrentResult.Messages.Add(userMessage);
             }
 
@@ -374,7 +377,7 @@ namespace LombdaAgentSDK.AgentStateSystem
                 MainThreadId = threadID;
             }
             //import image from disk
-            using ( var fileStream = new FileStream(fileId, FileMode.Open, FileAccess.Read))
+            using (var fileStream = new FileStream(fileId, FileMode.Open, FileAccess.Read))
             {
                 byte[] data = new byte[fileStream.Length];
                 await fileStream.ReadAsync(data, 0, (int)fileStream.Length);
@@ -427,7 +430,7 @@ namespace LombdaAgentSDK.AgentStateSystem
         {
             CurrentResult = new RunResult();
             MainThreadId = "";
-            var imageContent = new ModelMessageImageFileContent() { DataUri = base64 };
+            var imageContent = new ModelMessageImageFileContent(base64);
             var fileItem = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", new List<ModelMessageContent>([imageContent]), ModelStatus.Completed);
             return await AddToConversation(userInput, fileItem, streaming: streaming);
         }
