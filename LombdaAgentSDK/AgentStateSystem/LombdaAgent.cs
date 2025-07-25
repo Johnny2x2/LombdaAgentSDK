@@ -259,30 +259,31 @@ namespace LombdaAgentSDK.AgentStateSystem
 
             RunResult fileDescription = new();
             var userMessage = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", new List<ModelMessageContent>(), ModelStatus.Completed);
-            //Add in file content if provided
-            if (message != null)
-            {
-                // If the message is a file, we need to describe it
-                var originalInstructions = ControlAgent.Instructions;
-                ControlAgent.Instructions = "I need you to take the input file and describe the file/image. Be the eyes for the next step who cannot see the image but needs context from within the file/image" +
-                    "Be as descriptive as possible.";
-                fileDescription = await Runner.RunAsync(ControlAgent, messages: new List<ModelItem>([message]), verboseCallback: MainVerboseCallback, cancellationToken: CancellationTokenSource);
-
-                //Restore the original instructions
-                ControlAgent.Instructions = originalInstructions;
-                //Add file to the conversation
-                if(message is ModelMessageItem item)
-                {
-                    userMessage.Content.Add(item.Content.FirstOrDefault()!);
-                }
-            }
-
+            
             //If userInput is not empty, create a new message item and add it to the conversation
             if (!string.IsNullOrEmpty(userInput))
             {
                 // If an input preprocessor is set, run it on the user input
                 if (InputPreprocessor != null)
                 {
+                    //Add in file content if provided
+                    if (message != null)
+                    {
+                        // If the message is a file, we need to describe it
+                        var originalInstructions = ControlAgent.Instructions;
+                        ControlAgent.Instructions = "I need you to take the input file and describe the file/image. Be the eyes for the next step who cannot see the image but needs context from within the file/image" +
+                            "Be as descriptive as possible.";
+                        fileDescription = await Runner.RunAsync(ControlAgent, messages: new List<ModelItem>([message]), verboseCallback: MainVerboseCallback, cancellationToken: CancellationTokenSource);
+
+                        //Restore the original instructions
+                        ControlAgent.Instructions = originalInstructions;
+                        //Add file to the conversation
+                        if (message is ModelMessageItem item)
+                        {
+                            userMessage.Content.Add(item.Content.FirstOrDefault()!);
+                        }
+                    }
+
                     string inputMessage = userInput;
                     if (message != null)
                     {
