@@ -7,7 +7,8 @@ namespace Examples.OpenAI
     public class ComputerUseExample
     {
         //requires Teir 3 account & access to use computer-use-preview currently
-        //[Test]
+        [Test]
+
         public async Task Run()
         {
             OpenAIModelClient openAIModelClient = new OpenAIModelClient("computer-use-preview", enableComputerCalls:true);
@@ -21,8 +22,7 @@ namespace Examples.OpenAI
             //Runner needs to return callbacks for Computer Action
             RunResult result = await Runner.RunAsync(
                 agent, 
-                input:"Can take a screen shot?", 
-                single_turn: true,
+                input:"open blender?", 
                 verboseCallback:Console.WriteLine, 
                 computerUseCallback: HandleComputerAction
                 );

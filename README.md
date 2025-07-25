@@ -329,9 +329,7 @@ For comprehensive documentation, please visit the [docs folder](docs/):
 
 ## 🚦 Roadmap
 * [ ] Add non async support for agent execution.
-* [ ] Improve logging and diagnostics.
-* [ ] Enhance the debugging UI for better visualization of agent states
-* [ ] Add support for serializing agent state machines for persistence
+* [ ] Add Verbose Event Object for Events.
 * [ ] Fix structured outputs deserialization with field descriptions
 
 ---

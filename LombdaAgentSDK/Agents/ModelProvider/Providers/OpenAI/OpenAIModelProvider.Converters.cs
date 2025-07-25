@@ -432,7 +432,14 @@ namespace LombdaAgentSDK
                 }
                 else if (content is ModelMessageImageFileContent image)
                 {
-                    messageContent.Add(ResponseContentPart.CreateInputImagePart(image.DataBytes, image.MediaType));
+                    if(image.DataBytes == null || image.DataBytes.Length == 0)
+                    {
+                        messageContent.Add(ResponseContentPart.CreateInputImagePart(new Uri(image.DataUri),ResponseImageDetailLevel.Auto));
+                    }
+                    else
+                    {
+                        messageContent.Add(ResponseContentPart.CreateInputImagePart(image.DataBytes, image.MediaType));
+                    }      
                 }
                 else if (content is ModelMessageImageUrlContent imageurl)
                 {

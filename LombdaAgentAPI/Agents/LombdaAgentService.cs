@@ -1,3 +1,4 @@
+using BabyAGI;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
 using LombdaAgentAPI.Hubs;
@@ -33,6 +34,7 @@ namespace LombdaAgentAPI.Agents
             RegisterAgentType("Default", typeof(APILombdaAgent));
             RegisterAgentType("CodeAssistant", typeof(CodeAssistantLombdaAgent));
             RegisterAgentType("Creative", typeof(CreativeLombdaAgent));
+            RegisterAgentType("BabyAGI", typeof(BabyAGIRunner));
         }
 
         public List<string> GetAgentIds()
