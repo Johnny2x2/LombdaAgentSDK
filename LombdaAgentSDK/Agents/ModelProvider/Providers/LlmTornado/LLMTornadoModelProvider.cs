@@ -47,26 +47,49 @@ namespace LombdaAgentSDK
             VectorSearchOptions = searchOptions;
             EnableWebSearch = enableWebSearch;
             CodeOptions = codeOptions;
+
+            if (UseResponseAPI && (VectorSearchOptions != null || EnableWebSearch || CodeOptions != null || allowComputerUse))
+            {
+                throw new Exception("Cannot use Vector Search, Web Search or Code Interpreter with Response API, use Chat API instead.");
+            }
         }
 
         public LLMTornadoModelProvider(
-            ChatModel model, Uri provider, bool useResponseAPI = false, bool allowComputerUse = false)
+            ChatModel model, Uri provider, bool useResponseAPI = false, bool allowComputerUse = false, 
+            VectorSearchOptions? searchOptions = null, bool enableWebSearch = false, ModelCodeInterpreterOptions? codeOptions = null)
         {
             Model = model.Name;
             CurrentModel = model;
             Client = new TornadoApi(provider);
             UseResponseAPI = useResponseAPI;
             AllowComputerUse = allowComputerUse;
+            VectorSearchOptions = searchOptions;
+            EnableWebSearch = enableWebSearch;
+            CodeOptions = codeOptions;
+
+            if (UseResponseAPI && (VectorSearchOptions != null || EnableWebSearch || CodeOptions != null || allowComputerUse))
+            {
+                throw new Exception("Cannot use Vector Search, Web Search or Code Interpreter with Response API, use Chat API instead.");
+            }
         }
 
         public LLMTornadoModelProvider(
-            ChatModel model, TornadoApi client, bool useResponseAPI = false, bool allowComputerUse = false)
+            ChatModel model, TornadoApi client, bool useResponseAPI = false, bool allowComputerUse = false,
+            VectorSearchOptions? searchOptions = null, bool enableWebSearch = false, ModelCodeInterpreterOptions? codeOptions = null)
         {
             Model = model;
             CurrentModel = model;
             Client = client;
             UseResponseAPI = useResponseAPI;
             AllowComputerUse = allowComputerUse;
+            VectorSearchOptions = searchOptions;
+            EnableWebSearch = enableWebSearch;
+            CodeOptions = codeOptions;
+
+            if (UseResponseAPI && (VectorSearchOptions != null || EnableWebSearch || CodeOptions != null || allowComputerUse))
+            {
+                throw new Exception("Cannot use Vector Search, Web Search or Code Interpreter with Response API, use Chat API instead.");
+            }
         }
 
         public Conversation SetupClient(Conversation chat, List<ModelItem> messages, ModelResponseOptions options)
@@ -110,9 +133,7 @@ namespace LombdaAgentSDK
 
         public ResponseRequest SetupResponseClient(List<ModelItem> messages, ModelResponseOptions options)
         {
-            List<ResponseInputItem> InputItems = new();
-
-            InputItems.AddRange(ConvertToProviderResponseItems(new List<ModelItem>([messages.Last()])));
+            List<ResponseInputItem> InputItems = ConvertToProviderResponseItems(new List<ModelItem>([messages.Last()]));
 
             ResponseRequest request = new ResponseRequest
             {
