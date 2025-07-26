@@ -31,13 +31,13 @@ namespace LombdaAgentSDK
         public bool EnableWebSearch { get; set; } = false;
 
         //Need to add in some Converters first
-        //public bool EnableCodeInterpreter { get; set; } = false;
+        public ModelCodeInterpreterOptions? CodeOptions { get; set; }
         //Need MPC
         //Need LocalShell
 
         public LLMTornadoModelProvider(
             ChatModel model, List<ProviderAuthentication> provider, bool useResponseAPI = false, 
-            bool allowComputerUse = false, VectorSearchOptions? searchOptions = null, bool enableWebSearch = false)
+            bool allowComputerUse = false, VectorSearchOptions? searchOptions = null, bool enableWebSearch = false, ModelCodeInterpreterOptions? codeOptions = null)
         {
             Model = model.Name;
             CurrentModel = model;
@@ -46,6 +46,7 @@ namespace LombdaAgentSDK
             AllowComputerUse = allowComputerUse;
             VectorSearchOptions = searchOptions;
             EnableWebSearch = enableWebSearch;
+            CodeOptions = codeOptions;
         }
 
         public LLMTornadoModelProvider(
@@ -197,11 +198,20 @@ namespace LombdaAgentSDK
                 request.Tools.Add(new ResponseWebSearchTool());
             }
 
-            //Need to add Convertion methods to model provider converts for ResponseConverter
-            //if (EnableCodeInterpreter)
-            //{
-            //    request.Tools.Add(new ResponseCodeInterpreterTool());
-            //}
+            
+            if (CodeOptions != null)
+            {
+                var codeTool = new ResponseCodeInterpreterTool();
+                if( CodeOptions.FileIds != null && CodeOptions.FileIds.Count > 0)
+                {
+                    codeTool.Container = new ResponseCodeInterpreterContainerAuto() { FileIds = CodeOptions.FileIds };
+                }
+                else if(!string.IsNullOrEmpty(CodeOptions.ContainerId))
+                {
+                    codeTool.Container = new ResponseCodeInterpreterContainerString(CodeOptions.ContainerId);
+                }
+                request.Tools.Add(codeTool);
+            }
 
             return request;
         }
