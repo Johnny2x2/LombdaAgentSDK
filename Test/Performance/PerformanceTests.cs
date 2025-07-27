@@ -21,12 +21,12 @@ namespace Test.Performance
             {
                 _modelProvider = new LLMTornadoModelProvider(
                     ChatModel.OpenAi.Gpt41.V41Mini,
-                    [new ProviderAuthentication(LLmProviders.OpenAi, ApiKey!)]);
+                    [new ProviderAuthentication(LLmProviders.OpenAi, ApiKey!)], true);
             }
         }
 
         [Test]
-        [Category("Performance")]
+        [NUnit.Framework.Category("Performance")]
         public async Task RunAsync_SimpleAgent_ShouldCompleteWithinTimeout()
         {
             // Arrange
@@ -48,7 +48,7 @@ namespace Test.Performance
         }
 
         [Test]
-        [Category("Performance")]
+        [NUnit.Framework.Category("Performance")]
         public async Task RunAsync_WithTools_ShouldCompleteWithinTimeout()
         {
             // Arrange
@@ -70,7 +70,7 @@ namespace Test.Performance
         }
 
         [Test]
-        [Category("Performance")]
+        [NUnit.Framework.Category("Performance")]
         public async Task RunAsync_WithStructuredOutput_ShouldCompleteWithinTimeout()
         {
             // Arrange
@@ -95,7 +95,7 @@ namespace Test.Performance
         }
 
         [Test]
-        [Category("Performance")]
+        [NUnit.Framework.Category("Performance")]
         public async Task RunAsync_MultipleSequentialCalls_ShouldMaintainPerformance()
         {
             // Arrange
@@ -134,7 +134,7 @@ namespace Test.Performance
         }
 
         [Test]
-        [Category("Performance")]
+        [NUnit.Framework.Category("Performance")]
         public async Task RunAsync_WithMultipleTools_ShouldSelectToolEfficiently()
         {
             // Arrange
@@ -159,7 +159,7 @@ namespace Test.Performance
         }
 
         [Test]
-        [Category("Performance")]
+        [NUnit.Framework.Category("Performance")]
         public void Agent_Creation_WithManyTools_ShouldBeEfficient()
         {
             // Arrange
@@ -181,7 +181,7 @@ namespace Test.Performance
         }
 
         [Test]
-        [Category("Performance")]
+        [NUnit.Framework.Category("Performance")]
         public async Task StreamingResponse_ShouldStartQuickly()
         {
             // Arrange
@@ -208,7 +208,7 @@ namespace Test.Performance
             }
 
             // Act
-            var result = await Runner.RunAsync(agent, "Write a short poem", streamingCallback: StreamingCallback);
+            var result = await Runner.RunAsync(agent, "Write a short poem", streamingCallback: StreamingCallback, streaming:true);
 
             // Assert
             result.Should().NotBeNull();

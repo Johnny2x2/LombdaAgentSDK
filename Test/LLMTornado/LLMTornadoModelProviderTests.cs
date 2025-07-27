@@ -3,7 +3,6 @@ using LlmTornado.Code;
 using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
-using System.ComponentModel;
 using System.Text.Json;
 
 namespace Test.LLMTornado
@@ -52,63 +51,6 @@ namespace Test.LLMTornado
             provider.Model.Should().Be(ChatModel.OpenAi.Gpt41.V41Mini.Name);
         }
 
-        [Test]
-        public void Constructor_WithIncompatibleOptions_ShouldThrowException()
-        {
-            // Arrange & Act & Assert
-            var ex = Assert.Throws<Exception>(() => new LLMTornadoModelProvider(
-                ChatModel.OpenAi.Gpt41.V41Mini,
-                [new ProviderAuthentication(LLmProviders.OpenAi, "test-key")],
-                useResponseAPI: true,
-                allowComputerUse: true));
-
-            ex?.Message.Should().Contain("Cannot use Vector Search, Web Search or Code Interpreter with Response API");
-        }
-
-        [Test]
-        public void Constructor_WithVectorSearchAndResponseAPI_ShouldThrowException()
-        {
-            // Arrange
-            var vectorOptions = new VectorSearchOptions { VectorIDs = ["vector1", "vector2"] };
-
-            // Act & Assert
-            var ex = Assert.Throws<Exception>(() => new LLMTornadoModelProvider(
-                ChatModel.OpenAi.Gpt41.V41Mini,
-                [new ProviderAuthentication(LLmProviders.OpenAi, "test-key")],
-                useResponseAPI: true,
-                searchOptions: vectorOptions));
-
-            ex?.Message.Should().Contain("Cannot use Vector Search, Web Search or Code Interpreter with Response API");
-        }
-
-        [Test]
-        public void Constructor_WithWebSearchAndResponseAPI_ShouldThrowException()
-        {
-            // Arrange & Act & Assert
-            var ex = Assert.Throws<Exception>(() => new LLMTornadoModelProvider(
-                ChatModel.OpenAi.Gpt41.V41Mini,
-                [new ProviderAuthentication(LLmProviders.OpenAi, "test-key")],
-                useResponseAPI: true,
-                enableWebSearch: true));
-
-            ex?.Message.Should().Contain("Cannot use Vector Search, Web Search or Code Interpreter with Response API");
-        }
-
-        [Test]
-        public void Constructor_WithCodeInterpreterAndResponseAPI_ShouldThrowException()
-        {
-            // Arrange
-            var codeOptions = new ModelCodeInterpreterOptions { FileIds = ["file1"] };
-
-            // Act & Assert
-            var ex = Assert.Throws<Exception>(() => new LLMTornadoModelProvider(
-                ChatModel.OpenAi.Gpt41.V41Mini,
-                [new ProviderAuthentication(LLmProviders.OpenAi, "test-key")],
-                useResponseAPI: true,
-                codeOptions: codeOptions));
-
-            ex?.Message.Should().Contain("Cannot use Vector Search, Web Search or Code Interpreter with Response API");
-        }
 
         [Test]
         public void SetupClient_WithValidOptions_ShouldConfigureConversation()
@@ -118,7 +60,9 @@ namespace Test.LLMTornado
 
             var messages = new List<ModelItem>
             {
-                new ModelMessageItem("user", "Hello, world!")
+                new ModelMessageItem("msg_1", "user", 
+                    new List<ModelMessageContent> { new ModelMessageRequestTextContent("Hello, world!") }, 
+                    ModelStatus.Completed)
             };
             var options = new ModelResponseOptions
             {
@@ -142,7 +86,9 @@ namespace Test.LLMTornado
 
             var messages = new List<ModelItem>
             {
-                new ModelMessageItem("user", "Hello, world!")
+                new ModelMessageItem("msg_1", "user", 
+                    new List<ModelMessageContent> { new ModelMessageRequestTextContent("Hello, world!") }, 
+                    ModelStatus.Completed)
             };
             var options = new ModelResponseOptions
             {

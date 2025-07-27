@@ -67,8 +67,8 @@ namespace Test
         protected static void AssertValidJsonString(string json)
         {
             json.Should().NotBeNullOrWhiteSpace();
-            var exception = Record.Exception(() => System.Text.Json.JsonDocument.Parse(json));
-            exception.Should().BeNull("JSON should be valid");
+            Action parseAction = () => System.Text.Json.JsonDocument.Parse(json);
+            parseAction.Should().NotThrow("JSON should be valid");
         }
 
         protected static void AssertContainsAnyOf(string text, params string[] expectedSubstrings)

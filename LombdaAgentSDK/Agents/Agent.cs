@@ -66,11 +66,15 @@ namespace LombdaAgentSDK.Agents
         {
             LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Nano,
                                                    [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
-            return new Agent(client, "");
+            return new Agent(client, "Assistant");
         }
 
         public Agent(ModelClient client, string _name = "Assistant", string _instructions = "", Type? _output_schema = null, List<Delegate>? _tools = null, List<MCPServer>? mcpServers = null)
         {
+            if(client == null)
+            {
+                throw new ArgumentNullException(nameof(client), "ModelClient cannot be null");
+            }
             Client = client;
             AgentName = _name;
             Instructions = string.IsNullOrEmpty(_instructions) ? "You are a helpful assistant" : _instructions;

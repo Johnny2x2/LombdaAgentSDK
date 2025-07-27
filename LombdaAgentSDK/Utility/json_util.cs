@@ -12,6 +12,31 @@ namespace LombdaAgentSDK
     public static class json_util
     {
         /// <summary>
+        /// Determines whether the specified string is a valid JSON format.
+        /// </summary>
+        /// <remarks>This method attempts to parse the input string as JSON. If parsing succeeds without
+        /// exceptions, the string is considered valid JSON.</remarks>
+        /// <param name="jsonString">The string to validate as JSON. Cannot be null or whitespace.</param>
+        /// <returns><see langword="true"/> if the specified string is valid JSON; otherwise, <see langword="false"/>.</returns>
+        public static bool IsValidJson(string jsonString)
+        {
+            if (string.IsNullOrWhiteSpace(jsonString))
+            {
+                return false;
+            }
+            try
+            {
+                // Attempt to parse the JSON string
+                JsonDocument.Parse(jsonString);
+                return true;
+            }
+            catch (JsonException)
+            {
+                // If a JsonException is caught, the string is not valid JSON
+                return false;
+            }
+        }
+        /// <summary>
         /// Creates a <see cref="ModelOutputFormat"/> instance representing the JSON schema of the specified type.
         /// </summary>
         /// <remarks>If the specified type has a <see cref="DescriptionAttribute"/>, the first description
@@ -48,7 +73,7 @@ namespace LombdaAgentSDK
             string json = Result.Text;
 
             if (string.IsNullOrWhiteSpace(json))
-                throw new ArgumentException("RunResult Text is null or empty");
+                throw new ArgumentNullException("RunResult Text is null or empty");
 
             return JsonSerializer.Deserialize<T>(json)!;
         }
@@ -224,15 +249,25 @@ namespace LombdaAgentSDK
             var properties = new Dictionary<string, object>();
             if (fromArray)
             {
-                properties.Add("type", json_util.MapClrTypeToJsonType(type));
-                var subProperties = new Dictionary<string, object>();
-                foreach (var prop in type.GetProperties())
+                var jsonType = json_util.MapClrTypeToJsonType(type);
+                properties.Add("type", jsonType);
+
+                if (jsonType == "object")
                 {
-                    subProperties[prop.Name] = GetPropertySchema(prop);
+                    var subProperties = new Dictionary<string, object>();
+                    foreach (var prop in type.GetProperties())
+                    {
+                        if(prop.PropertyType.Name == type.Name)
+                        {
+                            throw new ArgumentException($"Infinite Recursion detected please fix nesting on {prop.Name} in Type {type.Name}.");
+                        }
+                        subProperties[prop.Name] = GetPropertySchema(prop);
+                    }
+                    properties.Add("properties", subProperties);
+                    properties.Add("required", GetRequiredProperties(type));
+                    properties.Add("additionalProperties", false);
                 }
-                properties.Add("properties", subProperties);
-                properties.Add("required", GetRequiredProperties(type));
-                properties.Add("additionalProperties", false);
+
                 return properties;
             }
             foreach (var prop in type.GetProperties())
@@ -326,5 +361,7 @@ namespace LombdaAgentSDK
         {
             return NumericTypes.Contains(Nullable.GetUnderlyingType(myType) ?? myType);
         }
+
+      
     }
 }
