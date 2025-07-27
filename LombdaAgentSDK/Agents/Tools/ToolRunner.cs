@@ -29,12 +29,12 @@ namespace LombdaAgentSDK
             if (!agent.tool_list.TryGetValue(call.FunctionName, out FunctionTool? tool))
                 throw new Exception($"I don't have a tool called {call.FunctionName}");
 
-            if (!json_util.IsValidJson(call.FunctionArguments.ToString()))
-                throw new System.Text.Json.JsonException($"Function arguments for {call.FunctionName} are not valid JSON");
-
             //Need to check if function has required parameters and if so, parse them from the call.FunctionArguments
             if (call.FunctionArguments != null)
             {
+                if (!json_util.IsValidJson(call.FunctionArguments.ToString()))
+                    throw new System.Text.Json.JsonException($"Function arguments for {call.FunctionName} are not valid JSON");
+
                 arguments = tool.Function.ParseFunctionCallArgs(call.FunctionArguments) ?? new();
             }
 
@@ -52,9 +52,21 @@ namespace LombdaAgentSDK
             if (!agent.mcp_tools.TryGetValue(call.FunctionName, out MCPServer? server))
                 throw new Exception($"I don't have a tool called {call.FunctionName}");
 
-            var json = call.FunctionArguments.ToString();
-            var dict = JsonConvert.DeserializeObject<Dictionary<string, object?>>(json);
-            var _result = await server.McpClient!.CallToolAsync(call.FunctionName,dict);
+            CallToolResult _result;
+            //Need to check if function has required parameters and if so, parse them from the call.FunctionArguments
+            if (call.FunctionArguments != null)
+            {
+                if (!json_util.IsValidJson(call.FunctionArguments.ToString()))
+                    throw new System.Text.Json.JsonException($"Function arguments for {call.FunctionName} are not valid JSON");
+
+                var json = call.FunctionArguments.ToString();
+                var dict = JsonConvert.DeserializeObject<Dictionary<string, object?>>(json);
+                _result = await server.McpClient!.CallToolAsync(call.FunctionName, dict);
+            }
+            else
+            {
+                _result = await server.McpClient!.CallToolAsync(call.FunctionName);
+            }
 
             if (_result is CallToolResult callToolResult)
             {
@@ -116,6 +128,9 @@ namespace LombdaAgentSDK
             Agent newAgent = tool.ToolAgent;
             if (call.FunctionArguments != null)
             {
+                if (!json_util.IsValidJson(call.FunctionArguments.ToString()))
+                    throw new System.Text.Json.JsonException($"Function arguments for {call.FunctionName} are not valid JSON");
+
                 using JsonDocument argumentsJson = JsonDocument.Parse(call.FunctionArguments);
 
                 if (argumentsJson.RootElement.TryGetProperty("input", out JsonElement jValue))

@@ -10,18 +10,6 @@ using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace LombdaAgentSDK.Agents.Tools
 {
-    public class MCPMethodTool : FunctionTool
-    {
-        public string ServerLabel { get; set; }
-        public string ServerUrl { get; set; }
-        public MCPMethodTool(string toolName, string toolDescription, string serverLabel, string serverUrl, Delegate? callback = null, BinaryData? binaryData = null)
-            : base(toolName, toolDescription, binaryData, callback, true)
-        {
-            ServerLabel = serverLabel;
-            ServerUrl = serverUrl;
-        }
-    }
-
     public class MCPServer
     {
         public string ServerLabel { get; set; }
