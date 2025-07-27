@@ -32,13 +32,13 @@ namespace LombdaAgentSDK
 
         //Need to add in some Converters first
         public ModelCodeInterpreterOptions? CodeOptions { get; set; }
-        //Need MPC
 
-        //Need LocalShell
+        public bool EnableLocalShell { get; set; } = false;
 
         public LLMTornadoModelProvider(
             ChatModel model, List<ProviderAuthentication> provider, bool useResponseAPI = false, 
-            bool allowComputerUse = false, VectorSearchOptions? searchOptions = null, bool enableWebSearch = false, ModelCodeInterpreterOptions? codeOptions = null, List<MCPServer>? mcpServers = null)
+            bool allowComputerUse = false, VectorSearchOptions? searchOptions = null, bool enableWebSearch = false, 
+            ModelCodeInterpreterOptions? codeOptions = null, List<MCPServer>? mcpServers = null, bool enableLocalShell = false)
         {
             Model = model.Name;
             CurrentModel = model;
@@ -48,11 +48,12 @@ namespace LombdaAgentSDK
             VectorSearchOptions = searchOptions;
             EnableWebSearch = enableWebSearch;
             CodeOptions = codeOptions;
+            EnableLocalShell = enableLocalShell;
         }
 
         public LLMTornadoModelProvider(
             ChatModel model, Uri provider, bool useResponseAPI = false, bool allowComputerUse = false, 
-            VectorSearchOptions? searchOptions = null, bool enableWebSearch = false, ModelCodeInterpreterOptions? codeOptions = null)
+            VectorSearchOptions? searchOptions = null, bool enableWebSearch = false, ModelCodeInterpreterOptions? codeOptions = null, bool enableLocalShell = false)
         {
             Model = model.Name;
             CurrentModel = model;
@@ -62,11 +63,12 @@ namespace LombdaAgentSDK
             VectorSearchOptions = searchOptions;
             EnableWebSearch = enableWebSearch;
             CodeOptions = codeOptions;
+            EnableLocalShell = enableLocalShell;
         }
 
         public LLMTornadoModelProvider(
             ChatModel model, TornadoApi client, bool useResponseAPI = false, bool allowComputerUse = false,
-            VectorSearchOptions? searchOptions = null, bool enableWebSearch = false, ModelCodeInterpreterOptions? codeOptions = null)
+            VectorSearchOptions? searchOptions = null, bool enableWebSearch = false, ModelCodeInterpreterOptions? codeOptions = null, bool enableLocalShell = false)
         {
             Model = model;
             CurrentModel = model;
@@ -76,6 +78,7 @@ namespace LombdaAgentSDK
             VectorSearchOptions = searchOptions;
             EnableWebSearch = enableWebSearch;
             CodeOptions = codeOptions;
+            EnableLocalShell = enableLocalShell;
         }
 
         public Conversation SetupClient(Conversation chat, List<ModelItem> messages, ModelResponseOptions options)
@@ -221,7 +224,11 @@ namespace LombdaAgentSDK
                 request.Tools.Add(new ResponseWebSearchTool());
             }
 
-            
+            if (EnableLocalShell)
+            {
+                request.Tools.Add(new ResponseLocalShellTool());
+            }
+
             if (CodeOptions != null)
             {
                 var codeTool = new ResponseCodeInterpreterTool();
