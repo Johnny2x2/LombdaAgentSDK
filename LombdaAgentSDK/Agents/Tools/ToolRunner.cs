@@ -1,6 +1,10 @@
-﻿using LombdaAgentSDK.Agents;
+﻿using LlmTornado.Common;
+using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
+using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
+using Newtonsoft.Json;
 using System.Reflection;
 using System.Text.Json;
 
@@ -31,12 +35,69 @@ namespace LombdaAgentSDK
                 arguments = tool.Function.ParseFunctionCallArgs(call.FunctionArguments) ?? new();
             }
 
-            string? result = (string?)await CallFuncAsync(tool.Function, [.. arguments]);
+            var _result = await CallFuncAsync(tool.Function, [.. arguments]);
 
-            return new ModelFunctionCallOutputItem("fc_"+Guid.NewGuid().ToString().Replace("-", "_"), call.CallId, result!, call.Status, call.FunctionName);
+
+            return new ModelFunctionCallOutputItem("fc_" + Guid.NewGuid().ToString().Replace("-", "_"), call.CallId, _result?.ToString() ?? "ERROR", call.Status, call.FunctionName);
         }
 
-        
+
+        public static async Task<ModelFunctionCallOutputItem> CallMcpToolAsync(Agent agent, ModelFunctionCallItem call)
+        {
+            List<object> arguments = new();
+
+            if (!agent.mcp_tools.TryGetValue(call.FunctionName, out MCPServer? server))
+                throw new Exception($"I don't have a tool called {call.FunctionName}");
+
+            var json = call.FunctionArguments.ToString();
+            var dict = JsonConvert.DeserializeObject<Dictionary<string, object?>>(json);
+            var _result = await server.McpClient!.CallToolAsync(call.FunctionName,dict);
+
+            if (_result is CallToolResult callToolResult)
+            {
+                string? result = "";
+
+                if (callToolResult.Content.Count > 0)
+                {
+                    ContentBlock firstBlock = callToolResult.Content[0];
+
+                    switch (firstBlock)
+                    {
+                        case TextContentBlock textBlock:
+                            {
+                                result = textBlock.Text;
+                                break;
+                            }
+                        case ImageContentBlock imageBlock:
+                            {
+                                result = imageBlock.Data;
+                                break;
+                            }
+                        case AudioContentBlock audioBlock:
+                            {
+                                result = audioBlock.Data;
+                                break;
+                            }
+                        case EmbeddedResourceBlock embeddedResourceBlock:
+                            {
+                                result = embeddedResourceBlock.Resource.Uri;
+                                break;
+                            }
+                        case ResourceLinkBlock resourceLinkBlock:
+                            {
+                                result = resourceLinkBlock.Uri;
+                                break;
+                            }
+                    }
+                }
+                return new ModelFunctionCallOutputItem("fc_" + Guid.NewGuid().ToString().Replace("-", "_"), call.CallId, result, call.Status, call.FunctionName);
+            }
+
+
+            return new ModelFunctionCallOutputItem("fc_" + Guid.NewGuid().ToString().Replace("-", "_"), call.CallId, "ERROR", call.Status, call.FunctionName);
+        }
+
+
         /// <summary>
         /// Invoke Agent from FunctionCallItem and return FunctionOutputItem
         /// </summary>

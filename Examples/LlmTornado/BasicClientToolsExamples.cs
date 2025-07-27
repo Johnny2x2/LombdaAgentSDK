@@ -1,5 +1,8 @@
-﻿using LlmTornado.Chat.Models;
+﻿using LlmTornado;
+using LlmTornado.Chat.Models;
 using LlmTornado.Code;
+using LlmTornado.Images.Models;
+using LlmTornado.Responses;
 using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
@@ -49,5 +52,33 @@ namespace Examples.LlmTornado
 
                 Console.WriteLine(result.Text);
             }
+
+        [Test]
+        public static async Task ResponseDeepResearchMcp()
+        {
+            EndpointBase.SetRequestsTimeout(20000);
+
+            TornadoApi api = new TornadoApi(
+                [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!)]);
+
+            ResponseResult result = await api.Responses.CreateResponse(new ResponseRequest
+            {
+                Model = ChatModel.OpenAi.Gpt41.V41,
+                Background = false,
+                InputItems = [
+                    new ResponseInputMessage(ChatMessageRoles.User, "Research detailed information about latest development in the Ukraine war and predict how long will Pokrovsk hold.  Please send e-mail analysis to EMAIL using the MCP.")
+                ],
+                Tools = [
+                new ResponseMcpTool
+                {
+                    ServerLabel = "scriptwriter",
+                    ServerUrl = "http://localhost:8000",
+                    RequireApproval = ResponseMcpRequireApprovalOption.Never
+                }
+                ]
+            });
+
+            int z = 0;
         }
+    }
 }

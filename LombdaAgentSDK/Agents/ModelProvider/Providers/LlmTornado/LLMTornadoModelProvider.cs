@@ -1,21 +1,21 @@
 ﻿using LlmTornado;
 using LlmTornado.Chat;
 using LlmTornado.Chat.Models;
-using LlmTornado.ChatFunctions;
 using LlmTornado.Code;
 using LlmTornado.Common;
 using LlmTornado.Responses;
 using LlmTornado.Responses.Events;
-using LlmTornado.Threads;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
+using ModelContextProtocol;
+using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
-using System.Collections.Generic;
 using System.Drawing;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 using FunctionCall = LlmTornado.ChatFunctions.FunctionCall;
+
 
 namespace LombdaAgentSDK
 {
@@ -33,11 +33,12 @@ namespace LombdaAgentSDK
         //Need to add in some Converters first
         public ModelCodeInterpreterOptions? CodeOptions { get; set; }
         //Need MPC
+
         //Need LocalShell
 
         public LLMTornadoModelProvider(
             ChatModel model, List<ProviderAuthentication> provider, bool useResponseAPI = false, 
-            bool allowComputerUse = false, VectorSearchOptions? searchOptions = null, bool enableWebSearch = false, ModelCodeInterpreterOptions? codeOptions = null)
+            bool allowComputerUse = false, VectorSearchOptions? searchOptions = null, bool enableWebSearch = false, ModelCodeInterpreterOptions? codeOptions = null, List<MCPServer>? mcpServers = null)
         {
             Model = model.Name;
             CurrentModel = model;
@@ -108,6 +109,14 @@ namespace LombdaAgentSDK
                     );
             }
 
+            foreach(var server in options.MCPServers)
+            { 
+                foreach (var tool in server.Tools)
+                {
+                    chat.RequestParameters.Tools?.Add(new LlmTornado.Common.Tool(new ToolFunction(tool.Name, tool.Description, tool.JsonSchema)));
+                }
+            }
+
             //Convert Text Format Here
             if (options.OutputFormat != null)
             {
@@ -142,7 +151,7 @@ namespace LombdaAgentSDK
                 Instructions = options.Instructions
             };
             
-            if (request.Tools == null) request.Tools = new List<ResponseTool>();
+            if (request.Tools == null) request.Tools = new List<LlmTornado.Responses.ResponseTool>();
 
             request.PreviousResponseId = options.PreviousResponseId ?? null;
             //Convert Tools here
@@ -161,7 +170,15 @@ namespace LombdaAgentSDK
                 request.Tools.Add(rftool);
             }
 
-            if(VectorSearchOptions != null)
+            foreach (var server in options.MCPServers)
+            {
+                foreach (var tool in server.Tools)
+                {
+                    request.Tools?.Add(ToResponseTool(new LlmTornado.Common.Tool(new ToolFunction(tool.Name, tool.Description, tool.JsonSchema))));
+                }
+            }
+
+            if (VectorSearchOptions != null)
             {
                 request.Tools.Add(new ResponseFileSearchTool
                 {
@@ -235,6 +252,22 @@ namespace LombdaAgentSDK
             }
 
             return request;
+        }
+
+        public LlmTornado.Responses.ResponseTool ToResponseTool(LlmTornado.Common.Tool tool)
+        {
+            if (tool.Function?.Parameters != null)
+            {
+                return new ResponseFunctionTool
+                {
+                    Name = tool.Function.Name,
+                    Description = tool.Function.Description,
+                    Parameters = JObject.FromObject(tool.Function.Parameters),
+                    Strict = tool.Strict
+                };
+            }
+
+            return null;
         }
 
         public async Task<ModelResponse> HandleStreaming(Conversation chat, List<ModelItem> messages, ModelResponseOptions options, StreamingCallbacks streamingCallback = null)

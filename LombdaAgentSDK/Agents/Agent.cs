@@ -2,6 +2,10 @@
 using LlmTornado.Code;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
+using ModelContextProtocol.Client;
+using ModelContextProtocol.Server;
+using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace LombdaAgentSDK.Agents
 {
@@ -55,13 +59,17 @@ namespace LombdaAgentSDK.Agents
         /// </summary>
         public Dictionary<string, AgentTool> agent_tools = new Dictionary<string, AgentTool>();
 
+        public Dictionary<string, MCPServer> mcp_tools = new Dictionary<string, MCPServer>();
+
+        public List<MCPServer> MCPServers = new List<MCPServer>();
         public static Agent DummyAgent()
         {
             LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Nano,
                                                    [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),]);
             return new Agent(client, "");
         }
-        public Agent(ModelClient client, string _name = "Assistant", string _instructions = "", Type? _output_schema = null, List<Delegate>? _tools = null)
+
+        public Agent(ModelClient client, string _name = "Assistant", string _instructions = "", Type? _output_schema = null, List<Delegate>? _tools = null, List<MCPServer>? mcpServers = null)
         {
             Client = client;
             AgentName = _name;
@@ -70,7 +78,7 @@ namespace LombdaAgentSDK.Agents
             OutputSchema = _output_schema;
             Tools = _tools ?? Tools;
             Options.Instructions = Instructions;
-
+            MCPServers = mcpServers != null ? mcpServers  : new List<MCPServer>();
 
             if (OutputSchema != null)
             {
@@ -78,9 +86,9 @@ namespace LombdaAgentSDK.Agents
             }
 
             //Setup tools and agent tools
-            if (Tools.Count > 0)
+            if (Tools.Count > 0 || MCPServers.Count > 0)
             {
-                SetupTools(Tools);
+                Task.Run(async () => await SetupTools()).Wait();
             }
         }
 
@@ -88,31 +96,44 @@ namespace LombdaAgentSDK.Agents
         /// Setup the provided methods as tools
         /// </summary>
         /// <param name="Tools"></param>
-        private void SetupTools(List<Delegate> Tools)
+        private async Task SetupTools()
         {
-            foreach (var fun in Tools)
+            if(Tools != null)
             {
-                //Convert Agent to tool
-                if (fun.Method.Name.Equals("AsTool"))
+                foreach (var fun in Tools)
                 {
-                    AgentTool? agentTool = (AgentTool?)fun.DynamicInvoke(); //Creates the Chat tool for the agents running as tools and adds them to global list
-                                                                            //Add agent tool to context list
-                    if (agentTool != null)
+                    //Convert Agent to tool
+                    if (fun.Method.Name.Equals("AsTool"))
                     {
-                        agent_tools.Add(agentTool.ToolAgent.AgentName, agentTool);
-                        Options.Tools.Add(agentTool.Tool);
+                        AgentTool? agentTool = (AgentTool?)fun.DynamicInvoke(); //Creates the Chat tool for the agents running as tools and adds them to global list
+                                                                                //Add agent tool to context list
+                        if (agentTool != null)
+                        {
+                            agent_tools.Add(agentTool.ToolAgent.AgentName, agentTool);
+                            Options.Tools.Add(agentTool.Tool);
+                        }
+                    }
+                    else
+                    {
+                        //Convert Method to tool
+                        FunctionTool? functionTool = fun.ConvertFunctionToTool();
+                        if (functionTool != null)
+                        {
+                            tool_list.Add(functionTool.ToolName, functionTool);
+                            Options.Tools.Add(functionTool);
+                        }
                     }
                 }
-                else
+           
+                foreach (var server in MCPServers)
                 {
-                    //Convert Method to tool
-                    FunctionTool? functionTool = fun.ConvertFunctionToTool();
-                    if (functionTool != null)
+                    Options.MCPServers.Add(server);
+                    foreach(var tool in server.Tools)
                     {
-                        tool_list.Add(functionTool.ToolName, functionTool);
-                        Options.Tools.Add(functionTool);
+                        mcp_tools.Add(tool.Name, server);
                     }
                 }
+                    
             }
         }
 

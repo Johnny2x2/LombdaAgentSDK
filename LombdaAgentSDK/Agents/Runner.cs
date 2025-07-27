@@ -171,6 +171,7 @@ namespace LombdaAgentSDK
         /// <returns></returns>
         private static async Task<ModelFunctionCallOutputItem> HandleToolCall(Agent agent, ModelFunctionCallItem toolCall)
         {
+            if(agent.mcp_tools.ContainsKey(toolCall.FunctionName)) return await ToolRunner.CallMcpToolAsync(agent, toolCall);
             return agent.agent_tools.ContainsKey(toolCall.FunctionName) ? await ToolRunner.CallAgentToolAsync(agent, toolCall) : await ToolRunner.CallFuncToolAsync(agent, toolCall);
         }
 
