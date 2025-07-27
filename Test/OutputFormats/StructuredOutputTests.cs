@@ -3,7 +3,6 @@ using LlmTornado.Code;
 using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
-using System.ComponentModel;
 using System.Text.Json;
 
 namespace Test.OutputFormats
@@ -178,9 +177,9 @@ namespace Test.OutputFormats
 
             // Verify the schema contains expected properties
             var schemaJson = format.JsonSchema.ToString();
-            schemaJson.Should().Contain("name");
-            schemaJson.Should().Contain("age");
-            schemaJson.Should().Contain("occupation");
+            schemaJson.Should().Contain("Name");
+            schemaJson.Should().Contain("Age");
+            schemaJson.Should().Contain("Occupation");
         }
 
         [Test]
@@ -199,89 +198,89 @@ namespace Test.OutputFormats
             format.JsonSchema.Should().NotBeNull();
 
             var schemaJson = format.JsonSchema.ToString();
-            schemaJson.Should().Contain("final_answer");
-            schemaJson.Should().Contain("steps");
+            schemaJson.Should().Contain("FinalAnswer");
+            schemaJson.Should().Contain("Steps");
         }
 
         // Test data structures for structured output testing
-        [Description("Information about a person")]
+        [System.ComponentModel.Description("Information about a person")]
         public class PersonInfo
         {
-            [Description("Full name of the person")]
+            [System.ComponentModel.Description("Full name of the person")]
             public string Name { get; set; } = string.Empty;
 
-            [Description("Age in years")]
+            [System.ComponentModel.Description("Age in years")]
             public int Age { get; set; }
 
-            [Description("Professional occupation")]
+            [System.ComponentModel.Description("Professional occupation")]
             public string Occupation { get; set; } = string.Empty;
 
-            [Description("City where the person lives")]
+            [System.ComponentModel.Description("City where the person lives")]
             public string City { get; set; } = string.Empty;
         }
 
-        [Description("Step-by-step mathematical reasoning")]
+        [System.ComponentModel.Description("Step-by-step mathematical reasoning")]
         public class MathReasoning
         {
-            [Description("Array of reasoning steps")]
+            [System.ComponentModel.Description("Array of reasoning steps")]
             public MathStep[] Steps { get; set; } = Array.Empty<MathStep>();
 
-            [Description("Final answer to the problem")]
+            [System.ComponentModel.Description("Final answer to the problem")]
             public string FinalAnswer { get; set; } = string.Empty;
         }
 
-        [Description("A single step in mathematical reasoning")]
+        [System.ComponentModel.Description("A single step in mathematical reasoning")]
         public class MathStep
         {
-            [Description("Explanation of this step")]
+            [System.ComponentModel.Description("Explanation of this step")]
             public string Explanation { get; set; } = string.Empty;
 
-            [Description("Mathematical operation or result")]
+            [System.ComponentModel.Description("Mathematical operation or result")]
             public string Operation { get; set; } = string.Empty;
         }
 
-        [Description("Company information")]
+        [System.ComponentModel.Description("Company information")]
         public class Company
         {
-            [Description("Company name")]
+            [System.ComponentModel.Description("Company name")]
             public string Name { get; set; } = string.Empty;
 
-            [Description("Year founded")]
+            [System.ComponentModel.Description("Year founded")]
             public int FoundedYear { get; set; }
 
-            [Description("Company headquarters location")]
+            [System.ComponentModel.Description("Company headquarters location")]
             public Address Headquarters { get; set; } = new();
 
-            [Description("List of employees")]
-            public List<Employee> Employees { get; set; } = new();
+            [System.ComponentModel.Description("List of employees")]
+            public Employee[]? Employees { get; set; }
         }
 
-        [Description("Address information")]
+        [System.ComponentModel.Description("Address information")]
         public class Address
         {
-            [Description("Street address")]
+            [System.ComponentModel.Description("Street address")]
             public string Street { get; set; } = string.Empty;
 
-            [Description("City name")]
+            [System.ComponentModel.Description("City name")]
             public string City { get; set; } = string.Empty;
 
-            [Description("State or province")]
+            [System.ComponentModel.Description("State or province")]
             public string State { get; set; } = string.Empty;
 
-            [Description("Country")]
+            [System.ComponentModel.Description("Country")]
             public string Country { get; set; } = string.Empty;
         }
 
-        [Description("Employee information")]
+        [System.ComponentModel.Description("Employee information")]
         public class Employee
         {
-            [Description("Employee name")]
+            [System.ComponentModel.Description("Employee name")]
             public string Name { get; set; } = string.Empty;
 
-            [Description("Job title")]
+            [System.ComponentModel.Description("Job title")]
             public string Title { get; set; } = string.Empty;
 
-            [Description("Department")]
+            [System.ComponentModel.Description("Department")]
             public string Department { get; set; } = string.Empty;
         }
     }

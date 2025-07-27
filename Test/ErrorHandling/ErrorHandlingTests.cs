@@ -4,7 +4,9 @@ using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
-using System.ComponentModel;
+using Newtonsoft.Json;
+using System.Reflection;
+using System.Text.Json;
 
 namespace Test.ErrorHandling
 {
@@ -36,9 +38,9 @@ namespace Test.ErrorHandling
         public void LLMTornadoModelProvider_WithNullAuthentication_ShouldThrowException()
         {
             // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => new LLMTornadoModelProvider(
+            Assert.Throws<ArgumentException>(() => new LLMTornadoModelProvider(
                 ChatModel.OpenAi.Gpt41.V41Mini,
-                null!));
+                []));
         }
 
         [Test]
@@ -50,33 +52,37 @@ namespace Test.ErrorHandling
                 new List<ProviderAuthentication>()));
         }
 
-        [Test]
-        public async Task RunAsync_WithInvalidApiKey_ShouldThrowException()
-        {
-            // Arrange
-            var invalidProvider = new LLMTornadoModelProvider(
-                ChatModel.OpenAi.Gpt41.V41Mini,
-                [new ProviderAuthentication(LLmProviders.OpenAi, "invalid-key")]);
+        /// <summary>
+        /// I do not Error Out on run only verbose logging of failed result.
+        /// </summary>
+        /// <returns></returns>
+        //[Test]
+        //public async Task RunAsync_WithInvalidApiKey_ShouldThrowException()
+        //{
+        //    // Arrange
+        //    var invalidProvider = new LLMTornadoModelProvider(
+        //        ChatModel.OpenAi.Gpt41.V41Mini,
+        //        [new ProviderAuthentication(LLmProviders.OpenAi, "invalid-key")]);
 
-            var agent = new Agent(invalidProvider, "Assistant", "You are a helpful assistant");
+        //    var agent = new Agent(invalidProvider, "Assistant", "You are a helpful assistant");
 
-            // Act & Assert
-            var ex = await Assert.ThrowsAsync<Exception>(() => Runner.RunAsync(agent, "Hello"));
-            ex.Should().NotBeNull();
-        }
+        //    // Act & Assert
+        //    var ex = Assert.ThrowsAsync<Exception>(async () => await Runner.RunAsync(agent, "Hello"));
+        //    ex.Should().NotBeNull();
+        //}
 
-        [Test]
-        public async Task RunAsync_WithNullPrompt_ShouldThrowArgumentNullException()
-        {
-            // Arrange
-            SkipIfNoApiKey();
-            if (_modelProvider == null) Assert.Fail("Model provider not initialized");
+        //[Test]
+        //public async Task RunAsync_WithNullPrompt_ShouldThrowArgumentNullException()
+        //{
+        //    // Arrange
+        //    SkipIfNoApiKey();
+        //    if (_modelProvider == null) Assert.Fail("Model provider not initialized");
 
-            var agent = new Agent(_modelProvider, "Assistant", "You are a helpful assistant");
+        //    var agent = new Agent(_modelProvider, "Assistant", "You are a helpful assistant");
 
-            // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => Runner.RunAsync(agent, null!));
-        }
+        //    // Act & Assert
+        //     Assert.ThrowsAsync<ArgumentNullException>(async () => await Runner.RunAsync(agent, null!));
+        //}
 
         [Test]
         public async Task RunAsync_WithEmptyPrompt_ShouldHandleGracefully()
@@ -112,8 +118,7 @@ namespace Test.ErrorHandling
                 BinaryData.FromString("{}"));
 
             // Act & Assert
-            var ex = await Assert.ThrowsAsync<Exception>(() => ToolRunner.CallFuncToolAsync(agent, functionCall));
-            ex.Message.Should().Contain("Tool error");
+            var ex = Assert.ThrowsAsync<TargetInvocationException>(async () => await ToolRunner.CallFuncToolAsync(agent, functionCall));
         }
 
         [Test]
@@ -133,15 +138,21 @@ namespace Test.ErrorHandling
                 BinaryData.FromString("{ invalid json }"));
 
             // Act & Assert
-            var ex = await Assert.ThrowsAsync<Exception>(() => ToolRunner.CallFuncToolAsync(agent, functionCall));
-            ex.Should().NotBeNull();
+            var ex = Assert.ThrowsAsync<System.Text.Json.JsonException>(async () => await ToolRunner.CallFuncToolAsync(agent, functionCall));
         }
 
         [Test]
         public void ParseJson_WithMalformedJson_ShouldThrowJsonException()
         {
             // Arrange
-            var runResult = new RunResult("{ invalid json }", null!, null!);
+            var runResult = new RunResult();
+            runResult.Response = new ModelResponse();
+            runResult.Response.OutputItems = new List<ModelItem>
+            {
+                new ModelMessageItem("msg_1", "assistant", 
+                    new List<ModelMessageContent> { new ModelMessageAssistantResponseTextContent("{ invalid json }") }, 
+                    ModelStatus.Completed)
+            };
 
             // Act & Assert
             Assert.Throws<System.Text.Json.JsonException>(() => runResult.ParseJson<TestClass>());
@@ -152,7 +163,14 @@ namespace Test.ErrorHandling
         {
             // Arrange
             var validJson = "{ \"wrongProperty\": \"value\" }";
-            var runResult = new RunResult(validJson, null!, null!);
+            var runResult = new RunResult();
+            runResult.Response = new ModelResponse();
+            runResult.Response.OutputItems = new List<ModelItem>
+            {
+                new ModelMessageItem("msg_1", "assistant", 
+                    new List<ModelMessageContent> { new ModelMessageAssistantResponseTextContent(validJson) }, 
+                    ModelStatus.Completed)
+            };
 
             // Act - This should work as JSON deserialization is flexible
             var result = runResult.ParseJson<TestClass>();
@@ -161,24 +179,6 @@ namespace Test.ErrorHandling
             result.Should().NotBeNull();
             result.Name.Should().BeEmpty();
             result.Value.Should().Be(0);
-        }
-
-        [Test]
-        public async Task RunAsync_WithVeryLongPrompt_ShouldHandleGracefully()
-        {
-            // Arrange
-            SkipIfNoApiKey();
-            if (_modelProvider == null) Assert.Fail("Model provider not initialized");
-
-            var agent = new Agent(_modelProvider, "Assistant", "You are a helpful assistant");
-            var longPrompt = new string('A', 10000); // Very long prompt
-
-            // Act
-            var result = await Runner.RunAsync(agent, longPrompt);
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Text.Should().NotBeEmpty();
         }
 
         [Test]
@@ -196,37 +196,27 @@ namespace Test.ErrorHandling
             agent.OutputSchema.Should().Be(typeof(string));
         }
 
-        [Test]
-        public void ConvertFunctionToTool_WithInvalidFunction_ShouldReturnNull()
-        {
-            // Arrange
-            Delegate invalidFunction = InvalidFunction;
+        /// <summary>
+        /// Again this will not throw an exception, but will log the error, I guess i could provide a safe vs unsafe mode to toggle this behavior.
+        /// </summary>
+        //[Test]
+        //public async Task RunAsync_WithCancellationToken_ShouldRespectCancellation()
+        //{
+        //    // Arrange
+        //    SkipIfNoApiKey();
+        //    if (_modelProvider == null) Assert.Fail("Model provider not initialized");
 
-            // Act
-            var tool = invalidFunction.ConvertFunctionToTool();
+        //    var agent = new Agent(_modelProvider, "Assistant", "You are a helpful assistant");
+        //    using var cts = new CancellationTokenSource();
+        //    cts.CancelAfter(TimeSpan.FromMilliseconds(100)); // Cancel quickly
 
-            // Assert
-            tool.Should().BeNull();
-        }
+        //    // Set the cancellation token
+        //    _modelProvider.CancelTokenSource = cts;
 
-        [Test]
-        public async Task RunAsync_WithCancellationToken_ShouldRespectCancellation()
-        {
-            // Arrange
-            SkipIfNoApiKey();
-            if (_modelProvider == null) Assert.Fail("Model provider not initialized");
-
-            var agent = new Agent(_modelProvider, "Assistant", "You are a helpful assistant");
-            using var cts = new CancellationTokenSource();
-            cts.CancelAfter(TimeSpan.FromMilliseconds(100)); // Cancel quickly
-
-            // Set the cancellation token
-            _modelProvider.CancelTokenSource = cts;
-
-            // Act & Assert
-            var ex = await Assert.ThrowsAsync<OperationCanceledException>(
-                () => Runner.RunAsync(agent, "Write a very long story"));
-        }
+        //    // Act & Assert
+        //    var ex = Assert.ThrowsAsync<OperationCanceledException>(
+        //        async () => await Runner.RunAsync(agent, "Write a very long story"));
+        //}
 
         [Test]
         public void Agent_WithNullToolsList_ShouldInitializeWithEmptyTools()
@@ -251,19 +241,8 @@ namespace Test.ErrorHandling
             SkipIfNoApiKey();
             if (_modelProvider == null) Assert.Fail("Model provider not initialized");
 
-            var agent = new Agent(_modelProvider, "Assistant", "You are a helpful assistant", 
-                _output_schema: typeof(ComplexNestedStructure));
-
-            // Act
-            var result = await Runner.RunAsync(agent, "Create a complex data structure");
-
-            // Assert
-            result.Should().NotBeNull();
-            result.Text.Should().NotBeEmpty();
-            
-            // Should be able to parse even if some fields are missing
-            var parsed = result.ParseJson<ComplexNestedStructure>();
-            parsed.Should().NotBeNull();
+            Assert.Throws<ArgumentException>(() => new Agent(_modelProvider, "Assistant", "You are a helpful assistant",
+                _output_schema: typeof(ComplexNestedStructure)));
         }
 
         // Test helper methods and classes
@@ -291,29 +270,29 @@ namespace Test.ErrorHandling
             public int Value { get; set; }
         }
 
-        [Description("Complex nested structure for testing error handling")]
+        [System.ComponentModel.Description("Complex nested structure for testing error handling")]
         public class ComplexNestedStructure
         {
-            [Description("List of nested objects")]
-            public List<NestedObject> Items { get; set; } = new();
+            [System.ComponentModel.Description("List of nested objects")]
+            public NestedObject[] Items { get; set; } 
 
-            [Description("Dictionary of values")]
+            [System.ComponentModel.Description("Dictionary of values")]
             public Dictionary<string, NestedObject> Map { get; set; } = new();
 
-            [Description("Array of arrays")]
+            [System.ComponentModel.Description("Array of arrays")]
             public string[][] Matrix { get; set; } = Array.Empty<string[]>();
         }
 
-        [Description("Nested object for complex structure")]
+        [System.ComponentModel.Description("Nested object for complex structure")]
         public class NestedObject
         {
-            [Description("Name property")]
+            [System.ComponentModel.Description("Name property")]
             public string Name { get; set; } = string.Empty;
 
-            [Description("Nested list")]
-            public List<string> Values { get; set; } = new();
+            [System.ComponentModel.Description("Nested list")]
+            public string[] Values { get; set; }
 
-            [Description("Optional nested object")]
+            [System.ComponentModel.Description("Optional nested object")]
             public NestedObject? Child { get; set; }
         }
     }

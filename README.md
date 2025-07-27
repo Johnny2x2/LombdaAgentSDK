@@ -17,7 +17,7 @@
 * ✅ StateMachine Code is completely decoupled from Agent pipelines
 * 🧠 `AgentStateMachine` for creating stateful multi-agent workflows
 * 🌐 `LombdaAgent` to unify Agent and StateMachine operations
-* 🪟  MAUI Debugging UI with streaming chat
+* 🪟  MAUI Debugging UI with streaming chat [LombdaAgentMAUI](https://github.com/Johnny2x2/LombdaAgentMAUI)
 * 📢 Event system for monitoring agent operations and debugging
 * 📦 BabyAGI
 ---
@@ -84,51 +84,65 @@ public string GetCurrentWeather(string location, Unit unit = Unit.celsius)
     return $"31 C";
 } 
 ```
-## Create Complex Agent Workflows
+# Create Complex Agent Workflows
 
-### Create a States
+### AgentState and AgentStateMachine
+
+The `AgentState` system enhances the basic state machine by creating states specifically designed for agent execution. Unlike the `BaseState`, which is a generic state container, `AgentState` is tailored for AI agent operations.
+
 ```csharp
-class PlanningState : BaseState<string, WebSearchPlan>
+class ReportingState : AgentState<string, ReportData>
 {
-    public override async Task<WebSearchPlan> Invoke(string input)
+    public ReportingState(StateMachine stateMachine) : base(stateMachine){}
+
+    public override Agent InitilizeStateAgent()
     {
-        string instructions = """
-            You are a helpful research assistant. 
-            Given a query, come up with a set of web searches, to perform to best answer the query. 
-            Output between 5 and 20 terms to query for. 
-            """;
+        return new Agent(
+            client: new OpenAIModelClient("gpt-4o-mini"), 
+            _name: "Reporting agent",
+            _instructions: """
+                You are a senior researcher tasked with writing a cohesive report for a research query.
+                You will be provided with the original query, and some initial research done by a research assistant.
+                Generate a detailed report in markdown format.
+                """, 
+            _output_schema: typeof(ReportData)
+        );
+    }
 
-        Agent agent = new Agent(
-            client, 
-            "Assistant", 
-            instructions, 
-            _output_schema: typeof(WebSearchPlan));
-
-        return (await Runner.RunAsync(agent, this.Input)).ParseJson<WebSearchPlan>();
+    public override async Task<ReportData> Invoke(string input)
+    {
+        return await BeginRunnerAsync<ReportData>(input);
     }
 }
 ```
-### Connect States Together
+### Creating Multi-Agent Workflows with AgentStateMachine
+
+The `AgentStateMachine` provides a framework for creating complex multi-agent workflows:
+
 ```csharp
-PlanningState plannerState = new PlanningState(); 
-ResearchState ResearchState = new ResearchState();
-ReportingState reportingState = new ReportingState();
+public class ResearchAgent : AgentStateMachine<string, ReportData>
+{
+    public ResearchAgent(LombdaAgent lombdaAgent) : base(lombdaAgent) { }
 
-//Setup Transitions between states
-plannerState.AddTransition(IfPlanCreated, ResearchState); //Check if a plan was generated or Rerun
+    public override void InitilizeStates()
+    {
+        // Setup states
+        ResearchState researchState = new ResearchState(this);
+        ReportingState reportingState = new ReportingState(this){ IsDeadEnd = true };
 
-ResearchState.AddTransition(reportingState); //Use Lambda expression For passthrough to reporting state
+        // Setup transitions between states
+        researchState.AddTransition(reportingState);
 
-reportingState.AddTransition(new ExitState()); //Use Lambda expression For passthrough to Exit### Run the StateMachine//Create State Machine Runner
-StateMachine stateMachine = new StateMachine();
+        // Set entry and output states
+        SetEntryState(researchState);
+        SetOutputState(reportingState);
+    }
+}
 
-//Run the state machine
-await stateMachine.Run(plannerState, "Research for me top 3 best E-bikes under $1500 for mountain trails");
-
-//Report on the last state with Results
-Console.WriteLine(reportingState.Output.FinalReport);
+// Use the state machine
+var agent = new ResearchAgent(new LombdaAgent());
+var result = await agent.RunAsync("Research quantum computing");
 ```
-
 ### Creating State Machines
 
 States essentially transforms the Input into the Output
@@ -223,37 +237,6 @@ Console.WriteLine($"State Results: {string.Join(", ", stateResults.Select(r => s
 
 Assert.IsTrue(stateResults[0].Contains(3));
 ```
-## New Features
-
-### AgentState and AgentStateMachine
-
-The `AgentState` system enhances the basic state machine by creating states specifically designed for agent execution. Unlike the `BaseState`, which is a generic state container, `AgentState` is tailored for AI agent operations.
-
-```csharp
-class ReportingState : AgentState<string, ReportData>
-{
-    public ReportingState(StateMachine stateMachine) : base(stateMachine){}
-
-    public override Agent InitilizeStateAgent()
-    {
-        return new Agent(
-            client: new OpenAIModelClient("gpt-4o-mini"), 
-            _name: "Reporting agent",
-            _instructions: """
-                You are a senior researcher tasked with writing a cohesive report for a research query.
-                You will be provided with the original query, and some initial research done by a research assistant.
-                Generate a detailed report in markdown format.
-                """, 
-            _output_schema: typeof(ReportData)
-        );
-    }
-
-    public override async Task<ReportData> Invoke(string input)
-    {
-        return await BeginRunnerAsync<ReportData>(input);
-    }
-}
-```
 
 ### Using the LombdaAgent for Orchestration
 
@@ -271,37 +254,7 @@ ReportData result = await researchAgent.RunAsync("Research quantum computing app
 lombdaAgent.VerboseCallback += (message) => Console.WriteLine($"[VERBOSE] {message}");
 lombdaAgent.StreamingCallback += (update) => Console.WriteLine($"[STREAM] {update}");
 ```
-### Creating Multi-Agent Workflows with AgentStateMachine
 
-The `AgentStateMachine` provides a framework for creating complex multi-agent workflows:
-
-```csharp
-public class ResearchAgent : AgentStateMachine<string, ReportData>
-{
-    public ResearchAgent(LombdaAgent lombdaAgent) : base(lombdaAgent) { }
-
-    public override void InitilizeStates()
-    {
-        // Setup states
-        PlanningState plannerState = new PlanningState(this);
-        ResearchState researchState = new ResearchState(this);
-        ReportingState reportingState = new ReportingState(this);
-
-        // Setup transitions between states
-        plannerState.AddTransition((result) => result.items.Length > 0, researchState);
-        researchState.AddTransition(reportingState);
-        reportingState.AddTransition(new ExitState());
-
-        // Set entry and output states
-        SetEntryState(plannerState);
-        SetOutputState(reportingState);
-    }
-}
-
-// Use the state machine
-var agent = new ResearchAgent(new LombdaAgent());
-var result = await agent.RunAsync("Research quantum computing");
-```
 ### Event System for Logging and Debugging
 
 The new event system provides comprehensive monitoring and debugging capabilities:

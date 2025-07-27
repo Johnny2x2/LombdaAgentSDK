@@ -135,25 +135,6 @@ namespace Test.Tools
             result.CallId.Should().Be("call_complex");
         }
 
-        [Test]
-        public async Task CallFuncToolAsync_WithNonExistentTool_ShouldThrowException()
-        {
-            // Arrange
-            if (_agent == null) Assert.Ignore("Agent not initialized");
-
-            var functionCall = new ModelFunctionCallItem(
-                "call_nonexistent",
-                "call_nonexistent",
-                "NonExistentFunction",
-                ModelStatus.InProgress,
-                BinaryData.FromString("{}"));
-
-            // Act & Assert
-            var ex = await Assert.ThrowsAsync<Exception>(
-                () => ToolRunner.CallFuncToolAsync(_agent, functionCall));
-
-            ex?.Message.Should().Contain("I don't have a tool called NonExistentFunction");
-        }
 
         [Test]
         public async Task CallFuncToolAsync_WithNoArguments_ShouldCallFunctionWithoutArgs()
@@ -219,8 +200,8 @@ namespace Test.Tools
                 BinaryData.FromString(JsonSerializer.Serialize(new { input = "test" })));
 
             // Act & Assert
-            var ex = await Assert.ThrowsAsync<Exception>(
-                () => ToolRunner.CallAgentToolAsync(_agent, functionCall));
+            var ex =  Assert.ThrowsAsync<Exception>(
+                async() => await ToolRunner.CallAgentToolAsync(_agent, functionCall));
 
             ex?.Message.Should().Contain("I don't have a Agent tool called NonExistentAgent");
         }

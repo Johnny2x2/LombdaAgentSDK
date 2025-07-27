@@ -13,6 +13,7 @@ using ModelContextProtocol.Server;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using FunctionCall = LlmTornado.ChatFunctions.FunctionCall;
 
@@ -40,6 +41,10 @@ namespace LombdaAgentSDK
             bool allowComputerUse = false, VectorSearchOptions? searchOptions = null, bool enableWebSearch = false, 
             ModelCodeInterpreterOptions? codeOptions = null, List<MCPServer>? mcpServers = null, bool enableLocalShell = false)
         {
+            if(provider == null || provider.Count == 0)
+            {
+                throw new ArgumentException("Provider authentication is required for LLMTornadoModelProvider.");
+            }
             Model = model.Name;
             CurrentModel = model;
             Client = new TornadoApi(provider);
@@ -92,7 +97,8 @@ namespace LombdaAgentSDK
                         new LlmTornado.Common.ToolFunction(
                             tool.ToolName,
                             tool.ToolDescription,
-                            tool.ToolParameters.ToString()),true
+                            tool.ToolParameters.ToString()),
+                        tool.FunctionSchemaIsStrict
                         )
                     );
             }
@@ -122,6 +128,8 @@ namespace LombdaAgentSDK
                     _ => ChatReasoningEfforts.Low
                 };
             }
+
+            //chat.RequestParameters.ResponseRequestParameters = SetupResponseClient(messages, options);
 
             chat = ConvertToProviderItems(messages, chat);
 
@@ -436,7 +444,7 @@ namespace LombdaAgentSDK
             List<ModelItem> ModelItems = ConvertFromProviderItems(response.Data!, chat).ToList();
 
             //Return results.
-            return new ModelResponse(options.Model, [ConvertLastFromProviderItems(chat),], outputFormat: options.OutputFormat ?? null, ModelItems);
+            return new ModelResponse(options.Model, [ConvertLastFromProviderItems(chat)], outputFormat: options.OutputFormat ?? null, ModelItems)!;
         }
 
         public async Task<ModelResponse> CreateFromResponseAPIAsync(List<ModelItem> messages, ModelResponseOptions options)

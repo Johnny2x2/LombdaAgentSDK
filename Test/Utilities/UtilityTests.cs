@@ -1,6 +1,6 @@
+using LombdaAgentSDK;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
-using System.ComponentModel;
 using System.Text.Json;
 
 namespace Test.Utilities
@@ -61,16 +61,15 @@ namespace Test.Utilities
         }
 
         [Test]
-        public void ConvertFunctionToTool_WithNoToolAttribute_ShouldReturnNull()
+        public void ConvertFunctionToTool_WithNoToolAttribute_ShouldReturnException()
         {
             // Arrange
             Delegate functionWithoutAttribute = FunctionWithoutToolAttribute;
 
-            // Act
-            var tool = functionWithoutAttribute.ConvertFunctionToTool();
 
-            // Assert
-            tool.Should().BeNull();
+            // Ahow to check for exception?
+            Assert.Throws<Exception>(() => functionWithoutAttribute.ConvertFunctionToTool());
+
         }
 
         [Test]
@@ -160,7 +159,14 @@ namespace Test.Utilities
                 IsActive = true
             };
             var jsonString = JsonSerializer.Serialize(testObject);
-            var runResult = new RunResult(jsonString, null!, null!);
+            var runResult = new RunResult();
+            runResult.Response = new ModelResponse();
+            runResult.Response.OutputItems = new List<ModelItem>
+            {
+                new ModelMessageItem("msg_1", "assistant", 
+                    new List<ModelMessageContent> { new ModelMessageAssistantResponseTextContent(jsonString) }, 
+                    ModelStatus.Completed)
+            };
 
             // Act
             var parsedObject = runResult.ParseJson<TestDataClass>();
@@ -177,7 +183,14 @@ namespace Test.Utilities
         {
             // Arrange
             var invalidJson = "{ invalid json }";
-            var runResult = new RunResult(invalidJson, null!, null!);
+            var runResult = new RunResult();
+            runResult.Response = new ModelResponse();
+            runResult.Response.OutputItems = new List<ModelItem>
+            {
+                new ModelMessageItem("msg_1", "assistant", 
+                    new List<ModelMessageContent> { new ModelMessageAssistantResponseTextContent(invalidJson) }, 
+                    ModelStatus.Completed)
+            };
 
             // Act & Assert
             Assert.Throws<JsonException>(() => runResult.ParseJson<TestDataClass>());
@@ -187,7 +200,7 @@ namespace Test.Utilities
         public void ParseJson_WithNullText_ShouldThrowException()
         {
             // Arrange
-            var runResult = new RunResult(null!, null!, null!);
+            var runResult = new RunResult();
 
             // Act & Assert
             Assert.Throws<ArgumentNullException>(() => runResult.ParseJson<TestDataClass>());
@@ -226,16 +239,16 @@ namespace Test.Utilities
         }
 
         // Test data classes
-        [Description("Test data class for utility testing")]
+        [System.ComponentModel.Description("Test data class for utility testing")]
         public class TestDataClass
         {
-            [Description("Name property")]
+            [System.ComponentModel.Description("Name property")]
             public string Name { get; set; } = string.Empty;
 
-            [Description("Value property")]
+            [System.ComponentModel.Description("Value property")]
             public int Value { get; set; }
 
-            [Description("IsActive property")]
+            [System.ComponentModel.Description("IsActive property")]
             public bool IsActive { get; set; }
         }
 

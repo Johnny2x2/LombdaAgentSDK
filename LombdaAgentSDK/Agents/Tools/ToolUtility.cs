@@ -51,6 +51,7 @@ namespace LombdaAgentSDK.Agents.Tools
             
             //deconstruct the function method parameters
             int i = 0;
+            var description = "";
             foreach (ParameterInfo param in method.GetParameters())
             {
                 //Name required
@@ -59,11 +60,23 @@ namespace LombdaAgentSDK.Agents.Tools
                 //Set Json compatible type
                 string typeName = param.ParameterType.IsEnum ? "string" : json_util.MapClrTypeToJsonType(param.ParameterType);
 
+                if(toolAttr.In_parameters_description != null)
+                {
+                    if (toolAttr.In_parameters_description.Length < i)
+                    {
+                        description = toolAttr.In_parameters_description[i];
+                    }
+                }
+                else
+                {
+                    description = typeName; // Default description to type name if not provided
+                }
+
                 //Configure Schema
                 var schema = new ParameterSchema
                 {
                     Type = typeName,
-                    Description = toolAttr.In_parameters_description[i], //Add in description to parameter here from attribute
+                    Description = description, //Add in description to parameter here from attribute
                     Enum = param.ParameterType.IsEnum ? param.ParameterType.GetEnumNames() : null //Get enum list if parameter is enum
                 };
 

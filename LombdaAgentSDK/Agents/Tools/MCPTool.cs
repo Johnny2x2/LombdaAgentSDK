@@ -42,41 +42,54 @@ namespace LombdaAgentSDK.Agents.Tools
 
         public async Task<List<McpClientTool>> AsToolkit(MCPServer server)
         {
-
             var result = new List<McpClientTool>();
 
-            if (!server.ServerUrl.StartsWith("http"))
+            try
             {
-                (string command, string[] arguments) = GetCommandAndArguments([server.ServerUrl]);
-                // Create MCP client to connect to the server
-                McpClient = await McpClientFactory.CreateAsync(new StdioClientTransport(new StdioClientTransportOptions
+                if (!server.ServerUrl.StartsWith("http"))
                 {
-                    Name = server.ServerLabel,
-                    Command = command,
-                    Arguments = arguments,
-                }));
+                    (string command, string[] arguments) = GetCommandAndArguments([server.ServerUrl]);
+                    // Create MCP client to connect to the server
+                    McpClient = await McpClientFactory.CreateAsync(new StdioClientTransport(new StdioClientTransportOptions
+                    {
+                        Name = server.ServerLabel,
+                        Command = command,
+                        Arguments = arguments,
+                    }));
+                }
+                else
+                {
+                    SseClientTransport sseClientTransport = new SseClientTransport(new SseClientTransportOptions
+                    {
+                        Name = server.ServerLabel,
+                        Endpoint = new Uri(server.ServerUrl)
+                    });
+                    McpClient = await McpClientFactory.CreateAsync(sseClientTransport);
+                }
+
+                // Ping the server to ensure it's reachable
+                await McpClient.PingAsync();
+                
             }
-            else
+            catch (Exception ex)
             {
-                SseClientTransport sseClientTransport = new SseClientTransport(new SseClientTransportOptions
-                {
-                    Name = server.ServerLabel,
-                    Endpoint = new Uri(server.ServerUrl)
-                });
-                McpClient = await McpClientFactory.CreateAsync(sseClientTransport);
+                return result;
             }
 
-            // If the server URL is an HTTP endpoint, we can use the MCP client factory directly
-            var tools = await McpClient.ListToolsAsync();
-            foreach (McpClientTool tool in tools)
+            if (McpClient != null)
             {
-                if(server.AllowedTools != null)
+                // If the server URL is an HTTP endpoint, we can use the MCP client factory directly
+                var tools = await McpClient.ListToolsAsync();
+                foreach (McpClientTool tool in tools)
                 {
-                    if (!server.AllowedTools.Contains(tool.Name))
-                        continue; // Skip tools not in the allowed list
+                    if (server.AllowedTools != null)
+                    {
+                        if (!server.AllowedTools.Contains(tool.Name))
+                            continue; // Skip tools not in the allowed list
+                    }
+                    result.Add(tool);
+                    mcp_tools.Add(tool.Name, tool);
                 }
-                result.Add(tool);
-                mcp_tools.Add(tool.Name, tool);
             }
 
             return result;

@@ -32,7 +32,6 @@
 
         public ModelResponse() { }
 
-        [Obsolete]
         public ModelResponse(string model, List<ModelItem> outputItems = null, ModelOutputFormat outputFormat = null, List<ModelItem> messages = null)
         {
             Model = model;

@@ -190,14 +190,14 @@ namespace Test.Agents
         }
 
         // Helper method for testing
-        [Tool(Description = "A test function for testing purposes")]
+        [Tool(Description = "A test function for testing purposes", In_parameters_description =["Input"])]
         public static string TestFunction(string input)
         {
             return $"Processed: {input}";
         }
 
         // Test structured output class
-        [Description("Test structured output for testing")]
+        [System.ComponentModel.Description("Test structured output for testing")]
         public class TestStructuredOutput
         {
             [System.ComponentModel.Description("Test property")]

@@ -117,8 +117,8 @@ namespace Test.DataClasses
             options.Tools.Should().BeEmpty();
             options.MCPServers.Should().NotBeNull();
             options.MCPServers.Should().BeEmpty();
-            options.Instructions.Should().BeEmpty();
-            options.Model.Should().BeEmpty();
+            options.Instructions.Should().BeNull();
+            options.Model.Should().BeNull();
             options.OutputFormat.Should().BeNull();
             options.ReasoningOptions.Should().BeNull();
             options.PreviousResponseId.Should().BeNull();
@@ -181,7 +181,7 @@ namespace Test.DataClasses
 
             // Assert
             options.Should().NotBeNull();
-            options.EffortLevel.Should().Be(ModelReasoningEffortLevel.Low);
+            options.EffortLevel.Should().Be(ModelReasoningEffortLevel.Medium);
         }
 
         [Test]
@@ -246,7 +246,7 @@ namespace Test.DataClasses
             // Assert
             options.Should().NotBeNull();
             options.FileIds.Should().BeEquivalentTo(fileIds);
-            options.ContainerId.Should().BeNull();
+            options.ContainerId.Should().BeEmpty();
         }
 
         [Test]
@@ -261,7 +261,7 @@ namespace Test.DataClasses
             // Assert
             options.Should().NotBeNull();
             options.ContainerId.Should().Be(containerId);
-            options.FileIds.Should().BeNull();
+            options.FileIds.Should().BeEmpty();
         }
 
         [Test]

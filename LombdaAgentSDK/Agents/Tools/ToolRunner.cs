@@ -29,6 +29,9 @@ namespace LombdaAgentSDK
             if (!agent.tool_list.TryGetValue(call.FunctionName, out FunctionTool? tool))
                 throw new Exception($"I don't have a tool called {call.FunctionName}");
 
+            if (!json_util.IsValidJson(call.FunctionArguments.ToString()))
+                throw new System.Text.Json.JsonException($"Function arguments for {call.FunctionName} are not valid JSON");
+
             //Need to check if function has required parameters and if so, parse them from the call.FunctionArguments
             if (call.FunctionArguments != null)
             {

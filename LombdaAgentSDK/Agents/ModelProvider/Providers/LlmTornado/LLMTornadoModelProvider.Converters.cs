@@ -6,6 +6,7 @@ using LombdaAgentSDK.Agents.DataClasses;
 using Microsoft.VisualBasic;
 using System.Collections;
 using System.Collections.Generic;
+using System.Security.Cryptography.X509Certificates;
 
 namespace LombdaAgentSDK
 {
@@ -29,8 +30,50 @@ namespace LombdaAgentSDK
             return ConvertFromProviderItem(item);
         }
 
+        public ModelMessageContent ConvertFromProviderContent(ChatMessagePart content)
+        {
+            if (content.Type == ChatMessageTypes.Text)
+            {
+                return new ModelMessageTextContent() { Text = content.Text };
+            }
+            else if (content.Type == ChatMessageTypes.Image)
+            {
+                return new ModelMessageImageFileContent(content.Image.Url);
+            }
+            else
+            {
+                throw new ArgumentException($"Unknown ChatMessagePart type: {content.Type}", nameof(content));
+            }
+
+        }
+
+        public List<ModelMessageContent> ConvertFromProviderContents(IEnumerable<ChatMessagePart>? contents)
+        {
+            if(contents == null)
+            {
+                return new List<ModelMessageContent>();
+            }
+            List<ModelMessageContent> modelContents = new List<ModelMessageContent>();
+            foreach (ChatMessagePart content in contents)
+            {
+                modelContents.Add(ConvertFromProviderContent(content));
+            }
+            return modelContents;
+        }
+
+
         public ModelItem ConvertFromProviderItem(ChatMessage item)
         {
+            if (item.ToolCalls != null)
+            {
+                return new ModelFunctionCallItem(
+                        item.Id.ToString(),
+                        item.ToolCalls[0].Id!,
+                        item.ToolCalls[0].FunctionCall.Name,
+                        ModelStatus.Completed,
+                        BinaryData.FromString(item.ToolCalls[0].FunctionCall.Arguments)
+                        );
+            }
             switch (item.Role)
             {
                 case ChatMessageRoles.Unknown:
@@ -51,53 +94,48 @@ namespace LombdaAgentSDK
                     return new ModelMessageItem(
                         item.Id.ToString(),
                         ChatMessageRoles.User.ToString(),
-                        [new ModelMessageUserResponseTextContent(item.Content),],
+                        ConvertFromProviderContents(item.Parts),
                         ModelStatus.Completed
                         );
                 case ChatMessageRoles.Assistant:
-                    if (item.ToolCalls != null)
+                    string ReasonSummary = string.Empty;
+                    //Quen3.5 and Qwen 14B use <think> tags to indicate reasoning
+                    if (item.Content == null)
                     {
-                        return new ModelFunctionCallItem(
+                        new ModelMessageItem(
                                 item.Id.ToString(),
-                                item.ToolCalls[0].Id!,
-                                item.ToolCalls[0].FunctionCall.Name,
-                                ModelStatus.Completed,
-                                BinaryData.FromString(item.ToolCalls[0].FunctionCall.Arguments)
+                                ChatMessageRoles.Assistant.ToString(),
+                                [new ModelMessageAssistantResponseTextContent(" "),],
+                                ModelStatus.Completed
+                                );
+                    }
+                    if (item.Content.ToLower().StartsWith("<think>"))
+                    {
+                        // Extract reasoning summary from content
+                        int startIndex = item.Content.IndexOf("<think>");
+                        int endIndex = item.Content.IndexOf("</think>") + "</think>".Length;
+                        if (endIndex > startIndex)
+                        {
+                            ReasonSummary = item.Content.Substring(startIndex, endIndex - startIndex);
+                        }
+
+                        string outputContent = item.Content.Substring(endIndex).Trim();
+
+                        return new ModelMessageItem(
+                                item.Id.ToString(),
+                                ChatMessageRoles.Assistant.ToString(),
+                                [new ModelMessageAssistantResponseTextContent(ReasonSummary), new ModelMessageAssistantResponseTextContent(outputContent),],
+                                ModelStatus.Completed
                                 );
                     }
                     else
                     {
-                        string ReasonSummary = string.Empty;
-                        //Quen3.5 and Qwen 14B use <think> tags to indicate reasoning
-                        if (item.Content.ToLower().StartsWith("<think>"))
-                        {
-                            // Extract reasoning summary from content
-                            int startIndex = item.Content.IndexOf("<think>");
-                            int endIndex = item.Content.IndexOf("</think>") + "</think>".Length;
-                            if (endIndex > startIndex)
-                            {
-                                ReasonSummary = item.Content.Substring(startIndex, endIndex - startIndex);
-                            }
-
-                            string outputContent = item.Content.Substring(endIndex).Trim();
-
-                            return new ModelMessageItem(
-                                    item.Id.ToString(),
-                                    ChatMessageRoles.Assistant.ToString(),
-                                    [new ModelMessageAssistantResponseTextContent(ReasonSummary), new ModelMessageAssistantResponseTextContent(outputContent),],
-                                    ModelStatus.Completed
-                                    );
-                        }
-                        else
-                        {
-                            return new ModelMessageItem(
-                                    item.Id.ToString(),
-                                    ChatMessageRoles.Assistant.ToString(),
-                                    [new ModelMessageAssistantResponseTextContent(item.Content),],
-                                    ModelStatus.Completed
-                                    );
-                        }
-
+                        return new ModelMessageItem(
+                                item.Id.ToString(),
+                                ChatMessageRoles.Assistant.ToString(),
+                                [new ModelMessageAssistantResponseTextContent(item.Content),],
+                                ModelStatus.Completed
+                                );
                     }
                 case ChatMessageRoles.Tool:
                     return new ModelFunctionCallOutputItem(
@@ -191,7 +229,6 @@ namespace LombdaAgentSDK
                     call.FunctionCall = new FunctionCall();
                     call.FunctionCall.Name = toolCall.FunctionName;
                     call.FunctionCall.Arguments = toolCall.FunctionArguments.ToString();
-
                     chatMessage.ToolCalls.Add(call);
 
                     conv.AppendMessage(chatMessage);
@@ -202,14 +239,15 @@ namespace LombdaAgentSDK
                     chatMessage.Role = ChatMessageRoles.Tool;
                     chatMessage.ToolCallId = toolOutput.CallId;
                     chatMessage.Content = toolOutput.FunctionOutput;
-                    chatMessage.ToolCalls = new List<ToolCall>();
+                    chatMessage.ToolInvocationSucceeded = true;
+                    //chatMessage.ToolCalls = new List<ToolCall>();
 
-                    ToolCall call = new ToolCall();
-                    call.Id = toolOutput.CallId;
-                    call.FunctionCall = new FunctionCall();
-                    call.FunctionCall.Name = toolOutput.FunctionName;
+                    //ToolCall call = new ToolCall();
+                    //call.Id = toolOutput.CallId;
+                    //call.FunctionCall = new FunctionCall();
+                    //call.FunctionCall.Name = toolOutput.FunctionName;
 
-                    chatMessage.ToolCalls.Add(call);
+                    //chatMessage.ToolCalls.Add(call);
 
                     conv.AppendMessage(chatMessage);
                 }
