@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using CodeInterpreterOutputLogs = LlmTornado.Responses.CodeInterpreterOutputLogs;
 
 namespace LombdaAgentSDK
 {
@@ -30,10 +31,45 @@ namespace LombdaAgentSDK
                     .ToString()
                     .TryParseEnum(out ModelWebSearchingStatus _status) ? _status : ModelWebSearchingStatus.Completed);
             }
+            else if (item is ResponseCodeInterpreterToolCallItem codeInterpreterCall)
+            {
+                var codeCall = new ModelResponseCodeInterpreterCallItem(codeInterpreterCall.Id);
+                codeCall.ContainerId = codeInterpreterCall.ContainerId;
+                codeCall.Code = codeInterpreterCall.Code ?? "";
+
+                if(codeInterpreterCall.Outputs != null)
+                {
+                    foreach (var result in codeInterpreterCall.Outputs)
+                    {
+                        if (result.Type == "logs")
+                        {
+                            var logs = result as CodeInterpreterOutputLogs;
+                            codeCall.Results.Add(new CodeInterpreterLogResult(logs?.Logs ?? ""));
+                        }
+                        else if (result.Type == "image")
+                        {
+                            var imageResult = result as LlmTornado.Responses.CodeInterpreterOutputImage;
+                            if (imageResult != null)
+                            {
+                                codeCall.Results.Add(new CodeInterpreterImageResult(imageResult.Url));
+                            }
+                        }
+                    }
+                }
+                
+                return codeCall;
+            }
             else if (item is ResponseFileSearchToolCallItem fileSearchCall)
             {
                 List<FileSearchCallContent> resultContents = new List<FileSearchCallContent>();
 
+                //If there are no results, we return an empty result
+                if (fileSearchCall.Results == null || fileSearchCall.Results.Count == 0)
+                {
+                    return new ModelFileSearchCallItem(fileSearchCall.Id, fileSearchCall.Queries.ToList(), ModelStatus.Completed, resultContents);
+                }
+
+                //If there are results, we convert them to the model format
                 foreach (var file in fileSearchCall.Results)
                 {
                     Console.WriteLine($" {file.Filename}");
@@ -44,8 +80,7 @@ namespace LombdaAgentSDK
                     fileSearchCall.Queries.ToList(),
                     fileSearchCall.Status
                         .ToString()
-                        .TryParseEnum(out ModelStatus status) ? status : ModelStatus.Completed
-                        ,
+                        .TryParseEnum(out ModelStatus status) ? status : ModelStatus.Completed,
                     resultContents);
             }
             else if (item is ResponseFunctionToolCallItem toolCall)
@@ -440,12 +475,34 @@ namespace LombdaAgentSDK
                 {
                     InputItems.Add(new FileSearchToolCallInput(fileSearchCall.Id,fileSearchCall.Queries, ResponseMessageStatuses.Completed));
                 }
+                else if(item is ModelResponseCodeInterpreterCallItem codeItem)
+                {
+                    var newCodeItem = new CodeInterpreterToolCallInput(codeItem.Id, codeItem.ContainerId, ResponseMessageStatuses.Completed);
+                    newCodeItem.Outputs = new List<ICodeInterpreterOutput>();
+                    newCodeItem.Code = codeItem.Code;
+                    foreach (var result in codeItem.Results)
+                    {
+                        if (result is CodeInterpreterLogResult logResult)
+                        {
+                            var logContent = new CodeInterpreterOutputLogs();
+                            logContent.Logs = logResult.Logs;
+                            newCodeItem.Outputs.Add(logContent);
+                        }
+                        else if (result is CodeInterpreterImageResult imageResult)
+                        {
+                            var imageContent = new LlmTornado.Responses.CodeInterpreterOutputImage();
+                            imageContent.Url = imageResult.ImageURL;
+                            newCodeItem.Outputs.Add(imageContent);
+                        }
+                    }
+                    InputItems.Add(newCodeItem);
+                }
                 else if (item is ModelReasoningItem reasoning)
                 {
                     Reasoning reasoningItem = new Reasoning();
                     reasoningItem.Id = reasoning.Id;
                     reasoningItem.EncryptedContent = reasoning.EncryptedContent;
-                    foreach(var sum in reasoning.Summary)
+                    foreach (var sum in reasoning.Summary)
                     {
                         var summary = new ReasoningSummaryText();
                         summary.Text = sum;

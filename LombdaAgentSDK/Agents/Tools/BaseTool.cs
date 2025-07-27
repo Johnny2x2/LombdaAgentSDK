@@ -20,7 +20,7 @@
         /// <summary>
         /// Should all fields be required?
         /// </summary>
-        public bool FunctionSchemaIsStrict { get; set; }
+        public bool FunctionSchemaIsStrict { get; set; } = false;
         public BaseTool() { }
 
         public BaseTool(string toolName, string toolDescription, BinaryData toolParameters, bool strictSchema = false)

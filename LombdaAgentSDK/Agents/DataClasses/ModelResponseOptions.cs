@@ -37,6 +37,8 @@ namespace LombdaAgentSDK.Agents.DataClasses
         /// </summary>
         public ModelReasoningOptions ReasoningOptions { get; set; }
 
+        public List<MCPServer> MCPServers = new List<MCPServer>();
+
         public ModelResponseOptions() { }
     }
 }

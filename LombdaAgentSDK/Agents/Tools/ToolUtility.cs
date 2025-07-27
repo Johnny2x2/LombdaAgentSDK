@@ -1,4 +1,7 @@
-﻿using System.Reflection;
+﻿using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
+using OpenAI.Chat;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 
@@ -26,6 +29,7 @@ namespace LombdaAgentSDK.Agents.Tools
                 );
         }
 
+      
         /// <summary>
         /// Automatic conversion of method into a function tool
         /// </summary>

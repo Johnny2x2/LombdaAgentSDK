@@ -1,21 +1,21 @@
 ﻿using LlmTornado;
 using LlmTornado.Chat;
 using LlmTornado.Chat.Models;
-using LlmTornado.ChatFunctions;
 using LlmTornado.Code;
 using LlmTornado.Common;
 using LlmTornado.Responses;
 using LlmTornado.Responses.Events;
-using LlmTornado.Threads;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
+using ModelContextProtocol;
+using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
-using System.Collections.Generic;
 using System.Drawing;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 using FunctionCall = LlmTornado.ChatFunctions.FunctionCall;
+
 
 namespace LombdaAgentSDK
 {
@@ -31,13 +31,14 @@ namespace LombdaAgentSDK
         public bool EnableWebSearch { get; set; } = false;
 
         //Need to add in some Converters first
-        //public bool EnableCodeInterpreter { get; set; } = false;
+        public ModelCodeInterpreterOptions? CodeOptions { get; set; }
         //Need MPC
+
         //Need LocalShell
 
         public LLMTornadoModelProvider(
             ChatModel model, List<ProviderAuthentication> provider, bool useResponseAPI = false, 
-            bool allowComputerUse = false, VectorSearchOptions? searchOptions = null, bool enableWebSearch = false)
+            bool allowComputerUse = false, VectorSearchOptions? searchOptions = null, bool enableWebSearch = false, ModelCodeInterpreterOptions? codeOptions = null, List<MCPServer>? mcpServers = null)
         {
             Model = model.Name;
             CurrentModel = model;
@@ -46,26 +47,50 @@ namespace LombdaAgentSDK
             AllowComputerUse = allowComputerUse;
             VectorSearchOptions = searchOptions;
             EnableWebSearch = enableWebSearch;
+            CodeOptions = codeOptions;
+
+            if (UseResponseAPI && (VectorSearchOptions != null || EnableWebSearch || CodeOptions != null || allowComputerUse))
+            {
+                throw new Exception("Cannot use Vector Search, Web Search or Code Interpreter with Response API, use Chat API instead.");
+            }
         }
 
         public LLMTornadoModelProvider(
-            ChatModel model, Uri provider, bool useResponseAPI = false, bool allowComputerUse = false)
+            ChatModel model, Uri provider, bool useResponseAPI = false, bool allowComputerUse = false, 
+            VectorSearchOptions? searchOptions = null, bool enableWebSearch = false, ModelCodeInterpreterOptions? codeOptions = null)
         {
             Model = model.Name;
             CurrentModel = model;
             Client = new TornadoApi(provider);
             UseResponseAPI = useResponseAPI;
             AllowComputerUse = allowComputerUse;
+            VectorSearchOptions = searchOptions;
+            EnableWebSearch = enableWebSearch;
+            CodeOptions = codeOptions;
+
+            if (UseResponseAPI && (VectorSearchOptions != null || EnableWebSearch || CodeOptions != null || allowComputerUse))
+            {
+                throw new Exception("Cannot use Vector Search, Web Search or Code Interpreter with Response API, use Chat API instead.");
+            }
         }
 
         public LLMTornadoModelProvider(
-            ChatModel model, TornadoApi client, bool useResponseAPI = false, bool allowComputerUse = false)
+            ChatModel model, TornadoApi client, bool useResponseAPI = false, bool allowComputerUse = false,
+            VectorSearchOptions? searchOptions = null, bool enableWebSearch = false, ModelCodeInterpreterOptions? codeOptions = null)
         {
             Model = model;
             CurrentModel = model;
             Client = client;
             UseResponseAPI = useResponseAPI;
             AllowComputerUse = allowComputerUse;
+            VectorSearchOptions = searchOptions;
+            EnableWebSearch = enableWebSearch;
+            CodeOptions = codeOptions;
+
+            if (UseResponseAPI && (VectorSearchOptions != null || EnableWebSearch || CodeOptions != null || allowComputerUse))
+            {
+                throw new Exception("Cannot use Vector Search, Web Search or Code Interpreter with Response API, use Chat API instead.");
+            }
         }
 
         public Conversation SetupClient(Conversation chat, List<ModelItem> messages, ModelResponseOptions options)
@@ -82,6 +107,14 @@ namespace LombdaAgentSDK
                             tool.ToolParameters.ToString()),true
                         )
                     );
+            }
+
+            foreach(var server in options.MCPServers)
+            { 
+                foreach (var tool in server.Tools)
+                {
+                    chat.RequestParameters.Tools?.Add(new LlmTornado.Common.Tool(new ToolFunction(tool.Name, tool.Description, tool.JsonSchema)));
+                }
             }
 
             //Convert Text Format Here
@@ -109,9 +142,7 @@ namespace LombdaAgentSDK
 
         public ResponseRequest SetupResponseClient(List<ModelItem> messages, ModelResponseOptions options)
         {
-            List<ResponseInputItem> InputItems = new();
-
-            InputItems.AddRange(ConvertToProviderResponseItems(new List<ModelItem>([messages.Last()])));
+            List<ResponseInputItem> InputItems = ConvertToProviderResponseItems(new List<ModelItem>([messages.Last()]));
 
             ResponseRequest request = new ResponseRequest
             {
@@ -120,7 +151,7 @@ namespace LombdaAgentSDK
                 Instructions = options.Instructions
             };
             
-            if (request.Tools == null) request.Tools = new List<ResponseTool>();
+            if (request.Tools == null) request.Tools = new List<LlmTornado.Responses.ResponseTool>();
 
             request.PreviousResponseId = options.PreviousResponseId ?? null;
             //Convert Tools here
@@ -139,7 +170,15 @@ namespace LombdaAgentSDK
                 request.Tools.Add(rftool);
             }
 
-            if(VectorSearchOptions != null)
+            foreach (var server in options.MCPServers)
+            {
+                foreach (var tool in server.Tools)
+                {
+                    request.Tools?.Add(ToResponseTool(new LlmTornado.Common.Tool(new ToolFunction(tool.Name, tool.Description, tool.JsonSchema))));
+                }
+            }
+
+            if (VectorSearchOptions != null)
             {
                 request.Tools.Add(new ResponseFileSearchTool
                 {
@@ -197,13 +236,38 @@ namespace LombdaAgentSDK
                 request.Tools.Add(new ResponseWebSearchTool());
             }
 
-            //Need to add Convertion methods to model provider converts for ResponseConverter
-            //if (EnableCodeInterpreter)
-            //{
-            //    request.Tools.Add(new ResponseCodeInterpreterTool());
-            //}
+            
+            if (CodeOptions != null)
+            {
+                var codeTool = new ResponseCodeInterpreterTool();
+                if( CodeOptions.FileIds != null && CodeOptions.FileIds.Count > 0)
+                {
+                    codeTool.Container = new ResponseCodeInterpreterContainerAuto() { FileIds = CodeOptions.FileIds };
+                }
+                else if(!string.IsNullOrEmpty(CodeOptions.ContainerId))
+                {
+                    codeTool.Container = new ResponseCodeInterpreterContainerString(CodeOptions.ContainerId);
+                }
+                request.Tools.Add(codeTool);
+            }
 
             return request;
+        }
+
+        public LlmTornado.Responses.ResponseTool ToResponseTool(LlmTornado.Common.Tool tool)
+        {
+            if (tool.Function?.Parameters != null)
+            {
+                return new ResponseFunctionTool
+                {
+                    Name = tool.Function.Name,
+                    Description = tool.Function.Description,
+                    Parameters = JObject.FromObject(tool.Function.Parameters),
+                    Strict = tool.Strict
+                };
+            }
+
+            return null;
         }
 
         public async Task<ModelResponse> HandleStreaming(Conversation chat, List<ModelItem> messages, ModelResponseOptions options, StreamingCallbacks streamingCallback = null)

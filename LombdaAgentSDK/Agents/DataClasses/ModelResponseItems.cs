@@ -245,4 +245,79 @@
         /// </summary>
         public string? Text => ((ModelMessageTextContent?)Content.LastOrDefault(mess => mess is ModelMessageTextContent))?.Text ?? "";
     }
+
+    public static class  SupportedFiles
+    {
+        public static Dictionary<string, string> SupportedCodeFiles = new Dictionary<string, string>
+        {
+            {".c","text/x-c" },
+            {".cs","text/x-csharp" },
+            {".cpp","text/x-c++src" },
+            {".csv","text/csv" },
+            {".doc","application/msword" },
+            {".docx","application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+            {".html","text/html" },
+            {".java","text/x-java-source" },
+            {".json","application/json" },
+            {".md","text/markdown" },
+            {".pdf","application/pdf" },
+            {".php","text/x-php" },
+            {".pptx","application/vnd.openxmlformats-officedocument.presentationml.presentation" },
+            {".py","text/x-python" },
+            {".rb","text/x-ruby" },
+            {".tex","text/x-tex" },
+            {".txt","text/plain" },
+            {".css","text/css" },
+            {".js","text/javascript" },
+            {".sh", "text/x-sh" },
+            {".ts","application/typescript" },
+            {".jpeg","image/jpeg" },
+            {".jpg","image/jpg" },
+            {".gif","image/gif" },
+            {".pkl","application/octet-stream" },
+            {".png","image/png" },
+            {".tar","application/x-tar" },
+            {".xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+            {".xml","application/xml" },
+            {".zip","application/zip" }
+        };
+    }
+
+    public class ModelResponseCodeInterpreterCallItem : ModelItem
+    {
+        
+        public string ContainerId { get; set; } = "";   
+        public string Code { get; set; } = "";
+        public List<ICodeInterpreterResult> Results { get; set; } = new List<ICodeInterpreterResult>();
+        public ModelResponseCodeInterpreterCallItem(string id) : base(id)
+        {
+
+        }
+    }
+
+
+    public interface ICodeInterpreterResult
+    {
+       string type { get; } 
+    }
+
+    public class CodeInterpreterLogResult : ICodeInterpreterResult
+    {
+        public string type => "log";
+        public string Logs { get; set; } = "";
+        public CodeInterpreterLogResult(string log)
+        {
+            Logs = log;
+        } 
+    }
+
+    public class CodeInterpreterImageResult : ICodeInterpreterResult
+    {
+        public string type => "iamge";
+        public string ImageURL { get; set; } = "";
+        public CodeInterpreterImageResult(string imageUrl)
+        {
+            ImageURL = imageUrl;
+        }
+    }
 }
