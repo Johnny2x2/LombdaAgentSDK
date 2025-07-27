@@ -48,11 +48,6 @@ namespace LombdaAgentSDK
             VectorSearchOptions = searchOptions;
             EnableWebSearch = enableWebSearch;
             CodeOptions = codeOptions;
-
-            if (UseResponseAPI && (VectorSearchOptions != null || EnableWebSearch || CodeOptions != null || allowComputerUse))
-            {
-                throw new Exception("Cannot use Vector Search, Web Search or Code Interpreter with Response API, use Chat API instead.");
-            }
         }
 
         public LLMTornadoModelProvider(
@@ -67,11 +62,6 @@ namespace LombdaAgentSDK
             VectorSearchOptions = searchOptions;
             EnableWebSearch = enableWebSearch;
             CodeOptions = codeOptions;
-
-            if (UseResponseAPI && (VectorSearchOptions != null || EnableWebSearch || CodeOptions != null || allowComputerUse))
-            {
-                throw new Exception("Cannot use Vector Search, Web Search or Code Interpreter with Response API, use Chat API instead.");
-            }
         }
 
         public LLMTornadoModelProvider(
@@ -86,11 +76,6 @@ namespace LombdaAgentSDK
             VectorSearchOptions = searchOptions;
             EnableWebSearch = enableWebSearch;
             CodeOptions = codeOptions;
-
-            if (UseResponseAPI && (VectorSearchOptions != null || EnableWebSearch || CodeOptions != null || allowComputerUse))
-            {
-                throw new Exception("Cannot use Vector Search, Web Search or Code Interpreter with Response API, use Chat API instead.");
-            }
         }
 
         public Conversation SetupClient(Conversation chat, List<ModelItem> messages, ModelResponseOptions options)
