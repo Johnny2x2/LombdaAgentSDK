@@ -251,6 +251,7 @@ namespace Test
             resultState.AddTransition(_ => true, new ExitState());
 
             StateMachine<string, string> stateMachine = new();
+            stateMachine.RecordSteps = true;
 
             stateMachine.SetEntryState(inputState);
             stateMachine.SetOutputState(resultState);

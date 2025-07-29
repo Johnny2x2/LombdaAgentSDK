@@ -33,8 +33,9 @@ namespace LombdaAgentAPI.Agents
             // Register available agent types - you can register your custom agent types here
             RegisterAgentType("Default", typeof(APILombdaAgent));
             RegisterAgentType("CodeAssistant", typeof(CodeAssistantLombdaAgent));
-            RegisterAgentType("Creative", typeof(CreativeLombdaAgent));
             RegisterAgentType("BabyAGI", typeof(BabyAGIRunner));
+            RegisterAgentType("Creative", typeof(CreativeLombdaAgent));
+            
         }
 
         public List<string> GetAgentIds()
