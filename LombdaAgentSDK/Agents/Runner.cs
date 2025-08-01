@@ -12,7 +12,7 @@ namespace LombdaAgentSDK
     /// </summary>
     public class Runner
     {
-        public delegate void ComputerActionCallbacks(ComputerToolAction computerCall);
+        public delegate ModelMessageImageFileContent ComputerActionCallbacks(ComputerToolAction computerCall);
         public delegate void RunnerVerboseCallbacks(string runnerAction);
         public delegate bool ToolPermissionRequest(string message);
         /// <summary>
@@ -243,15 +243,12 @@ namespace LombdaAgentSDK
         /// <returns></returns>
         public static async Task<ModelComputerCallOutputItem> HandleComputerCall(ModelComputerCallItem computerCall, ComputerActionCallbacks? computerCallbacks = null)
         {
-            computerCallbacks?.Invoke(computerCall.Action);
-
-            Thread.Sleep(1000);
-
-            byte[] data = ComputerToolUtility.TakeScreenshotByteArray(ImageFormat.Png);
-
-            GC.Collect();
-
-            return new ModelComputerCallOutputItem("cuo_" + Guid.NewGuid().ToString().Replace("-", "_"), computerCall.CallId, ModelStatus.Completed, new ModelMessageImageFileContent(BinaryData.FromBytes(data), "image/png"));
+            var screenShot = computerCallbacks?.Invoke(computerCall.Action);
+            if(screenShot == null)
+            {
+                throw new Exception("Computer Call Callback did not return a screenshot");
+            }
+            return new ModelComputerCallOutputItem("cuo_" + Guid.NewGuid().ToString().Replace("-", "_"), computerCall.CallId, ModelStatus.Completed, screenShot!);
         }
 
         /// <summary>

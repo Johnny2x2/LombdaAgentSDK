@@ -1,6 +1,7 @@
 ﻿using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
+using System.Drawing.Imaging;
 
 namespace Examples.OpenAI
 {
@@ -31,7 +32,7 @@ namespace Examples.OpenAI
         }
 
         //This is called first before Screen Shot is taken.
-        public static void HandleComputerAction(ComputerToolAction action)
+        public static ModelMessageImageFileContent HandleComputerAction(ComputerToolAction action)
         {
             switch (action.Kind)
             {
@@ -70,7 +71,16 @@ namespace Examples.OpenAI
                 default:
                     break;
             }
+                return CreateScreenShot();
         }
-        
+
+        public static ModelMessageImageFileContent CreateScreenShot()
+        {
+            byte[] ss = ComputerToolUtility.TakeScreenshotByteArray(ImageFormat.Png);
+
+            GC.Collect();
+            // Return the screenshot as a ModelMessageImageFileContent
+            return new ModelMessageImageFileContent(BinaryData.FromBytes(ss), "image/png");
+        }      
     }
 }
