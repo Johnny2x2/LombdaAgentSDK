@@ -282,8 +282,9 @@ For comprehensive documentation, please visit the [docs folder](docs/):
 
 ## 🚦 Roadmap
 * [x] enable parallel function calling
-* [ ] Add In Human in the loop example
+* [x] Add In Human in the loop example
 * [ ] Upgrade Usage Information gathering
+* [ ] Improve Context functionality & management
 * [ ] Add in cancel functionality to API
 * [ ] Create MCP Server to run Agents and State Machines
 * [ ] Improve Debugging for agents

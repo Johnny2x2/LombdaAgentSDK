@@ -51,6 +51,12 @@ namespace LombdaAgentSDK.Agents
         public List<Delegate>? Tools { get; set; } = new List<Delegate>();
 
         /// <summary>
+        /// Gets or sets the permissions for tools, represented as a dictionary where the key is the tool name and the
+        /// value indicates whether the tool requires permission to be used.
+        /// </summary>
+        public Dictionary<string, bool> ToolPermissionRequired { get => toolPermission; set => toolPermission = value; }
+
+        /// <summary>
         /// Map of function tools to their methods
         /// </summary>
         public Dictionary<string, FunctionTool> tool_list = new Dictionary<string, FunctionTool>();
@@ -62,6 +68,9 @@ namespace LombdaAgentSDK.Agents
         public Dictionary<string, MCPServer> mcp_tools = new Dictionary<string, MCPServer>();
 
         public List<MCPServer> MCPServers = new List<MCPServer>();
+
+        private Dictionary<string, bool> toolPermission = new Dictionary<string, bool>();
+
         public static Agent DummyAgent()
         {
             LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41Nano,
@@ -115,6 +124,11 @@ namespace LombdaAgentSDK.Agents
                         {
                             agent_tools.Add(agentTool.ToolAgent.AgentName, agentTool);
                             Options.Tools.Add(agentTool.Tool);
+                            if (!toolPermission.ContainsKey(agentTool.ToolAgent.AgentName))
+                            {
+                                //Default all agent tools to false
+                                toolPermission.Add(agentTool.ToolAgent.AgentName, false); //Default all agent tools to false
+                            }
                         }
                     }
                     else
@@ -125,6 +139,11 @@ namespace LombdaAgentSDK.Agents
                         {
                             tool_list.Add(functionTool.ToolName, functionTool);
                             Options.Tools.Add(functionTool);
+                            if (!toolPermission.ContainsKey(functionTool.ToolName))
+                            {
+                                //Default all function tools to false
+                                toolPermission.Add(functionTool.ToolName, false); //Default all function tools to false
+                            }
                         }
                     }
                 }
@@ -135,6 +154,11 @@ namespace LombdaAgentSDK.Agents
                     foreach(var tool in server.Tools)
                     {
                         mcp_tools.Add(tool.Name, server);
+                        if (!toolPermission.ContainsKey(tool.Name))
+                        {
+                            toolPermission.Add(tool.Name, false); //Default all mcp tools to false
+                        }
+                            
                     }
                 }
                     

@@ -14,8 +14,7 @@ namespace LombdaAgentSDK
     {
         public delegate void ComputerActionCallbacks(ComputerToolAction computerCall);
         public delegate void RunnerVerboseCallbacks(string runnerAction);
-        
-
+        public delegate bool ToolPermissionRequest(string message);
         /// <summary>
         /// Invoke the agent loop to begin async
         /// </summary>
@@ -45,7 +44,8 @@ namespace LombdaAgentSDK
             bool streaming = false,
             StreamingCallbacks? streamingCallback = null,
             string responseID = "",
-            CancellationTokenSource? cancellationToken = default
+            CancellationTokenSource? cancellationToken = default,
+            ToolPermissionRequest? toolPermissionRequest = null
             )
         {
             RunResult runResult = new RunResult();
@@ -105,7 +105,7 @@ namespace LombdaAgentSDK
 
                     currentTurn++;
 
-                } while (await ProcessOutputItems(agent, runResult, verboseCallback, computerUseCallback) && !single_turn);
+                } while (await ProcessOutputItems(agent, runResult, verboseCallback, computerUseCallback, toolPermissionRequest) && !single_turn);
             }
             catch(Exception ex)
             {
@@ -135,7 +135,7 @@ namespace LombdaAgentSDK
         /// <param name="callback"></param>
         /// <param name="computerUseCallback"></param>
         /// <returns></returns>
-        private static async Task<bool> ProcessOutputItems(Agent agent, RunResult runResult, RunnerVerboseCallbacks? callback, ComputerActionCallbacks? computerUseCallback)
+        private static async Task<bool> ProcessOutputItems(Agent agent, RunResult runResult, RunnerVerboseCallbacks? callback, ComputerActionCallbacks? computerUseCallback, ToolPermissionRequest? toolPermissionRequest)
         {
             bool requiresAction = false;
 
@@ -151,10 +151,31 @@ namespace LombdaAgentSDK
                 //Process Action Call
                 if (item is ModelFunctionCallItem toolCall)
                 {
-                    var toolOutput = await HandleToolCall(agent, toolCall);
-                    runResult.Messages.Add(toolOutput);
-                    runResult.InputItems.Add(toolOutput);
-                    requiresAction = true;
+                    bool permissionGranted = true;
+                    if (toolPermissionRequest != null)
+                    {
+                        if (toolPermissionRequest?.GetInvocationList().Length > 0 && agent.ToolPermissionRequired[toolCall.FunctionName])
+                        {
+                            //If tool permission is required, ask user for permission
+                            permissionGranted = toolPermissionRequest.Invoke($"Do you want to allow the agent to use the tool: {toolCall.FunctionName}?");
+
+                        }
+                    }
+
+                    if (permissionGranted)
+                    {
+                        var toolOutput = await HandleToolCall(agent, toolCall);
+                        runResult.Messages.Add(toolOutput);
+                        runResult.InputItems.Add(toolOutput);
+                        requiresAction = true;
+                    }
+                    else
+                    {
+                        var errorOutput = new ModelFunctionCallOutputItem("fc_" + Guid.NewGuid().ToString().Replace("-", "_"),
+                            toolCall.CallId, "ERROR: Function Invocation denied by user", toolCall.Status, toolCall.FunctionName);
+                        runResult.Messages.Add(errorOutput);
+                        runResult.InputItems.Add(errorOutput);
+                    }
                 }
                 else if (item is ModelComputerCallItem computerCall)
                 {
