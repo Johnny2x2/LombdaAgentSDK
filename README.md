@@ -291,7 +291,7 @@ For comprehensive documentation, please visit the [docs folder](docs/):
 * [ ] Get Agent Status and Progress from API
 * [ ] Add control computer event to API (and receive screen shot)
 * [ ] Create AWS Cloud runner for API
-* [ ] Update Chroma usage / Local Vector Store
+* [X] Update Chroma usage / Local Vector Store
 * [ ] Make Moderation easier
 ---
 

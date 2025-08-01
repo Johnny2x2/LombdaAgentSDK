@@ -78,6 +78,24 @@ namespace LombdaAgentSDK.Agents
             return new Agent(client, "Assistant");
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Agent"/> class with the specified configuration parameters.
+        /// </summary>
+        /// <remarks>If tools or MCP servers are provided, the agent will initialize them asynchronously
+        /// during construction. If an output schema is specified, it will be used to configure the agent's response
+        /// format.</remarks>
+        /// <param name="client">The <see cref="ModelClient"/> instance used to interact with the underlying model. This parameter cannot be
+        /// <see langword="null"/>.</param>
+        /// <param name="_name">The name of the agent. Defaults to "Assistant" if not specified.</param>
+        /// <param name="_instructions">The instructions or context provided to the agent. Defaults to "You are a helpful assistant" if not
+        /// specified or empty.</param>
+        /// <param name="_output_schema">The optional output schema that defines the expected structure of the agent's responses. Can be <see
+        /// langword="null"/>.</param>
+        /// <param name="_tools">A list of tools (delegates) available to the agent. If <see langword="null"/>, the default tools will be
+        /// used.</param>
+        /// <param name="mcpServers">A list of <see cref="MCPServer"/> instances for MCP Server tools. If <see langword="null"/>, an
+        /// empty list will be initialized.</param>
+        /// <exception cref="ArgumentNullException">Thrown if <paramref name="client"/> is <see langword="null"/>.</exception>
         public Agent(ModelClient client, string _name = "Assistant", string _instructions = "", Type? _output_schema = null, List<Delegate>? _tools = null, List<MCPServer>? mcpServers = null)
         {
             if(client == null)

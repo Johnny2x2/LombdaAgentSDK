@@ -1,6 +1,5 @@
 ﻿using BabyAGI;
 using BabyAGI.FunctionGenerator.DataModels;
-using BabyAGI.Utility;
 using ChromaDB.Client;
 using Examples.Demos.CodingAgent;
 using LlmTornado;
@@ -13,6 +12,7 @@ using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.StateMachine;
+using LombdaAgentSDK.Utility;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Examples.Demos.FunctionGenerator.States
@@ -69,13 +69,8 @@ namespace Examples.Demos.FunctionGenerator.States
 
         public async Task<string[]?> QueryFunctionDB(string query)
         {
-            var handler = new ApiV1ToV2DelegatingHandler
-            {
-                InnerHandler = new HttpClientHandler()
-            };
-
             var configOptions = new ChromaConfigurationOptions(uri: BabyAGIConfig.ChromaDbURI);
-            using var httpClient = new HttpClient(handler);
+            using var httpClient = new HttpClient(ChromaV2ClientHandler.V2handler);
             var chromaClient = new ChromaClient(configOptions, httpClient);
 
             var functionCollection = await chromaClient.GetOrCreateCollection("functionCollection");

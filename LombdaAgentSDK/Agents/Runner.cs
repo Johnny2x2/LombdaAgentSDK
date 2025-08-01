@@ -29,6 +29,8 @@ namespace LombdaAgentSDK
         /// <param name="streaming">Enable streaming</param>
         /// <param name="streamingCallback">delegate to send streaming information (Console.Write)</param>
         /// <param name="responseID">Previous Response ID from response API</param>
+        /// <param name="cancellationToken">Cancellation token to cancel the run</param>
+        /// <param name="toolPermissionRequest">Delegate to request tool permission from user</param>
         /// <returns>Result of the run</returns>
         /// <exception cref="GuardRailTriggerException">Triggers when Guardrail detects bad input</exception>
         /// <exception cref="Exception"></exception>
@@ -134,6 +136,7 @@ namespace LombdaAgentSDK
         /// <param name="runResult"></param>
         /// <param name="callback"></param>
         /// <param name="computerUseCallback"></param>
+        /// <param name="toolPermissionRequest"
         /// <returns></returns>
         private static async Task<bool> ProcessOutputItems(Agent agent, RunResult runResult, RunnerVerboseCallbacks? callback, ComputerActionCallbacks? computerUseCallback, ToolPermissionRequest? toolPermissionRequest)
         {
@@ -158,7 +161,6 @@ namespace LombdaAgentSDK
                         {
                             //If tool permission is required, ask user for permission
                             permissionGranted = toolPermissionRequest.Invoke($"Do you want to allow the agent to use the tool: {toolCall.FunctionName}?");
-
                         }
                     }
 
