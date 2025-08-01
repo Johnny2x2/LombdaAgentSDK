@@ -5,6 +5,7 @@ using LlmTornado.Code;
 using LlmTornado.Common;
 using LlmTornado.Responses;
 using LlmTornado.Responses.Events;
+using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
 using ModelContextProtocol;
@@ -131,6 +132,8 @@ namespace LombdaAgentSDK
 
             chat.RequestParameters.ParallelToolCalls = options.AllowParallelToolCalling;
             //chat.RequestParameters.ResponseRequestParameters = SetupResponseClient(messages, options);
+
+            chat.AddSystemMessage(options.Instructions);
 
             chat = ConvertToProviderItems(messages, chat);
 
