@@ -15,8 +15,8 @@
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <PackageId>LombdaAiAgents</PackageId>
     <Authors>Johnny2x2</Authors>
-    <AssemblyVersion>1.7.1</AssemblyVersion>
-    <VersionPrefix>1.7.1</VersionPrefix>
+    <AssemblyVersion>1.7.2</AssemblyVersion>
+    <VersionPrefix>1.7.2</VersionPrefix>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,7 +31,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="LlmTornado" Version="3.7.16" />
+    <PackageReference Include="LlmTornado" Version="3.7.21" />
     <PackageReference Include="ModelContextProtocol" Version="0.3.0-preview.3" />
     <PackageReference Include="OpenAI" Version="2.2.0" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.6" />

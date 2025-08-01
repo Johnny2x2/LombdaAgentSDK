@@ -17,7 +17,7 @@
 * ✅ StateMachine Code is completely decoupled from Agent pipelines
 * 🧠 `AgentStateMachine` for creating stateful multi-agent workflows
 * 🌐 `LombdaAgent` to unify Agent and StateMachine operations
-* 🪟  MAUI Debugging UI with streaming chat [LombdaAgentMAUI](https://github.com/Johnny2x2/LombdaAgentMAUI)
+* ⚙️ MAUI Debugging UI with streaming chat [LombdaAgentMAUI](https://github.com/Johnny2x2/LombdaAgentMAUI)
 * 📢 Event system for monitoring agent operations and debugging
 * 📦 BabyAGI
 ---
@@ -281,7 +281,7 @@ For comprehensive documentation, please visit the [docs folder](docs/):
 - **[Contributing Guide](docs/CONTRIBUTING.md)** - Guidelines for contributors
 
 ## 🚦 Roadmap
-* [ ] enable parallel function calling
+* [x] enable parallel function calling
 * [ ] Add In Human in the loop example
 * [ ] Upgrade Usage Information gathering
 * [ ] Add in cancel functionality to API

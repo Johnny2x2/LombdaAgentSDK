@@ -8,6 +8,10 @@
         /// <summary>
         /// Messages from the run
         /// </summary>
+        private List<ModelItem> inputItems = new List<ModelItem>();
+        /// <summary>
+        /// Messages from the run
+        /// </summary>
         private List<ModelItem> messages = new List<ModelItem>();
 
         /// <summary>
@@ -34,6 +38,8 @@
         /// Text from the last message in the response
         /// </summary>
         public string? Text => TryGetText();
+
+        public List<ModelItem> InputItems { get => inputItems; set => inputItems = value; }
 
         /// <summary>
         /// Attempt to get Text if the last message is a text type

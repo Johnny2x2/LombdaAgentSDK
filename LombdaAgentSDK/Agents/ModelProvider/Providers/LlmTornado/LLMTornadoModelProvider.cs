@@ -129,6 +129,7 @@ namespace LombdaAgentSDK
                 };
             }
 
+            chat.RequestParameters.ParallelToolCalls = options.AllowParallelToolCalling;
             //chat.RequestParameters.ResponseRequestParameters = SetupResponseClient(messages, options);
 
             chat = ConvertToProviderItems(messages, chat);
@@ -138,7 +139,7 @@ namespace LombdaAgentSDK
 
         public ResponseRequest SetupResponseClient(List<ModelItem> messages, ModelResponseOptions options)
         {
-            List<ResponseInputItem> InputItems = ConvertToProviderResponseItems(new List<ModelItem>([messages.Last()]));
+            List<ResponseInputItem> InputItems = ConvertToProviderResponseItems(messages);
 
             ResponseRequest request = new ResponseRequest
             {
@@ -250,6 +251,8 @@ namespace LombdaAgentSDK
                 }
                 request.Tools.Add(codeTool);
             }
+
+            request.ParallelToolCalls = options.AllowParallelToolCalling;
 
             return request;
         }

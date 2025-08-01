@@ -8,6 +8,10 @@ namespace LombdaAgentSDK.Agents.DataClasses
     public class ModelResponseOptions
     {
         /// <summary>
+        /// Gets or sets a value indicating whether tools can be called in parallel.
+        /// </summary>
+        public bool AllowParallelToolCalling { get; set; } = false; 
+        /// <summary>
         /// Previous Response ID for response API only
         /// </summary>
         public string? PreviousResponseId {  get; set; }

@@ -171,6 +171,29 @@ namespace Test.Integration
         }
 
         [Test]
+        public async Task RunAsync_WithMultipleTools_ShouldSelectMultipleCorrectTool()
+        {
+            // Arrange
+            if (_modelProvider == null) Assert.Ignore("Model provider not initialized");
+
+            var agent = new Agent(
+                _modelProvider,
+                "Assistant",
+                "You are a helpful assistant with access to various tools",
+                _tools: [GetWeather, CalculateArea, GetCurrentTime]);
+
+            agent.Options.AllowParallelToolCalling = true; // Allow parallel tool calls
+
+            // Act
+            var result = await Runner.RunAsync(agent, "What time is it and the weather in boston?");
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Text.Should().NotBeEmpty();
+            result.Text.Should().Contain("current time"); // Should use the time tool
+        }
+
+        [Test]
         public async Task RunAsync_WithReasoningOptions_ShouldUseReasoning()
         {
             // Arrange

@@ -70,7 +70,9 @@ namespace LombdaAgentSDK
             //Add the latest message to the stream
             if (!string.IsNullOrEmpty(input.Trim()))
             {
-                runResult.Messages.Add(new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", [new ModelMessageRequestTextContent(input),], ModelStatus.Completed));
+                var userMessage = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", [new ModelMessageRequestTextContent(input),], ModelStatus.InProgress);
+                runResult.Messages.Add(userMessage);
+                runResult.InputItems.Add(userMessage);
             }
             
             //Check if the input triggers a guardrail to stop the agent from continuing
@@ -99,7 +101,7 @@ namespace LombdaAgentSDK
                     
                     if (currentTurn >= maxTurns) throw new Exception("Max Turns Reached");
 
-                    runResult.Response = await _get_new_response(agent, runResult.Messages, streaming, streamingCallback, verboseCallback)! ?? runResult.Response;
+                    runResult.Response = await _get_new_response(agent, runResult.InputItems, streaming, streamingCallback, verboseCallback)! ?? runResult.Response;
 
                     currentTurn++;
 
@@ -138,24 +140,27 @@ namespace LombdaAgentSDK
             bool requiresAction = false;
 
             List<ModelItem> outputItems = runResult.Response.OutputItems!.ToList();
+            runResult.InputItems.Clear();
 
             foreach (ModelItem item in outputItems)
             {
                 runResult.Messages.Add(item);
-
+                
                 await HandleVerboseCallback(item, callback);
 
                 //Process Action Call
                 if (item is ModelFunctionCallItem toolCall)
                 {
-                    runResult.Messages.Add(await HandleToolCall(agent, toolCall));
-
+                    var toolOutput = await HandleToolCall(agent, toolCall);
+                    runResult.Messages.Add(toolOutput);
+                    runResult.InputItems.Add(toolOutput);
                     requiresAction = true;
                 }
                 else if (item is ModelComputerCallItem computerCall)
                 {
-                    runResult.Messages.Add(await HandleComputerCall(computerCall, computerUseCallback));
-
+                    var computerOutput = await HandleComputerCall(computerCall, computerUseCallback);
+                    runResult.Messages.Add(computerOutput);
+                    runResult.InputItems.Add(computerOutput);
                     requiresAction = true;
                 }
             }
@@ -250,7 +255,7 @@ namespace LombdaAgentSDK
             {
                 verboseCallback?.Invoke(ex.ToString());
                 verboseCallback?.Invoke("Removing Last Message thread");
-                RemoveLastMessageThread(messages);
+                //RemoveLastMessageThread(messages); //Removed due to parallel tool calling moving input to InputItems so messages has no bearing on input
             }
 
             return null;
