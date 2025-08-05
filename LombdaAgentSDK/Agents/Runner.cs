@@ -12,10 +12,9 @@ namespace LombdaAgentSDK
     /// </summary>
     public class Runner
     {
-        public delegate void ComputerActionCallbacks(ComputerToolAction computerCall);
+        public delegate ModelMessageImageFileContent ComputerActionCallbacks(ComputerToolAction computerCall);
         public delegate void RunnerVerboseCallbacks(string runnerAction);
-        
-
+        public delegate bool ToolPermissionRequest(string message);
         /// <summary>
         /// Invoke the agent loop to begin async
         /// </summary>
@@ -30,6 +29,8 @@ namespace LombdaAgentSDK
         /// <param name="streaming">Enable streaming</param>
         /// <param name="streamingCallback">delegate to send streaming information (Console.Write)</param>
         /// <param name="responseID">Previous Response ID from response API</param>
+        /// <param name="cancellationToken">Cancellation token to cancel the run</param>
+        /// <param name="toolPermissionRequest">Delegate to request tool permission from user</param>
         /// <returns>Result of the run</returns>
         /// <exception cref="GuardRailTriggerException">Triggers when Guardrail detects bad input</exception>
         /// <exception cref="Exception"></exception>
@@ -45,7 +46,8 @@ namespace LombdaAgentSDK
             bool streaming = false,
             StreamingCallbacks? streamingCallback = null,
             string responseID = "",
-            CancellationTokenSource? cancellationToken = default
+            CancellationTokenSource? cancellationToken = default,
+            ToolPermissionRequest? toolPermissionRequest = null
             )
         {
             RunResult runResult = new RunResult();
@@ -70,7 +72,9 @@ namespace LombdaAgentSDK
             //Add the latest message to the stream
             if (!string.IsNullOrEmpty(input.Trim()))
             {
-                runResult.Messages.Add(new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", [new ModelMessageRequestTextContent(input),], ModelStatus.Completed));
+                var userMessage = new ModelMessageItem("msg_" + Guid.NewGuid().ToString().Replace("-", "_"), "USER", [new ModelMessageRequestTextContent(input),], ModelStatus.InProgress);
+                runResult.Messages.Add(userMessage);
+                runResult.InputItems.Add(userMessage);
             }
             
             //Check if the input triggers a guardrail to stop the agent from continuing
@@ -99,11 +103,11 @@ namespace LombdaAgentSDK
                     
                     if (currentTurn >= maxTurns) throw new Exception("Max Turns Reached");
 
-                    runResult.Response = await _get_new_response(agent, runResult.Messages, streaming, streamingCallback, verboseCallback)! ?? runResult.Response;
+                    runResult.Response = await _get_new_response(agent, runResult.InputItems, streaming, streamingCallback, verboseCallback)! ?? runResult.Response;
 
                     currentTurn++;
 
-                } while (await ProcessOutputItems(agent, runResult, verboseCallback, computerUseCallback) && !single_turn);
+                } while (await ProcessOutputItems(agent, runResult, verboseCallback, computerUseCallback, toolPermissionRequest) && !single_turn);
             }
             catch(Exception ex)
             {
@@ -132,30 +136,54 @@ namespace LombdaAgentSDK
         /// <param name="runResult"></param>
         /// <param name="callback"></param>
         /// <param name="computerUseCallback"></param>
+        /// <param name="toolPermissionRequest"
         /// <returns></returns>
-        private static async Task<bool> ProcessOutputItems(Agent agent, RunResult runResult, RunnerVerboseCallbacks? callback, ComputerActionCallbacks? computerUseCallback)
+        private static async Task<bool> ProcessOutputItems(Agent agent, RunResult runResult, RunnerVerboseCallbacks? callback, ComputerActionCallbacks? computerUseCallback, ToolPermissionRequest? toolPermissionRequest)
         {
             bool requiresAction = false;
 
             List<ModelItem> outputItems = runResult.Response.OutputItems!.ToList();
+            runResult.InputItems.Clear();
 
             foreach (ModelItem item in outputItems)
             {
                 runResult.Messages.Add(item);
-
+                
                 await HandleVerboseCallback(item, callback);
 
                 //Process Action Call
                 if (item is ModelFunctionCallItem toolCall)
                 {
-                    runResult.Messages.Add(await HandleToolCall(agent, toolCall));
+                    bool permissionGranted = true;
+                    if (toolPermissionRequest != null)
+                    {
+                        if (toolPermissionRequest?.GetInvocationList().Length > 0 && agent.ToolPermissionRequired[toolCall.FunctionName])
+                        {
+                            //If tool permission is required, ask user for permission
+                            permissionGranted = toolPermissionRequest.Invoke($"Do you want to allow the agent to use the tool: {toolCall.FunctionName}?");
+                        }
+                    }
 
-                    requiresAction = true;
+                    if (permissionGranted)
+                    {
+                        var toolOutput = await HandleToolCall(agent, toolCall);
+                        runResult.Messages.Add(toolOutput);
+                        runResult.InputItems.Add(toolOutput);
+                        requiresAction = true;
+                    }
+                    else
+                    {
+                        var errorOutput = new ModelFunctionCallOutputItem("fc_" + Guid.NewGuid().ToString().Replace("-", "_"),
+                            toolCall.CallId, "ERROR: Function Invocation denied by user", toolCall.Status, toolCall.FunctionName);
+                        runResult.Messages.Add(errorOutput);
+                        runResult.InputItems.Add(errorOutput);
+                    }
                 }
                 else if (item is ModelComputerCallItem computerCall)
                 {
-                    runResult.Messages.Add(await HandleComputerCall(computerCall, computerUseCallback));
-
+                    var computerOutput = await HandleComputerCall(computerCall, computerUseCallback);
+                    runResult.Messages.Add(computerOutput);
+                    runResult.InputItems.Add(computerOutput);
                     requiresAction = true;
                 }
             }
@@ -217,15 +245,12 @@ namespace LombdaAgentSDK
         /// <returns></returns>
         public static async Task<ModelComputerCallOutputItem> HandleComputerCall(ModelComputerCallItem computerCall, ComputerActionCallbacks? computerCallbacks = null)
         {
-            computerCallbacks?.Invoke(computerCall.Action);
-
-            Thread.Sleep(1000);
-
-            byte[] data = ComputerToolUtility.TakeScreenshotByteArray(ImageFormat.Png);
-
-            GC.Collect();
-
-            return new ModelComputerCallOutputItem("cuo_" + Guid.NewGuid().ToString().Replace("-", "_"), computerCall.CallId, ModelStatus.Completed, new ModelMessageImageFileContent(BinaryData.FromBytes(data), "image/png"));
+            var screenShot = computerCallbacks?.Invoke(computerCall.Action);
+            if(screenShot == null)
+            {
+                throw new Exception("Computer Call Callback did not return a screenshot");
+            }
+            return new ModelComputerCallOutputItem("cuo_" + Guid.NewGuid().ToString().Replace("-", "_"), computerCall.CallId, ModelStatus.Completed, screenShot!);
         }
 
         /// <summary>
@@ -250,7 +275,7 @@ namespace LombdaAgentSDK
             {
                 verboseCallback?.Invoke(ex.ToString());
                 verboseCallback?.Invoke("Removing Last Message thread");
-                RemoveLastMessageThread(messages);
+                //RemoveLastMessageThread(messages); //Removed due to parallel tool calling moving input to InputItems so messages has no bearing on input
             }
 
             return null;

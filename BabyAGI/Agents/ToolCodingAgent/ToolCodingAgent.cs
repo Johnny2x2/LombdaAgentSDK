@@ -4,9 +4,9 @@ using BabyAGI.Agents.ResearchAgent.DataModels;
 using BabyAGI.FunctionGenerator.DataModels;
 using BabyAGI.Utility;
 using Examples.Demos.CodingAgent.states;
+using LombdaAgentSDK.StateMachine;
 using LombdaAgentSDK.Agents.Tools;
 using LombdaAgentSDK.AgentStateSystem;
-using LombdaAgentSDK.StateMachine;
 using NUnit.Framework;
 
 namespace Examples.Demos.CodingAgent

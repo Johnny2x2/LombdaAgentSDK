@@ -75,7 +75,12 @@ namespace LombdaAgentSDK
             if (string.IsNullOrWhiteSpace(json))
                 throw new ArgumentNullException("RunResult Text is null or empty");
 
-            return JsonSerializer.Deserialize<T>(json)!;
+            return JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                AllowTrailingCommas = true,
+                UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip
+            })!;
         }
 
         /// <summary>
@@ -90,7 +95,12 @@ namespace LombdaAgentSDK
             if (string.IsNullOrWhiteSpace(json))
                 throw new ArgumentException("JSON is null or empty");
 
-            return JsonSerializer.Deserialize<T>(json)!;
+            return JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                AllowTrailingCommas = true,
+                UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip
+            })!;
         }
 
 
@@ -113,7 +123,7 @@ namespace LombdaAgentSDK
             {
                 if (string.IsNullOrWhiteSpace(json))
                     throw new ArgumentException("JSON is null or empty");
-                result = JsonSerializer.Deserialize<T>(json);
+                result = JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true, AllowTrailingCommas = true, UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip });// 👈 This is the key});
                 return true;
             }
             catch (Exception)
@@ -166,6 +176,9 @@ namespace LombdaAgentSDK
             if (type.IsArray) return "array";
             return "object"; // fallback for complex types
         }
+
+
+
     }
 
     /// <summary>
@@ -289,11 +302,11 @@ namespace LombdaAgentSDK
         private static object GetPropertySchema(PropertyInfo prop)
         {
             var props = new Dictionary<string, object>();
-            //var descriptions = prop.GetCustomAttributes<DescriptionAttribute>();
-            //if(descriptions.Count() > 0)
-            //{
-            //    props.Add("description", descriptions.First().Description);
-            //}
+            var descriptions = prop.GetCustomAttributes<DescriptionAttribute>();
+            if (descriptions.Count() > 0)
+            {
+                props.Add("description", descriptions.First().Description);
+            }
             if (prop.PropertyType == typeof(string)) props.Add("type", "string");
             else if (prop.PropertyType == typeof(bool)) props.Add("type", "boolean");
             else if (prop.PropertyType.IsNumeric()) props.Add("type", "number");

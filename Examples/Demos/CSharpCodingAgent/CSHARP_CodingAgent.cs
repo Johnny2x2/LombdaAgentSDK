@@ -1,6 +1,6 @@
 ﻿using Examples.Demos.CodingAgent.states;
-using LombdaAgentSDK.Agents.Tools;
 using LombdaAgentSDK.StateMachine;
+using LombdaAgentSDK.Agents.Tools;
 using static Examples.Demos.CodeUtility;
 
 namespace Examples.Demos.CodingAgent

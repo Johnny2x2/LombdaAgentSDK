@@ -1,6 +1,6 @@
-﻿using LombdaAgentSDK.Agents;
+﻿using LombdaAgentSDK.StateMachine;
+using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
-using LombdaAgentSDK.StateMachine;
 using System;
 using System.Collections.Generic;
 using System.Linq;

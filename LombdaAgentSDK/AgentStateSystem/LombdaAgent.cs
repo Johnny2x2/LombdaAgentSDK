@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using static LombdaAgentSDK.Runner;
 using static System.Runtime.InteropServices.JavaScript.JSType;
+using LombdaAgentSDK.StateMachine;
 
 namespace LombdaAgentSDK.AgentStateSystem
 {

@@ -1,8 +1,8 @@
 ﻿using BabyAGI.Agents.ResearchAgent.DataModels;
 using BabyAGI.Agents.ResearchAgent.States;
+using LombdaAgentSDK.StateMachine;
 using LombdaAgentSDK.Agents.Tools;
 using LombdaAgentSDK.AgentStateSystem;
-using LombdaAgentSDK.StateMachine;
 
 namespace BabyAGI.Agents.ResearchAgent
 {

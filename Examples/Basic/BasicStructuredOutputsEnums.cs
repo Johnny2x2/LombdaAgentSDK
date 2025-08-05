@@ -33,6 +33,7 @@ namespace Examples.Basic
         public struct conditions
         {
             public string summary { get; set; }
+
             [JsonConverter(typeof(JsonStringEnumConverter))]
             public condition weather { get; set; }
         }

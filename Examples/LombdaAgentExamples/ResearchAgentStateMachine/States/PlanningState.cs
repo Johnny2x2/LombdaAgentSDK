@@ -1,9 +1,9 @@
 ﻿using LombdaAgentSDK.Agents;
-using LombdaAgentSDK.StateMachine;
 using LombdaAgentSDK;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
 using LombdaAgentSDK.AgentStateSystem;
+using LombdaAgentSDK.StateMachine;
 
 namespace Examples.LombdaAgentExamples.ResearchAgentStateMachine
 {

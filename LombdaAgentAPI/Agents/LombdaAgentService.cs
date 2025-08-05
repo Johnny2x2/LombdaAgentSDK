@@ -4,6 +4,7 @@ using LlmTornado.Code;
 using LombdaAgentAPI.Hubs;
 using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
+using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.AgentStateSystem;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
@@ -33,8 +34,9 @@ namespace LombdaAgentAPI.Agents
             // Register available agent types - you can register your custom agent types here
             RegisterAgentType("Default", typeof(APILombdaAgent));
             RegisterAgentType("CodeAssistant", typeof(CodeAssistantLombdaAgent));
-            RegisterAgentType("Creative", typeof(CreativeLombdaAgent));
             RegisterAgentType("BabyAGI", typeof(BabyAGIRunner));
+            RegisterAgentType("Creative", typeof(CreativeLombdaAgent));
+            
         }
 
         public List<string> GetAgentIds()
@@ -138,6 +140,23 @@ namespace LombdaAgentAPI.Agents
                     _agentConnections.TryUpdate(agentId, newConnections, connections);
                 }
             }
+        }
+
+        public async Task<Agent> CreateAgentAsync(string name, string instructions = "")
+        {
+            // For now, return a dummy agent - this can be enhanced later
+            return Agent.DummyAgent();
+        }
+
+        public async Task<RunResult> RunAgentAsync(Agent agent, string input)
+        {
+            // Run the agent with the provided input
+            return await Runner.RunAsync(agent, input);
+        }
+
+        public async Task<Agent> GetDefaultAgentAsync()
+        {
+            return Agent.DummyAgent();
         }
     }
 

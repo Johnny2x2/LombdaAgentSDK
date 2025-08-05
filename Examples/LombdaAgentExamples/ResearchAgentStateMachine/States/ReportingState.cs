@@ -1,5 +1,4 @@
 ﻿using LombdaAgentSDK.Agents;
-using LombdaAgentSDK.StateMachine;
 using LombdaAgentSDK;
 using System;
 using System.Collections.Generic;
@@ -7,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using LombdaAgentSDK.AgentStateSystem;
+using LombdaAgentSDK.StateMachine;
 
 namespace Examples.LombdaAgentExamples.ResearchAgentStateMachine
 {

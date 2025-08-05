@@ -1,6 +1,5 @@
 ﻿using BabyAGI.Agents.ResearchAgent.DataModels;
 using LombdaAgentSDK.Agents;
-using LombdaAgentSDK.StateMachine;
 using LombdaAgentSDK;
 using System;
 using System.Collections.Generic;
@@ -11,6 +10,7 @@ using System.Runtime.CompilerServices;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
 using LombdaAgentSDK.AgentStateSystem;
+using LombdaAgentSDK.StateMachine;
 
 namespace BabyAGI.Agents.ResearchAgent.States
 {

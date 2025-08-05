@@ -17,7 +17,7 @@
 * ✅ StateMachine Code is completely decoupled from Agent pipelines
 * 🧠 `AgentStateMachine` for creating stateful multi-agent workflows
 * 🌐 `LombdaAgent` to unify Agent and StateMachine operations
-* 🪟  MAUI Debugging UI with streaming chat [LombdaAgentMAUI](https://github.com/Johnny2x2/LombdaAgentMAUI)
+* ⚙️ MAUI Debugging UI with streaming chat [LombdaAgentMAUI](https://github.com/Johnny2x2/LombdaAgentMAUI)
 * 📢 Event system for monitoring agent operations and debugging
 * 📦 BabyAGI
 ---
@@ -281,10 +281,18 @@ For comprehensive documentation, please visit the [docs folder](docs/):
 - **[Contributing Guide](docs/CONTRIBUTING.md)** - Guidelines for contributors
 
 ## 🚦 Roadmap
-* [ ] Add non async support for agent execution.
-* [ ] Add Verbose Event Object for Events.
-* [ ] Fix structured outputs deserialization with field descriptions
-
+* [x] enable parallel function calling
+* [x] Add In Human in the loop example
+* [ ] Upgrade Usage Information gathering
+* [ ] Improve Context functionality & management
+* [ ] Add in cancel functionality to API
+* [ ] Create MCP Server to run Agents and State Machines
+* [ ] Improve Debugging for agents
+* [ ] Get Agent Status and Progress from API
+* [ ] Add control computer event to API (and receive screen shot)
+* [ ] Create AWS Cloud runner for API
+* [X] Update Chroma usage / Local Vector Store
+* [ ] Make Moderation easier
 ---
 
 ## 🤝 Contributing

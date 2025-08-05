@@ -21,7 +21,7 @@ namespace BabyAGI
         /// </summary>
         public BabyAgiStateMachine _stateMachine { get; set; } 
 
-        public BabyAGIRunner() : base("baby") 
+        public BabyAGIRunner(string name) : base(name) 
         {             //Initialize the agent
             _stateMachine = new BabyAgiStateMachine(this);
             InputPreprocessor = RunStateMachine;
@@ -30,7 +30,7 @@ namespace BabyAGI
         public override void InitializeAgent()
         {
             LLMTornadoModelProvider client = new(ChatModel.OpenAi.Gpt41.V41, [new ProviderAuthentication(LLmProviders.OpenAi, Environment.GetEnvironmentVariable("OPENAI_API_KEY")!),], useResponseAPI:true);
-            string instructions = $"""You are a person assistant AGI.""";
+            string instructions = $"""You are a personal assistant AGI.""";
             ControlAgent = new Agent(client, "BabyAGI", instructions);
         }
 

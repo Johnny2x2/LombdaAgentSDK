@@ -1,5 +1,5 @@
-﻿using LombdaAgentSDK.AgentStateSystem;
-using LombdaAgentSDK.StateMachine;
+﻿using LombdaAgentSDK.StateMachine;
+using LombdaAgentSDK.AgentStateSystem;
 
 namespace Examples.LombdaAgentExamples.ResearchAgentStateMachine
 {

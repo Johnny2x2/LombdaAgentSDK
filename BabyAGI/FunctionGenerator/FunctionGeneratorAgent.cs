@@ -1,9 +1,9 @@
 ﻿using BabyAGI.FunctionGenerator.States;
 using Examples.Demos.FunctionGenerator.States;
-using LombdaAgentSDK.StateMachine;
 using LombdaAgentSDK.AgentStateSystem;
 using BabyAGI.FunctionGenerator.DataModels;
 using LombdaAgentSDK.Agents;
+using LombdaAgentSDK.StateMachine;
 
 namespace Examples.Demos.FunctionGenerator
 {

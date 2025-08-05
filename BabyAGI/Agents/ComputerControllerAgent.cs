@@ -5,7 +5,7 @@ using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
 using LombdaAgentSDK.AgentStateSystem;
-using LombdaAgentSDK.StateMachine;
+using System.Drawing.Imaging;
 using System.Threading.Tasks;
 using static LombdaAgentSDK.Runner;
 using static System.Runtime.CompilerServices.RuntimeHelpers;
@@ -72,13 +72,11 @@ namespace BabyAGI.Agents
         }
 
         //This is called first before Screen Shot is taken.
-        public static void HandleComputerAction(ComputerToolAction action)
+        public static ModelMessageImageFileContent HandleComputerAction(ComputerToolAction action)
         {
             switch (action.Kind)
             {
                 case ModelComputerCallAction.Click:
-                    Console.WriteLine($"[Computer Call Action]({action}) {action.MoveCoordinates}");
-                    Console.WriteLine($"[Computer Call Action]({action}) {action.MouseButtonClick}");
                     switch (action.MouseButtonClick)
                     {
                         case MouseButtons.Left:
@@ -97,47 +95,52 @@ namespace BabyAGI.Agents
                     }
                     break;
                 case ModelComputerCallAction.DoubleClick:
-                    Console.WriteLine($"[Computer Call Action]({action}) {action.MoveCoordinates}");
                     ComputerToolUtility.MoveAndDoubleClick(
                         action.MoveCoordinates.X,
                         action.MoveCoordinates.Y);
                     break;
                 case ModelComputerCallAction.Drag:
-                    Console.WriteLine($"[Computer Call Action]({action}) {action.StartDragLocation}");
+                    ComputerToolUtility.Drag(
+                        action.MoveCoordinates.X,
+                        action.MoveCoordinates.Y);
                     break;
                 case ModelComputerCallAction.KeyPress:
-                    Console.WriteLine($"[Computer Call Action]({action}) {string.Join(",",action.KeysToPress.ToArray())}");
                     ComputerToolUtility.PressKey(action.KeysToPress[0]);
                     break;
                 case ModelComputerCallAction.Move:
-                    Console.WriteLine($"[Computer Call Action]({action}) {action.MoveCoordinates}");
-                    if (action.MoveCoordinates != null)
-                    {
-                        ComputerToolUtility.MoveCursorSmooth(action.MoveCoordinates.X,
-                            action.MoveCoordinates.Y);
-                    }
+                    ComputerToolUtility.MoveCursorSmooth(
+                        action.MoveCoordinates.X,
+                        action.MoveCoordinates.Y);
                     break;
                 case ModelComputerCallAction.Screenshot:
-                    Console.WriteLine($"[Computer Call Action]({action})");
                     break;
                 case ModelComputerCallAction.Scroll:
-                    Console.WriteLine($"[Computer Call Action]({action}) {action.MoveCoordinates}");
-                    Console.WriteLine($"[Computer Call Horizontal Offset Value]({action}) {action.ScrollHorOffset}");
-                    Console.WriteLine($"[Computer Call Vertical Offset Valu]({action}) {action.ScrollVertOffset}");
                     ComputerToolUtility.Scroll(action.ScrollVertOffset);
                     break;
                 case ModelComputerCallAction.Type:
-                    Console.WriteLine($"[Computer Call Action TypeText Value]({action}) {action.TypeText}");
                     ComputerToolUtility.Type(action.TypeText);
                     break;
                 case ModelComputerCallAction.Wait:
-                    Console.WriteLine($"[Computer Call Action]({action})");
                     Thread.Sleep(2000);
                     break;
                 default:
                     break;
             }
+
+            return CreateScreenShot();
+        }
+
+        public static ModelMessageImageFileContent CreateScreenShot()
+        {
+            byte[] ss = ComputerToolUtility.TakeScreenshotByteArray(ImageFormat.Png);
+
+            GC.Collect();
+            // Return the screenshot as a ModelMessageImageFileContent
+            return new ModelMessageImageFileContent(BinaryData.FromBytes(ss), "image/png");
         }
 
     }
 }
+
+
+        

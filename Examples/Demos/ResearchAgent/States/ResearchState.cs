@@ -1,7 +1,6 @@
 ﻿using Examples.Demos.ResearchAgent.DataModels;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents;
-using LombdaAgentSDK.StateMachine;
 using LombdaAgentSDK;
 using System;
 using System.Collections.Generic;
@@ -10,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using LlmTornado.Responses;
+using LombdaAgentSDK.StateMachine;
 
 namespace Examples.Demos.ResearchAgent.States
 {
