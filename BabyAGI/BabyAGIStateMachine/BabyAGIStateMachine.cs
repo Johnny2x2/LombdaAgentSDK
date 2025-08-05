@@ -1,7 +1,7 @@
 ﻿using BabyAGI.BabyAGIStateMachine.DataModels;
 using BabyAGI.BabyAGIStateMachine.States;
-using LombdaAgentSDK.AgentStateSystem;
 using LombdaAgentSDK.StateMachine;
+using LombdaAgentSDK.AgentStateSystem;
 
 namespace BabyAGI.BabyAGIStateMachine
 {

@@ -1,12 +1,12 @@
 ﻿using Examples.Demos.ResearchAgent.DataModels;
 using LombdaAgentSDK.Agents;
-using LombdaAgentSDK.StateMachine;
 using LombdaAgentSDK;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using LombdaAgentSDK.StateMachine;
 
 namespace Examples.Demos.ResearchAgent.States
 {

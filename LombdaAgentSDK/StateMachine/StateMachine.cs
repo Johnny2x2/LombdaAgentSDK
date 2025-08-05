@@ -3,7 +3,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 
 namespace LombdaAgentSDK.StateMachine
@@ -118,17 +117,6 @@ namespace LombdaAgentSDK.StateMachine
         /// <remarks>This list holds instances of <see cref="BaseState"/> and is used to track the various
         /// states within the application. It can be modified to add or remove states as needed.</remarks>
         private List<BaseState> states = new List<BaseState>();
-
-        /// <summary>
-        /// Gets or sets a value indicating whether the steps of the process should be recorded.
-        /// </summary>
-        public bool RecordSteps { get; set; } = false;
-
-        /// <summary>
-        /// Gets or sets the collection of steps, where each step is represented as a list of state processes.
-        /// </summary>
-        public List<List<StateProcess>> Steps { get; set; } = new List<List<StateProcess>>();
-
 
         public StateMachine() { 
             threadLimitor = new(MaxThreads, maxThreads); 
@@ -259,10 +247,6 @@ namespace LombdaAgentSDK.StateMachine
             //If there are no new processes, return
             if (newStateProcesses.Count == 0) { IsFinished = true; return; }
 
-            //Record Step
-            if (RecordSteps) { Steps.Add(newStateProcesses); }
-                
-
             //Initialize each new state process concurrently
             List<Task> Tasks = new List<Task>();
             foreach (StateProcess stateProcess in newStateProcesses)
@@ -388,7 +372,7 @@ namespace LombdaAgentSDK.StateMachine
             ResetRun(); //Reset the state machine before running
 
             //Initialize the process with the starting state and input
-            await InitilizeAllNewProcesses([new StateProcess(runStartState, input)]);
+            await InitilizeProcess(new StateProcess(runStartState, input));
 
             //Run the state machine until it is finished or cancelled
             while (true)
@@ -514,10 +498,12 @@ namespace LombdaAgentSDK.StateMachine
             // Use a ConcurrentBag to collect results from multiple tasks
             ConcurrentBag<RunOutputCollection<TOutput?>> oResults = new ConcurrentBag<RunOutputCollection<TOutput?>>();
 
+            // Create a list of tasks to run the state machine for each input
             for (int i = 0; i < inputs.Length; i++)
             {
                 var runResult = await base.Run(StartState, inputs[i], i + 1, ResultState);
-                oResults.Add(new RunOutputCollection<TOutput?>(runResult.Item1, runResult.Item2.ConvertAll(item => (TOutput)item)!));
+                RunOutputCollection<TOutput?> runOutput = new(runResult.Item1, runResult.Item2.ConvertAll(item => (TOutput)item)!);
+                oResults.Add(runOutput);
             }
 
             // Convert the ConcurrentBag to a List and sort it by index

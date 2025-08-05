@@ -5,6 +5,8 @@ using LombdaAgentSDK.Agents.Tools;
 using System.ClientModel;
 using System.Drawing;
 using static LombdaAgentSDK.Runner;
+using LlmTornado.Code;
+using LlmTornado.Chat.Models;
 
 namespace LombdaAgentSDK
 {
@@ -18,7 +20,7 @@ namespace LombdaAgentSDK
 
         //Client Specific Properties
 
-        public OpenAIResponseClient Client { get; set; }
+        public LLMTornadoModelProvider Client { get; set; }
 
         public OpenAIClientOptions Options { get; set; }
         public ApiKeyCredential ApiKeyCredential { get; set; }
@@ -34,25 +36,36 @@ namespace LombdaAgentSDK
             OpenAIFileSearchOptions? vectorDbOptions = null
             )
         {
+
             Model = model;
+
+            EnableWebSearch = enableWebSearch;
+            EnableComputerCalls = enableComputerCalls;
+            FileSearchOptions = vectorDbOptions ?? FileSearchOptions;
+
+            Client = new LLMTornadoModelProvider(
+                new ChatModel(model),
+                [new ProviderAuthentication(LLmProviders.OpenAi, SetAndValidateApiKey(_apiKeyCredential))],
+                useResponseAPI: true,
+                allowComputerUse: enableComputerCalls,
+                enableWebSearch: enableWebSearch
+                );
 
             if (string.IsNullOrEmpty(Model))
             {
                 throw new ArgumentException("Model name cannot be null or empty.", nameof(model));
             }
 
-            EnableWebSearch = enableWebSearch;
-            EnableComputerCalls = enableComputerCalls;
-            FileSearchOptions = vectorDbOptions ?? FileSearchOptions;
-
-            SetAndValidateApiKey(_apiKeyCredential);
 
             Options = _clientOptions == null ? new OpenAIClientOptions() : _clientOptions;
 
-            Client = new(model: model, ApiKeyCredential, Options);
+            if(_clientOptions is not null)
+            {
+                Console.WriteLine("Using Custom OpenAI Client Options no longer supported (using LLMTornado backend)");
+            }
         }
 
-        private void SetAndValidateApiKey(ApiKeyCredential? _apiKeyCredential = null)
+        private string SetAndValidateApiKey(ApiKeyCredential? _apiKeyCredential = null)
         {
             ApiKeyCredential = _apiKeyCredential == null ? new ApiKeyCredential(Environment.GetEnvironmentVariable("OPENAI_API_KEY")) : _apiKeyCredential;
 
@@ -64,155 +77,19 @@ namespace LombdaAgentSDK
             {
                 throw new ArgumentException("API Key cannot be null or empty. Try Setting Enviornment Variable OPENAI_API_KEY", nameof(_apiKeyCredential));
             }
-        }
 
-        public (List<ResponseItem>, ResponseCreationOptions) SetupOpenAIClient(List<ModelItem> messages, ModelResponseOptions options)
-        {
-            //Convert Input items here
-            List<ResponseItem> responseItems = ConvertToProviderItems(messages).ToList();
-
-            //Convert Options here
-            ResponseCreationOptions responseCreationOptions = new ResponseCreationOptions();
-            responseCreationOptions.Instructions = options.Instructions;
-
-            
-            if(options.ReasoningOptions != null)
-            {
-                responseCreationOptions.ReasoningOptions = new ResponseReasoningOptions();
-                responseCreationOptions.ReasoningOptions.ReasoningEffortLevel = options.ReasoningOptions.EffortLevel == ModelReasoningEffortLevel.High
-                    ? ResponseReasoningEffortLevel.High
-                    : ResponseReasoningEffortLevel.Low;
-            }
-
-            //Convert Tools here
-            foreach (BaseTool tool in options.Tools)
-            {
-                responseCreationOptions.Tools.Add(ResponseTool.CreateFunctionTool(
-                    tool.ToolName,
-                    tool.ToolDescription,
-                    tool.ToolParameters,
-                    tool.FunctionSchemaIsStrict)
-                    );
-            }
-
-            if (EnableWebSearch)
-            {
-                responseCreationOptions.Tools.Add(ResponseTool.CreateWebSearchTool());
-            }
-
-            if (FileSearchOptions!=null)
-            {
-                responseCreationOptions.Tools.Add(ResponseTool.CreateFileSearchTool(
-                    FileSearchOptions.VectorIDs,
-                    FileSearchOptions.MaxResults,
-                    FileSearchOptions.RankingOptions,
-                    FileSearchOptions.Filters
-                    ));
-            }
-
-            if (EnableComputerCalls)
-            {
-                Size screenSize = ComputerToolUtility.GetScreenSize();
-
-
-                responseCreationOptions.Tools.Add(ResponseTool.CreateComputerTool(ComputerToolEnvironment.Windows, screenSize.Width, screenSize.Height));
-
-                responseCreationOptions.TruncationMode = ResponseTruncationMode.Auto;
-            }
-
-            ResponseTextOptions responseTextOptions = new ResponseTextOptions();
-
-            //Convert Text Format Here
-            if (options.OutputFormat != null)
-            {
-                responseTextOptions.TextFormat = ResponseTextFormat.CreateJsonSchemaFormat(
-                    options.OutputFormat.JsonSchemaFormatName,
-                    options.OutputFormat.JsonSchema,
-                    jsonSchemaIsStrict: true
-                    );
-            }
-
-            responseCreationOptions.TextOptions = responseTextOptions;
-            
-            return (responseItems, responseCreationOptions);
-        }
-
-        public async Task<ModelResponse> HandleStreaming(AsyncCollectionResult<StreamingResponseUpdate> responseUpdates, ModelResponseOptions options, StreamingCallbacks streamingCallback = null)
-        {
-            ModelResponse ResponseOutput = new();
-            ResponseOutput.Model = options.Model;
-            ResponseOutput.OutputFormat = options.OutputFormat ?? null;
-            ResponseOutput.OutputItems = new List<ModelItem>();
-
-            //Convert to possible output types as streaming message is received.
-            await foreach (StreamingResponseUpdate update in responseUpdates)
-            {
-                if (update is StreamingResponseOutputItemDoneUpdate finishedItem)
-                {
-                    ResponseOutput.OutputItems.Add(ConvertFromProviderItem(finishedItem.Item));
-                }
-                if (update is StreamingResponseOutputItemAddedUpdate newItem)
-                {
-                    //Do nothing
-                }
-                else if(update is StreamingResponseCreatedUpdate created)
-                {
-                    streamingCallback?.Invoke(new ModelStreamingCreatedEvent(created.SequenceNumber, created.Response.Id));
-                }
-                else if(update is StreamingResponseCompletedUpdate completed)
-                {
-                    streamingCallback?.Invoke(new ModelStreamingCompletedEvent(completed.SequenceNumber, completed.Response.Id));
-                }
-                else if (update is StreamingResponseOutputItemDoneUpdate completedItem)
-                {
-                    //Do nothing
-                }
-                else if (update is StreamingResponseOutputTextDeltaUpdate deltaUpdate)
-                {
-                    streamingCallback?
-                        .Invoke(new ModelStreamingOutputTextDeltaEvent(deltaUpdate.SequenceNumber, deltaUpdate.OutputIndex, deltaUpdate.ContentIndex, deltaUpdate.Delta, deltaUpdate.ItemId));
-                }
-                else if (update is StreamingResponseFunctionCallArgumentsDeltaUpdate deltaUpdateFuncArgs)
-                {
-                    //streamingCallback?.Invoke($"{deltaUpdateFuncArgs.Delta}");
-                }
-                else if (update is StreamingResponseContentPartAddedUpdate newContent)
-                {
-                    //Do nothing
-                }
-                else if (update is StreamingResponseContentPartDoneUpdate completedContent)
-                {
-                    //Do nothing
-                }
-            }
-
-            //Return results.
-            return ResponseOutput;
+            return apiKey;
         }
 
         public override async Task<ModelResponse> CreateStreamingResponseAsync(List<ModelItem> messages, ModelResponseOptions options, StreamingCallbacks streamingCallback = null)
         {
-            (List<ResponseItem> responseItems, ResponseCreationOptions responseCreationOptions) = SetupOpenAIClient(messages, options);
-
-            return await HandleStreaming(
-                Client.CreateResponseStreamingAsync(responseItems, responseCreationOptions, cancellationToken: CancelTokenSource.Token), 
-                options, 
-                streamingCallback);
+            return await Client.CreateStreamingResponseAsync(messages, options, streamingCallback);
         }
 
         public override async Task<ModelResponse> CreateResponseAsync(List<ModelItem> messages, ModelResponseOptions options)
         {
-            //Convert Model Items to OpenAI Response Items and Options
-            (List<ResponseItem> responseItems, ResponseCreationOptions responseCreationOptions) = SetupOpenAIClient(messages, options);
-
-            //Create Open Ai response
-            OpenAIResponse response = await Client.CreateResponseAsync(responseItems, responseCreationOptions, cancellationToken: CancelTokenSource.Token);
-
-            //Convert the response back to Model
-            List<ModelItem> ModelItems = ConvertFromProviderItems(response, responseItems).ToList();
-
-            //Return results.
-            return new ModelResponse(ModelItems, outputFormat: options.OutputFormat ?? null, messages);
+            
+            return await Client.CreateResponseAsync(messages, options);
         }
     }
 

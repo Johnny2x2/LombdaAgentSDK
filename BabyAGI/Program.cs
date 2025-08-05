@@ -5,17 +5,25 @@ using BabyAGI.BabyAGIStateMachine.Memory;
 using Examples.Demos.FunctionGenerator;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
+using LombdaAgentSDK.StateMachine;
 using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents.Tools;
-
+using LombdaAgentSDK.AgentStateSystem;
+using LombdaAgentSDK.Utility;
 internal class Program
 {
     private static async Task Main(string[] args)
     {
-        ProgramRun programRun = new ProgramRun();
-        await programRun.Run();
+        //ProgramRun programRun = new ProgramRun();
+        //await programRun.Run();
+        FunctionGeneratorAgent agent = new FunctionGeneratorAgent(
+            new BabyAGIRunner("FunctionGeneratorAgent"),
+            Path.Combine(Environment.CurrentDirectory, "Functions"));
+        var graph = agent.ToDotGraph("FunctionGeneratorAgent");
+        Console.WriteLine(graph);
+
     }
 
 

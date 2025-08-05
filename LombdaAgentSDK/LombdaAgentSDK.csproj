@@ -15,8 +15,9 @@
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <PackageId>LombdaAiAgents</PackageId>
     <Authors>Johnny2x2</Authors>
-    <AssemblyVersion>1.7.2</AssemblyVersion>
-    <VersionPrefix>1.7.2</VersionPrefix>
+    <AssemblyVersion>1.8.0</AssemblyVersion>
+    <VersionPrefix>1.8.0</VersionPrefix>
+    <PackageReleaseNotes>Critical Oversight on Instructions not making it on LLM tornado Chat API.. this fixes that and adds some new features as well. </PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

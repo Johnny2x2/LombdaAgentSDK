@@ -1,9 +1,10 @@
 ﻿using BabyAGI.FunctionGenerator.DataModels;
 using Examples.Demos.CodingAgent;
+using LombdaAgentSDK.StateMachine;
 using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.AgentStateSystem;
-using LombdaAgentSDK.StateMachine;
+
 using System;
 using System.Collections.Generic;
 using System.Linq;

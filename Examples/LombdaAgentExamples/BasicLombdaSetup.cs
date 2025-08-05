@@ -5,12 +5,7 @@ using LombdaAgentSDK;
 using LombdaAgentSDK.Agents;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.AgentStateSystem;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using static System.Net.Mime.MediaTypeNames;
+
 namespace Examples.LombdaAgentExamples
 {
     internal class BasicLombdaSetup

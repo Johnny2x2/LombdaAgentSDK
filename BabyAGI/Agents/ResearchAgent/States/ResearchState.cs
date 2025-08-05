@@ -1,7 +1,6 @@
 ﻿using BabyAGI.Agents.ResearchAgent.DataModels;
 using LombdaAgentSDK.Agents.DataClasses;
 using LombdaAgentSDK.Agents;
-using LombdaAgentSDK.StateMachine;
 using LombdaAgentSDK;
 using System;
 using System.Collections.Generic;
@@ -11,6 +10,7 @@ using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using LlmTornado.Responses;
 using LombdaAgentSDK.AgentStateSystem;
+using LombdaAgentSDK.StateMachine;
 
 namespace BabyAGI.Agents.ResearchAgent.States
 {
