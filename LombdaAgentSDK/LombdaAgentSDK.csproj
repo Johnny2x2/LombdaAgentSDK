@@ -15,9 +15,14 @@
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <PackageId>LombdaAiAgents</PackageId>
     <Authors>Johnny2x2</Authors>
-    <AssemblyVersion>1.8.0</AssemblyVersion>
-    <VersionPrefix>1.8.0</VersionPrefix>
-    <PackageReleaseNotes>Critical Oversight on Instructions not making it on LLM tornado Chat API.. this fixes that and adds some new features as well. </PackageReleaseNotes>
+    <AssemblyVersion>2.0.0</AssemblyVersion>
+    <VersionPrefix>2.0.0</VersionPrefix>
+    <PackageReleaseNotes>&gt; [!IMPORTANT] 
+&gt; This project has moved! I have joined forces with 🌪️[LlmTornado](https://github.com/lofcz/LlmTornado) 🚀🚀🚀 Please visit the new repository at and show some love at [LLM Tornado Agents](https://github.com/lofcz/LlmTornado/tree/master/src/LlmTornado.Agents)
+&gt; Many improvements have been made to the system including better architecture, more features, and improved performance.
+&gt; This repo will remain here for historical purposes but will no longer be actively maintained.
+
+</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

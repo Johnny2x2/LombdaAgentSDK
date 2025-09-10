@@ -1,6 +1,18 @@
 # LombdaAgentSDK
+> [!IMPORTANT] 
+> This project has moved! I have joined forces with 🌪️[LlmTornado](https://github.com/lofcz/LlmTornado) 🚀🚀🚀 Please visit the new repository at and show some love at [LLM Tornado Agents](https://github.com/lofcz/LlmTornado/tree/master/src/LlmTornado.Agents)
+> Many improvements have been made to the system including better architecture, more features, and improved performance.
+> This repo will remain here for historical purposes but will no longer be actively maintained.
+
+
+
+
 
 ⚡ **LombdaAgentSDK** is a lightweight C# SDK designed to create and run modular "agents" that can execute tasks, manage state, and communicate with your custom infrastructure. Inspired by modern AI/automation agent patterns, it provides a framework for orchestrating workflows and modular logic with minimal overhead.
+
+
+
+
 
 ---
 > [!CAUTION]
